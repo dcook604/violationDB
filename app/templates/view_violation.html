@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Violation Details | Strata Violation Log</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f8fafc; }
+    .details-box { max-width: 700px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 20px #0001; padding: 2rem; }
+    .logo { display: block; margin: 0 auto 2rem; max-width: 180px; }
+    .label { font-weight: bold; }
+    .row + .row { margin-top: 1em; }
+  </style>
+</head>
+<body>
+  <div class="details-box">
+    <img src="/static/logo.png" alt="Logo" class="logo">
+    <h3 class="mb-4 text-center">Violation Details</h3>
+    <div class="row">
+      <div class="col-md-4 label">Entry Date:</div>
+      <div class="col-md-8">{{ v.incident_date }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Category:</div>
+      <div class="col-md-8">{{ v.category }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Building:</div>
+      <div class="col-md-8">{{ v.building }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Incident Units:</div>
+      <div class="col-md-8">{{ v.unit_number }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Incident Area:</div>
+      <div class="col-md-8">{{ v.incident_area }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Report To:</div>
+      <div class="col-md-8">{{ v.report_to }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Concierge Shift:</div>
+      <div class="col-md-8">{{ v.concierge_shift }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Time:</div>
+      <div class="col-md-8">{{ v.incident_time }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">People Involved:</div>
+      <div class="col-md-8">{{ v.people_involved }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Noticed By:</div>
+      <div class="col-md-8">{{ v.noticed_by }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">People Called:</div>
+      <div class="col-md-8">{{ v.people_called }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Subject:</div>
+      <div class="col-md-8">{{ v.subject }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Details:</div>
+      <div class="col-md-8">{{ v.details }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Initial Action Taken:</div>
+      <div class="col-md-8">{{ v.initial_action }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Resolution:</div>
+      <div class="col-md-8">{{ v.resolution }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Created By (User ID):</div>
+      <div class="col-md-8">{{ v.created_by }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Created At:</div>
+      <div class="col-md-8">{{ v.created_at }}</div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">PDF:</div>
+      <div class="col-md-8">
+        {% if v.pdf_letter_path %}
+          <a href="/{{ v.pdf_letter_path }}" target="_blank" class="btn btn-sm btn-outline-primary">View PDF</a>
+          <a href="/{{ v.pdf_letter_path }}" download class="btn btn-sm btn-outline-success">Download PDF</a>
+        {% else %}-{% endif %}
+      </div>
+    </div>
+    <div class="row">
+      <div class="col-md-4 label">Photos:</div>
+      <div class="col-md-8">
+        {% if v.photo_paths %}
+          {% for p in v.photo_paths.split(',') %}
+            <a href="/{{ p }}" target="_blank">Photo</a>{% if not loop.last %}, {% endif %}
+          {% endfor %}
+        {% else %}-{% endif %}
+      </div>
+    </div>
+    <a href="/violations" class="btn btn-link mt-4">Back to Violations</a>
+  </div>
+</body>
+</html>
