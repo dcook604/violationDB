@@ -1,9 +1,12 @@
+<!-- DEBUG: login.html rendered -->
 {% extends 'base.html' %}
 {% block title %}Login | Strata Violation Log{% endblock %}
 {% block body_class %}login-bg{% endblock %}
-{% block navbar %}{% endblock %}
 {% block head %}{{ super() }}<link rel="stylesheet" href="{{ url_for('static', filename='login.css') }}">{% endblock %}
 {% block container %}
+<h1 style="color: red;">DEBUG: Minimal template rendered</h1>
+
+<p style="color: red; font-weight: bold;">DEBUG: Inside content block</p>
   <div class="d-flex justify-content-center align-items-center min-vh-100">
     <div class="login-card">
       <img src="/static/logo.png" alt="Logo" class="login-logo">

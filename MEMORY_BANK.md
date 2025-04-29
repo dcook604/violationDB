@@ -30,6 +30,8 @@ This file serves as a persistent, human-readable memory bank for the project. It
 - This project is refactored for maintainability, extensibility, and robust access control
 - All new developers should review this file, `ARCHITECTURE.md`, and `README.md` before making changes
 - Note: Registration test still fails, likely due to duplicate email or test DB state not being reset between tests
+- 2025-04-29: Changed Flask development server to run on port 5003 for local testing (previously 5001, originally 5000).
+- 2025-04-29: Fixed login, register, and reset password templates by moving form content from block 'container' to block 'content', ensuring forms render as intended.
 
 ---
 

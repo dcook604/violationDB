@@ -4,6 +4,11 @@ A modern, modular web application for logging, managing, and reporting strata vi
 
 ---
 
+## Changelog
+
+2025-04-29: Fixed login, register, and reset password templates to display forms correctly by moving content from block 'container' to block 'content' as per base.html structure.
+2025-04-29: Added missing 'remember' BooleanField to LoginForm so login page renders correctly.
+
 ## Table of Contents
 - [Features](#features)
 - [Project Structure](#project-structure)
