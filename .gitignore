@@ -1,0 +1,35 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDE/tools
+.cache/
+.windsurf-server/
+.codeium/
+*.sqlite
+*.db
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Other
+.env
+.env.*
+*.log
+
+# Ignore large files and artifacts
+*.so
+*.bin
+*.exe
+*.dll
+*.zip
+*.tar.gz
+*.tar.bz2
+*.egg-info/
+
+# Ignore uploads and generated files
+uploads/
