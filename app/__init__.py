@@ -31,10 +31,12 @@ def create_app():
     login_manager.login_view = 'auth.login'
     mail.init_app(app)
 
-    from . import routes, models, auth_routes
+    from . import routes, models, auth_routes, admin_routes, user_routes
     from .violation_routes import violation_bp
     app.register_blueprint(routes.bp)
     app.register_blueprint(auth_routes.auth_bp)
+    app.register_blueprint(admin_routes.admin_bp)
     app.register_blueprint(violation_bp)
+    app.register_blueprint(user_routes.bp)
 
     return app
