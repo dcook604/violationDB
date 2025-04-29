@@ -1,8 +1,16 @@
 import os
+import logging
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_mail import Mail
+
+# Configure logging to save errors to flask_error.log
+logging.basicConfig(
+    filename='flask_error.log',
+    level=logging.ERROR,
+    format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+)
 
 db = SQLAlchemy()
 login_manager = LoginManager()
