@@ -7,8 +7,8 @@
       {{ form.hidden_tag() }}
       <div class="row mb-3">
         <div class="col">
-          {{ form.entry_date.label(class="form-label") }}
-          {{ form.entry_date(class="form-control") }}
+          {{ form.incident_date.label(class="form-label") }}
+          {{ form.incident_date(class="form-control") }}
               <option value="">Select a Category</option>
               {% for cat in categories %}<option>{{ cat }}</option>{% endfor %}
             </select>
@@ -89,9 +89,19 @@
           <label class="form-label">Upload PDFs</label>
           <input type="file" name="pdfs" class="form-control" accept="application/pdf" multiple>
         </div>
-        <button type="submit" class="btn btn-primary w-100">Submit Violation</button>
-        <a href="/" class="btn btn-link mt-2">Cancel</a>
-      </form>
-    </div>
-  </body>
-</html>
+        {% if custom_fields %}
+        <div class="mb-3">
+          <label class="form-label">Additional Information</label>
+        </div>
+        {% for field in custom_fields %}
+        <div class="mb-3">
+          <label class="form-label">{{ field.label }}</label>
+          <input type="{{ field.type }}" name="custom_{{ field.name }}" class="form-control">
+        </div>
+        {% endfor %}
+      {% endif %}
+      <button type="submit" class="btn btn-primary w-100">Submit Violation</button>
+      <a href="/" class="btn btn-link mt-2">Cancel</a>
+    </form>
+  </div>
+{% endblock %}

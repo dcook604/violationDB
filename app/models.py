@@ -11,6 +11,8 @@ class User(UserMixin, db.Model):
 
 class Violation(db.Model):
     __tablename__ = 'violations'
+    reference = db.Column(db.String(32), unique=True, nullable=False, index=True)
+    extra_fields = db.Column(db.JSON, default=dict)
     id = db.Column(db.Integer, primary_key=True)
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     resident_name = db.Column(db.String(120))

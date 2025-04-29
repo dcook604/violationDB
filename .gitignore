@@ -33,3 +33,9 @@ Thumbs.db
 
 # Ignore uploads and generated files
 uploads/
+
+# Ignore all test directories and test files
+tests/
+**/tests/
+**/test_*
+**/*_test.py

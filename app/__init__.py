@@ -16,10 +16,13 @@ def create_app():
 
     db.init_app(app)
     login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
     mail.init_app(app)
 
     from . import routes, models, auth
+    from .violation_routes import violation_bp
     app.register_blueprint(routes.bp)
     app.register_blueprint(auth.bp)
+    app.register_blueprint(violation_bp)
 
     return app

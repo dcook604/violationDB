@@ -14,6 +14,18 @@
 </head>
 <body>
   <div class="violations-box">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div>
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
     <img src="/static/logo.png" alt="Logo" class="logo">
     <h3 class="mb-4 text-center">Past Violations</h3>
     <form method="get" class="row g-3 mb-4">
@@ -39,6 +51,7 @@
       <table class="table table-bordered table-hover align-middle">
         <thead class="table-light">
           <tr>
+            <th>Reference</th>
             <th>Date</th>
             <th>Category</th>
             <th>Unit(s)</th>
@@ -53,6 +66,7 @@
         <tbody>
           {% for v in violations %}
           <tr>
+            <td>{{ v.reference }}</td>
             <td>{{ v.incident_date or '' }}</td>
             <td>{{ v.category or '' }}</td>
             <td>{{ v.unit_number or '' }}</td>

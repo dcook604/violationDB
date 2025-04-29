@@ -1,4 +1,29 @@
-# Strata Violation Logging App — Architectural & Design Decisions
+# Strata Violation Logging App — Architectural, Design & Product Decisions
+
+## Product Design
+
+### Product Goals
+- Provide a secure, modern platform for logging, tracking, and managing strata violations.
+- Support both regular users (residents, staff) and administrators (property managers, council).
+- Ensure data privacy, auditability, and a clear workflow for violation resolution.
+
+### User Roles
+- **Regular User:** Can log in, submit new violations, view their own violations, and receive notifications.
+- **Admin User:** Can view all violations, manage users (promote/demote admin), and edit/delete any violation.
+
+### Key User Stories
+- As a resident, I want to submit a violation report with supporting files so that issues can be addressed promptly.
+- As an admin, I want to manage user roles and review all violation reports to ensure proper follow-up.
+- As any user, I want a clear, modern dashboard with easy access to my relevant actions.
+- As an admin, I want to generate and send PDF reports for official records.
+
+### Product Rationale
+- **Role-based access** ensures sensitive data is only visible to authorized users.
+- **Modular blueprints** enable future extensibility (e.g., adding analytics, notifications).
+- **Modern UI/UX** (Bootstrap, flash messages, responsive design) increases adoption and reduces training needs.
+- **Test exclusion from VCS**: Tests are not included in production deployments for security and size reasons, but are required for local/dev quality assurance.
+
+---
 
 ## 1. Blueprint Separation
 - App is split into multiple Flask blueprints:

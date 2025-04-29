@@ -24,10 +24,12 @@ A modern, modular web application for logging, managing, and reporting strata vi
 - PDF generation for each violation (WeasyPrint)
 - Email notifications with PDF attachments (Flask-Mail)
 - Admin panel for user management (promote/demote admin)
+- Modular blueprints: admin features in admin_routes.py, authentication in auth_routes.py, violations in violation_routes.py
 - Searchable/filterable violations table
 - Role-based access control (admin vs. regular user)
 - Clean, modern UI (Bootstrap, logo, responsive)
 - Modular codebase (blueprints, WTForms, config, utils)
+- Tests are excluded from version control by .gitignore for production deployments
 
 ---
 
@@ -39,9 +41,9 @@ app/
   forms.py            # WTForms classes for all forms
   config.py           # Configuration (env vars, secrets, DB, mail)
   utils.py            # File uploads, PDF, email helpers
-  auth_routes.py      # Auth (login, logout, register, reset)
-  violation_routes.py # Violation CRUD and viewing
-  admin_routes.py     # Admin user management
+  admin_routes.py     # Admin panel routes (user management)
+  auth_routes.py      # Authentication routes (login, registration, reset)
+  violation_routes.py # Violation reporting and management
   templates/          # Jinja2 templates (all inherit from base.html)
   static/             # Logo, CSS, JS
   uploads/            # User-uploaded files (photos, PDFs)
@@ -53,6 +55,9 @@ requirements.txt      # Python dependencies
 ---
 
 ## Setup & Installation
+
+### Requirements
+- All dependencies are listed in requirements.txt, including Flask-WTF and pytest for forms and testing.
 1. **Clone the repo:**
    ```bash
    git clone <repo-url>
