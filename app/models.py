@@ -1,71 +1,147 @@
 from . import db
 from flask_login import UserMixin
-from datetime import datetime
+from datetime import datetime, timedelta
 import secrets
+from werkzeug.security import generate_password_hash, check_password_hash
+
+class UserError(Exception):
+    """Base exception for user-related errors"""
+    pass
+
+class InvalidRoleError(UserError):
+    """Raised when an invalid role is assigned"""
+    pass
 
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
+    
+    # Role constants
+    ROLE_USER = 'user'
+    ROLE_MANAGER = 'manager'
+    ROLE_ADMIN = 'admin'
+    VALID_ROLES = [ROLE_USER, ROLE_MANAGER, ROLE_ADMIN]
+    
+    # Database columns
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=False)
-    role = db.Column(db.String(50), default='user')  # Possible values: 'user', 'manager', 'admin'
+    role = db.Column(db.String(50), default=ROLE_USER)
     temp_password = db.Column(db.String(128))
     temp_password_expiry = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
 
+    @classmethod
+    def generate_temp_password(cls, length=12):
+        """Generate a secure temporary password
+        
+        Args:
+            length (int): Length of the temporary password
+            
+        Returns:
+            str: Secure temporary password
+        """
+        return secrets.token_urlsafe(length)
+
     def promote_to_admin(self):
+        """Promote user to admin role with full privileges"""
         self.is_admin = True
         self.is_active = True
-        self.role = 'admin'
+        self.role = self.ROLE_ADMIN
         db.session.commit()
 
     def activate(self, is_admin=False):
+        """Activate user account
+        
+        Args:
+            is_admin (bool): Whether to also grant admin privileges
+        """
         self.is_active = True
-        self.is_admin = is_admin
         if is_admin:
-            self.role = 'admin'
+            self.is_admin = True
+            self.role = self.ROLE_ADMIN
         db.session.commit()
 
     def set_role(self, role):
-        valid_roles = ['user', 'manager', 'admin']
-        if role not in valid_roles:
-            raise ValueError(f"Invalid role. Must be one of: {', '.join(valid_roles)}")
+        """Set user role with validation
+        
+        Args:
+            role (str): New role to assign
+            
+        Raises:
+            InvalidRoleError: If role is not valid
+        """
+        if role not in self.VALID_ROLES:
+            raise InvalidRoleError(f"Invalid role. Must be one of: {', '.join(self.VALID_ROLES)}")
+        
         self.role = role
-        if role == 'admin':
+        if role == self.ROLE_ADMIN:
             self.is_admin = True
+            self.is_active = True
         db.session.commit()
 
     def set_temporary_password(self, expiry_hours=24):
-        """Set a temporary password that expires after the specified hours"""
-        temp_pass = secrets.token_urlsafe(12)  # Generate a secure random password
-        from werkzeug.security import generate_password_hash
+        """Set a temporary password that expires after specified hours
+        
+        Args:
+            expiry_hours (int): Hours until password expires
+            
+        Returns:
+            str: Plain text temporary password
+        """
+        temp_pass = self.generate_temp_password()
         self.temp_password = generate_password_hash(temp_pass)
-        self.temp_password_expiry = datetime.utcnow() + datetime.timedelta(hours=expiry_hours)
+        self.temp_password_expiry = datetime.utcnow() + timedelta(hours=expiry_hours)
         db.session.commit()
-        return temp_pass  # Return the plain text temporary password
+        return temp_pass
 
     def check_temporary_password(self, password):
-        """Check if the provided password matches the temporary password and hasn't expired"""
+        """Check if temporary password is valid and not expired
+        
+        Args:
+            password (str): Password to check
+            
+        Returns:
+            bool: True if password is valid and not expired
+        """
         if not self.temp_password or not self.temp_password_expiry:
             return False
         if datetime.utcnow() > self.temp_password_expiry:
             return False
-        from werkzeug.security import check_password_hash
         return check_password_hash(self.temp_password, password)
 
     def clear_temporary_password(self):
-        """Clear the temporary password"""
+        """Clear temporary password and expiry"""
         self.temp_password = None
         self.temp_password_expiry = None
         db.session.commit()
 
     def update_last_login(self):
-        """Update the last login timestamp"""
+        """Update last login timestamp to current UTC time"""
         self.last_login = datetime.utcnow()
         db.session.commit()
+
+    def set_password(self, password):
+        """Set user's password hash
+        
+        Args:
+            password (str): Plain text password to hash and store
+        """
+        self.password_hash = generate_password_hash(password)
+        db.session.commit()
+
+    def check_password(self, password):
+        """Check if password matches stored hash
+        
+        Args:
+            password (str): Password to check
+            
+        Returns:
+            bool: True if password matches
+        """
+        return check_password_hash(self.password_hash, password)
 
 class Violation(db.Model):
     __tablename__ = 'violations'

@@ -1,0 +1,96 @@
+# User Management Quick Reference
+
+## User Roles
+| Role    | Access Level | Permissions                    |
+|---------|-------------|--------------------------------|
+| user    | Basic       | Access own account             |
+| manager | Extended    | View/manage violations         |
+| admin   | Full        | Full system administration     |
+
+## API Methods Quick Reference
+
+### User Creation
+```python
+# Create new user
+user = User(email="user@example.com", role="user")
+user.set_temporary_password()  # Returns temporary password
+
+# Generate temporary password
+temp_pass = User.generate_temp_password()
+```
+
+### Role Management
+```python
+# Set user role
+user.set_role('manager')  # Options: 'user', 'manager', 'admin'
+
+# Promote to admin
+user.promote_to_admin()  # Sets role='admin' and is_admin=True
+
+# Activate user
+user.activate(is_admin=False)  # Optional admin promotion
+```
+
+### Password Management
+```python
+# Set temporary password
+temp_pass = user.set_temporary_password(expiry_hours=24)
+
+# Check temporary password
+is_valid = user.check_temporary_password(password)
+
+# Clear temporary password
+user.clear_temporary_password()
+```
+
+## Common Operations
+
+### User Creation
+```python
+# Admin creates new user
+temp_password = User.generate_temp_password()
+user = User(
+    email=email,
+    password_hash=generate_password_hash(temp_password),
+    role=role,
+    is_active=True
+)
+db.session.add(user)
+db.session.commit()
+```
+
+### Password Reset
+```python
+# Admin resets user password
+temp_pass = user.set_temporary_password()
+# User must change on next login
+```
+
+### Role Updates
+```python
+# Change user role
+user.set_role('manager')
+# Automatically handles admin status
+```
+
+## Configuration Parameters
+
+### Password Settings
+- Temporary password length: 12 characters
+- Expiry time: 24 hours (configurable)
+- Minimum password length: 8 characters
+
+### Security Settings
+- Session timeout: 1 hour
+- Max login attempts: 5
+- Password hash algorithm: SHA256
+
+## Common Error Codes
+
+| Error Code | Description                  | Resolution                    |
+|------------|------------------------------|-------------------------------|
+| 401        | Unauthorized access          | Check login credentials      |
+| 403        | Insufficient permissions     | Verify user role            |
+| 404        | User not found              | Verify user ID              |
+| 409        | Email already exists        | Use different email         |
+| 500        | Database operation failed   | Check logs for details      | 
