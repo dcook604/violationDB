@@ -34,3 +34,43 @@ This file serves as a persistent, human-readable memory bank for the project. It
 ---
 
 *For updates, add new memories or key decisions below this line:*
+
+---
+
+## [2025-04-29] Application Structure & Implementation Review
+
+### Blueprints
+- **auth_routes.py**: Handles authentication (login, logout, registration, password reset).
+- **violation_routes.py**: Handles violation CRUD, custom fields, and related admin actions.
+- **admin_routes.py**: Handles user management (promote/demote admin).
+- **routes.py**: Main dashboard, registration, and password reset (some overlap with auth_routes).
+
+### Models
+- **User**: `id`, `email`, `password_hash`, `is_admin` (role-based access).
+- **Violation**: Rich schema for violations, including `reference`, `category`, `details`, `extra_fields` (JSON), and metadata for incident and reporting.
+
+### Forms
+- **LoginForm, RegisterForm, ResetPasswordForm**: WTForms for authentication.
+- **ViolationForm**: WTForms for violation entry, supports dynamic/custom fields.
+
+### Utilities
+- **utils.py**: File upload, PDF generation (WeasyPrint), and email (Flask-Mail) helpers.
+
+### Templates
+- All templates inherit from `base.html` for consistent UI.
+- Custom fields for violations are managed via JSON file and rendered dynamically in forms.
+
+### Other Notes
+- Uses Flask-Login for authentication and role-based access control.
+- Uses SQLAlchemy ORM for persistence.
+- **Production database is MariaDB (see `SQLALCHEMY_DATABASE_URI` in `config.py`). Project was migrated from SQLite to MariaDB for better scalability and production reliability.**
+- Admin users can manage custom violation fields and promote/demote users.
+- Project is modular and follows best practices for maintainability and extensibility.
+
+### Persistent Context (Update)
+- The actual implementation matches the architectural intent described above.
+- No evidence of a separate "memory bank" feature for user notes or logs; all persistent data is related to users and violations.
+- Custom violation fields are managed via a JSON file and admin interface.
+- Test isolation is handled via in-memory SQLite in pytest fixtures.
+
+---
