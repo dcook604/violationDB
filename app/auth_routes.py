@@ -1,10 +1,14 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response, session
 from flask_login import login_user, logout_user, login_required, current_user
-from .models import User
+from .models import User, AccountLockedError
 from werkzeug.security import check_password_hash, generate_password_hash
 from . import db
 from functools import wraps
 from datetime import datetime
+import logging
+
+# Set up logger
+logger = logging.getLogger(__name__)
 
 auth = Blueprint('auth', __name__)
 
@@ -107,74 +111,111 @@ def login():
         password = data.get('password', '').strip()
 
         if not email or not password:
-            print(f"Login attempt failed: Email or password missing. Email: {bool(email)}, Password: {bool(password)}")
+            logger.warning(f"Login attempt failed: Email or password missing. Email: {bool(email)}, Password: {bool(password)}")
             return jsonify({'error': 'Email and password are required'}), 400
 
         user = User.query.filter_by(email=email).first()
         
         if not user:
-            print(f"Login attempt failed: User {email} not found.")
+            logger.warning(f"Login attempt failed: User {email} not found.")
+            # Return same error message to avoid user enumeration
             return jsonify({'error': 'Invalid credentials'}), 401
 
         if not user.password_hash:
-            print(f"Login attempt failed: User {email} has no password hash set.")
+            logger.warning(f"Login attempt failed: User {email} has no password hash set.")
             return jsonify({'error': 'Account not properly configured'}), 401
-
-        if check_password_hash(user.password_hash, password):
-            if not user.is_active:
-                print(f"Login attempt failed: User {email} is inactive.")
-                return jsonify({'error': 'Account pending approval'}), 403
+        
+        # Check if account is locked
+        if user.is_account_locked():
+            lockout_time = user.account_locked_until
+            logger.warning(f"Login attempt for locked account: {email}. Locked until {lockout_time}")
+            return jsonify({'error': 'Account temporarily locked due to too many failed attempts. Please try again later.'}), 423
+            
+        try:
+            # Verify the password
+            if user.check_password(password):
+                if not user.is_active:
+                    logger.warning(f"Login attempt failed: User {email} is inactive.")
+                    return jsonify({'error': 'Account pending approval'}), 403
+                    
+                # Check if we need to migrate password to Argon2id
+                if user.password_algorithm != 'argon2' or not user.password_hash.startswith('$argon2'):
+                    user.migrate_to_argon2(password)
+                    logger.info(f"Migrated password hash for user {email} to Argon2id")
                 
-            # Set session as permanent
-            session.permanent = True
-            
-            # Explicitly login user
-            login_user(user, remember=True)
-            print(f"User {email} logged in successfully.")
-            
-            # Create response with user data
-            user_data = {
-                'id': user.id,
-                'email': user.email,
-                'role': 'admin' if current_user.is_admin else 'user',
-                'is_admin': current_user.is_admin  # Explicitly include is_admin boolean
-            }
-            
-            # Create a response object with proper CORS headers for specific origin
-            response = make_response(jsonify({'user': user_data}))
-            
-            # Get the origin from the request
-            origin = request.headers.get('Origin')
-            allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
-            
-            # Only set CORS headers for allowed origins
-            if origin and origin in allowed_origins:
-                response.headers['Access-Control-Allow-Origin'] = origin
-                response.headers['Access-Control-Allow-Credentials'] = 'true'
-            
-            # Manually set a test cookie for troubleshooting
-            response.set_cookie(
-                'test_auth', 
-                'authenticated', 
-                httponly=False,
-                secure=False,
-                samesite='Lax',
-                path='/',
-                max_age=86400
-            )
-            
-            # Print debug info
-            print("Response headers:", dict(response.headers))
-            
-            return response
-        else:
-            print(f"Login attempt failed: Invalid password for user {email}.")
-            return jsonify({'error': 'Invalid credentials'}), 401
-            
+                # Set session as permanent
+                session.permanent = True
+                
+                # Explicitly login user
+                login_user(user, remember=True)
+                logger.info(f"User {email} logged in successfully.")
+                
+                # Update last login and reset failed attempts
+                user.update_last_login()
+                
+                # Create response with user data
+                user_data = {
+                    'id': user.id,
+                    'email': user.email,
+                    'role': 'admin' if current_user.is_admin else 'user',
+                    'is_admin': current_user.is_admin  # Explicitly include is_admin boolean
+                }
+                
+                # Create a response object with proper CORS headers for specific origin
+                response = make_response(jsonify({'user': user_data}))
+                
+                # Get the origin from the request
+                origin = request.headers.get('Origin')
+                allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
+                
+                # Only set CORS headers for allowed origins
+                if origin and origin in allowed_origins:
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                
+                # Manually set a test cookie for troubleshooting
+                response.set_cookie(
+                    'test_auth', 
+                    'authenticated', 
+                    httponly=False,
+                    secure=False,
+                    samesite='Lax',
+                    path='/',
+                    max_age=86400
+                )
+                
+                # Print debug info
+                logger.debug("Response headers: %s", dict(response.headers))
+                
+                return response
+            else:
+                # Record the failed login attempt
+                user.record_failed_login()
+                
+                # Get remaining attempts before lockout
+                remaining_attempts = User.MAX_FAILED_ATTEMPTS - user.failed_login_attempts
+                
+                if remaining_attempts <= 0:
+                    logger.warning(f"Account locked: User {email} exceeded maximum failed login attempts.")
+                    return jsonify({'error': 'Account locked due to too many failed attempts. Please try again later.'}), 423
+                elif remaining_attempts <= 3:
+                    # Warn user about remaining attempts
+                    logger.warning(f"Login attempt failed: Invalid password for user {email}. {remaining_attempts} attempts remaining.")
+                    return jsonify({
+                        'error': f'Invalid credentials. You have {remaining_attempts} attempts remaining before your account is temporarily locked.'
+                    }), 401
+                else:
+                    logger.warning(f"Login attempt failed: Invalid password for user {email}.")
+                    return jsonify({'error': 'Invalid credentials'}), 401
+                    
+        except AccountLockedError as e:
+            logger.warning(f"Login attempt on locked account: {email}. {str(e)}")
+            return jsonify({'error': 'Account temporarily locked due to too many failed attempts. Please try again later.'}), 423
+                
     except Exception as e:
-        print(f"Login error: {str(e)}")
+        logger.error(f"Login error: {str(e)}")
         import traceback
-        print(traceback.format_exc())
+        logger.error(traceback.format_exc())
         return jsonify({'error': 'Authentication error occurred'}), 500
 
 @auth.route('/api/auth/logout', methods=['POST', 'OPTIONS'])
@@ -358,3 +399,35 @@ def user_debug():
         return jsonify({
             'error': f'Error retrieving debug information: {str(e)}'
         }), 500
+
+@auth.route('/api/auth/unlock-account', methods=['POST', 'OPTIONS'])
+@cors_preflight
+@login_required
+def unlock_account():
+    """Admin endpoint to unlock a locked user account"""
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    # Verify admin permissions
+    if not current_user.is_admin:
+        return jsonify({'error': 'Admin permissions required'}), 403
+    
+    try:
+        data = request.get_json()
+        if not data or 'user_id' not in data:
+            return jsonify({'error': 'User ID is required'}), 400
+            
+        user_id = data['user_id']
+        user = User.query.get(user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        user.unlock_account()
+        logger.info(f"Account unlocked: User {user.email} by admin {current_user.email}")
+        
+        return jsonify({'message': f'Account for {user.email} has been unlocked successfully.'}), 200
+        
+    except Exception as e:
+        logger.error(f"Error unlocking account: {str(e)}")
+        return jsonify({'error': 'Failed to unlock account'}), 500

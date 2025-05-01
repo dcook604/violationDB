@@ -190,3 +190,60 @@ def get_violations():
 - Improved styling for HTML/PDF document links
 - Better visibility with distinct button designs
 - Updated API to ensure document links are always available 
+
+# Security Enhancements
+
+## Password Security
+
+### Argon2id Password Hashing
+- Uses Argon2id, the winner of the Password Hashing Competition
+- Configured with time_cost=3, memory_cost=65536 (64MB), parallelism=4
+- Automatically migrates passwords from Werkzeug's default hashing
+- Includes automatic hash rehashing when parameters change
+
+### Account Lockout
+```python
+class User(UserMixin, db.Model):
+    # Max failed login attempts before lockout
+    MAX_FAILED_ATTEMPTS = 10
+    
+    # Account lockout fields
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    last_failed_login = db.Column(db.DateTime)
+    account_locked_until = db.Column(db.DateTime)
+    password_algorithm = db.Column(db.String(20), default='argon2')
+```
+
+## Login Security
+
+### Failed Login Handling
+- Tracks failed login attempts per user
+- Provides warnings when approaching the lockout threshold
+- Temporarily locks accounts after 10 failed attempts
+- 30-minute automatic lockout period
+
+### Account Unlocking
+```python
+@auth.route('/api/auth/unlock-account', methods=['POST', 'OPTIONS'])
+@cors_preflight
+@login_required
+def unlock_account():
+    """Admin endpoint to unlock a locked user account"""
+    if not current_user.is_admin:
+        return jsonify({'error': 'Admin permissions required'}), 403
+    
+    # ... implementation details ...
+```
+
+## Security Migration
+
+### Database Migration
+- Updated password_hash field length to accommodate Argon2id hashes
+- Added fields for tracking login attempts and account locks
+- Migration includes both Alembic and direct SQL scripts
+- Graceful handling of existing password hashes
+
+### Password Migration
+- Seamless migration during user login
+- No user disruption during transition
+- Multiple hash verification strategies for compatibility 

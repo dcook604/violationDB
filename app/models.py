@@ -3,6 +3,16 @@ from flask_login import UserMixin
 from datetime import datetime, timedelta
 import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
+import argon2
+
+# Create Argon2 password hasher
+ph = argon2.PasswordHasher(
+    time_cost=3,       # Number of iterations
+    memory_cost=65536, # Memory usage in kibibytes (64MB)
+    parallelism=4,     # Number of parallel threads
+    hash_len=32,       # Length of the hash in bytes
+    salt_len=16        # Length of the random salt in bytes
+)
 
 class UserError(Exception):
     """Base exception for user-related errors"""
@@ -10,6 +20,10 @@ class UserError(Exception):
 
 class InvalidRoleError(UserError):
     """Raised when an invalid role is assigned"""
+    pass
+
+class AccountLockedError(UserError):
+    """Raised when login is attempted on a locked account"""
     pass
 
 class User(UserMixin, db.Model):
@@ -21,17 +35,26 @@ class User(UserMixin, db.Model):
     ROLE_ADMIN = 'admin'
     VALID_ROLES = [ROLE_USER, ROLE_MANAGER, ROLE_ADMIN]
     
+    # Max failed login attempts before lockout
+    MAX_FAILED_ATTEMPTS = 10
+    
     # Database columns
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)  # Increased length for Argon2
     is_admin = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=False)
     role = db.Column(db.String(50), default=ROLE_USER)
-    temp_password = db.Column(db.String(128))
+    temp_password = db.Column(db.String(255))  # Increased length for Argon2
     temp_password_expiry = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_login = db.Column(db.DateTime)
+    
+    # New columns for account lockout
+    failed_login_attempts = db.Column(db.Integer, default=0)
+    last_failed_login = db.Column(db.DateTime)
+    account_locked_until = db.Column(db.DateTime)
+    password_algorithm = db.Column(db.String(20), default='argon2')  # Track password hash algorithm
 
     @classmethod
     def generate_temp_password(cls, length=12):
@@ -92,7 +115,10 @@ class User(UserMixin, db.Model):
             str: Plain text temporary password
         """
         temp_pass = self.generate_temp_password()
-        self.temp_password = generate_password_hash(temp_pass)
+        if self.password_algorithm == 'argon2':
+            self.temp_password = ph.hash(temp_pass)
+        else:
+            self.temp_password = generate_password_hash(temp_pass)
         self.temp_password_expiry = datetime.utcnow() + timedelta(hours=expiry_hours)
         db.session.commit()
         return temp_pass
@@ -110,7 +136,18 @@ class User(UserMixin, db.Model):
             return False
         if datetime.utcnow() > self.temp_password_expiry:
             return False
-        return check_password_hash(self.temp_password, password)
+            
+        # Check if account is locked
+        if self.is_account_locked():
+            return False
+            
+        try:
+            if self.password_algorithm == 'argon2' and self.temp_password.startswith('$argon2'):
+                return ph.verify(self.temp_password, password)
+            else:
+                return check_password_hash(self.temp_password, password)
+        except Exception:
+            return False
 
     def clear_temporary_password(self):
         """Clear temporary password and expiry"""
@@ -119,8 +156,10 @@ class User(UserMixin, db.Model):
         db.session.commit()
 
     def update_last_login(self):
-        """Update last login timestamp to current UTC time"""
+        """Update last login timestamp to current UTC time and reset failed attempts"""
         self.last_login = datetime.utcnow()
+        self.failed_login_attempts = 0
+        self.account_locked_until = None
         db.session.commit()
 
     def set_password(self, password):
@@ -129,7 +168,20 @@ class User(UserMixin, db.Model):
         Args:
             password (str): Plain text password to hash and store
         """
-        self.password_hash = generate_password_hash(password)
+        if self.password_algorithm == 'argon2':
+            self.password_hash = ph.hash(password)
+        else:
+            self.password_hash = generate_password_hash(password)
+        db.session.commit()
+        
+    def migrate_to_argon2(self, password):
+        """Migrate user's password to Argon2id hash
+        
+        Args:
+            password (str): Plain text password to rehash
+        """
+        self.password_hash = ph.hash(password)
+        self.password_algorithm = 'argon2'
         db.session.commit()
 
     def check_password(self, password):
@@ -141,7 +193,66 @@ class User(UserMixin, db.Model):
         Returns:
             bool: True if password matches
         """
-        return check_password_hash(self.password_hash, password)
+        # Check if account is locked
+        if self.is_account_locked():
+            raise AccountLockedError(f"Account locked until {self.account_locked_until}")
+            
+        try:
+            # If using Argon2id
+            if self.password_algorithm == 'argon2' and self.password_hash.startswith('$argon2'):
+                is_valid = ph.verify(self.password_hash, password)
+                
+                # Check if hash needs rehashing (parameters changed, etc)
+                if ph.check_needs_rehash(self.password_hash):
+                    self.password_hash = ph.hash(password)
+                    db.session.commit()
+                
+                return is_valid
+            else:
+                # Using Werkzeug's check_password_hash for older hashes
+                return check_password_hash(self.password_hash, password)
+                
+        except argon2.exceptions.VerifyMismatchError:
+            self.record_failed_login()
+            return False
+        except Exception:
+            self.record_failed_login()
+            return False
+            
+    def record_failed_login(self):
+        """Record a failed login attempt and lock account if needed"""
+        self.failed_login_attempts += 1
+        self.last_failed_login = datetime.utcnow()
+        
+        # Lock account if max attempts reached
+        if self.failed_login_attempts >= self.MAX_FAILED_ATTEMPTS:
+            # Lock for 30 minutes
+            self.account_locked_until = datetime.utcnow() + timedelta(minutes=30)
+            
+        db.session.commit()
+        
+    def is_account_locked(self):
+        """Check if account is currently locked
+        
+        Returns:
+            bool: True if account is locked
+        """
+        if not self.account_locked_until:
+            return False
+            
+        # If lock time has passed, unlock the account
+        if datetime.utcnow() > self.account_locked_until:
+            self.account_locked_until = None
+            db.session.commit()
+            return False
+            
+        return True
+        
+    def unlock_account(self):
+        """Manually unlock a locked account"""
+        self.failed_login_attempts = 0
+        self.account_locked_until = None
+        db.session.commit()
 
 class Violation(db.Model):
     __tablename__ = 'violations'
