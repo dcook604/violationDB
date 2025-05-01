@@ -43,17 +43,26 @@ def api_create_user():
     if not data.get('email') or not data.get('role'):
         return jsonify({'error': 'Email and role are required'}), 400
     try:
-        temp_password = User.generate_temp_password() if hasattr(User, 'generate_temp_password') else 'changeme123'
+        # Use provided password if available, otherwise use default or generate
+        if data.get('password'):
+            password = data['password']
+        else:
+            password = User.generate_temp_password() if hasattr(User, 'generate_temp_password') else 'changeme123'
+            
         user = User(
             email=data['email'],
-            password_hash=generate_password_hash(temp_password),
+            password_hash=generate_password_hash(password),
             role=data['role'],
             is_active=data.get('is_active', True),
             is_admin=(data['role'] == 'admin')
         )
         db.session.add(user)
         db.session.commit()
-        return jsonify({'message': 'User created', 'id': user.id, 'temp_password': temp_password}), 201
+        # Only return the password in the response if it was auto-generated
+        result = {'message': 'User created', 'id': user.id}
+        if not data.get('password'):
+            result['temp_password'] = password
+        return jsonify(result), 201
     except IntegrityError:
         db.session.rollback()
         return jsonify({'error': 'Email address already registered'}), 400

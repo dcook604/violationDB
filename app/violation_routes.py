@@ -144,19 +144,34 @@ def api_create_violation():
             
             # Create the HTML file
             html_path, html_content = create_violation_html(violation, field_defs)
+            current_app.logger.info(f"HTML generated successfully for violation {violation.id}")
             
             # Generate the PDF file
+            current_app.logger.info(f"Starting PDF generation for violation {violation.id}")
             pdf_path = generate_violation_pdf(violation, html_content)
             
+            # Verify the PDF was created successfully
+            if os.path.exists(pdf_path) and os.path.getsize(pdf_path) > 0:
+                current_app.logger.info(f"PDF generated successfully at {pdf_path} ({os.path.getsize(pdf_path)} bytes)")
+            else:
+                current_app.logger.error(f"PDF generation issue: file is empty or missing at {pdf_path}")
+            
             # Send email notification
-            send_violation_notification(violation, html_path)
+            try:
+                send_violation_notification(violation, html_path)
+                current_app.logger.info(f"Email notification sent for violation {violation.id}")
+            except Exception as email_err:
+                current_app.logger.error(f"Error sending email notification: {str(email_err)}")
             
             # Store the HTML and PDF paths in the database
             violation.html_path = os.path.relpath(html_path, current_app.config['BASE_DIR'])
             violation.pdf_path = os.path.relpath(pdf_path, current_app.config['BASE_DIR'])
             db.session.commit()
+            current_app.logger.info(f"Updated violation record with HTML and PDF paths")
         except Exception as e:
-            current_app.logger.error(f"Error generating violation files: {str(e)}")
+            current_app.logger.error(f"Error in document generation process: {str(e)}")
+            import traceback
+            current_app.logger.error(f"Traceback: {traceback.format_exc()}")
         
         return jsonify({
             'id': violation.id,
@@ -202,21 +217,31 @@ def download_violation_pdf(vid):
     pdf_dir = os.path.join(current_app.config['BASE_DIR'], 'pdf_violations')
     pdf_path = os.path.join(pdf_dir, f'violation_{vid}.pdf')
     
-    # If the file doesn't exist, create it
-    if not os.path.exists(pdf_path):
+    # If the file doesn't exist or is empty, create it
+    if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
         try:
+            current_app.logger.info(f"Generating PDF for violation {vid}")
             pdf_path = generate_violation_pdf(violation)
+            
+            # Verify the PDF was generated and is not empty
+            if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
+                current_app.logger.error(f"Generated PDF is empty or missing: {pdf_path}")
+                abort(500, description="Could not generate valid PDF")
         except Exception as e:
             current_app.logger.error(f"Error generating PDF: {str(e)}")
             abort(500, description="Could not generate PDF")
     
     # Serve the PDF file
-    return send_file(
-        pdf_path, 
-        download_name=f"violation_{violation.reference}.pdf",
-        as_attachment=True,
-        mimetype='application/pdf'
-    )
+    try:
+        return send_file(
+            pdf_path, 
+            download_name=f"violation_{violation.reference}.pdf",
+            as_attachment=True,
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        current_app.logger.error(f"Error sending PDF file: {str(e)}")
+        abort(500, description="Error delivering PDF file")
 
 @violation_bp.route('/api/violations/<int:vid>/upload', methods=['POST'])
 @login_required
@@ -325,19 +350,62 @@ def get_uploaded_file(filename):
 def api_list_violations():
     try:
         # Get query parameters
-        limit = request.args.get('limit', type=int)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        date_filter = request.args.get('date_filter', None, type=str)  # 'last7days', 'last30days', or None
         
-        # Build a SQL query to avoid ORM issues with missing columns
+        # Special handling for dashboard which uses limit parameter
+        limit = request.args.get('limit', None, type=int)
+        if limit is not None:
+            # If limit is specified, use it as per_page and set page to 1
+            per_page = limit
+            page = 1
+        
+        # Calculate offset for pagination
+        offset = (page - 1) * per_page
+        
+        # Base SQL query
         if current_user.is_admin:
-            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations ORDER BY created_at DESC"
+            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations"
         else:
-            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations WHERE created_by = :user_id ORDER BY created_at DESC"
+            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations WHERE created_by = :user_id"
         
-        if limit:
-            sql += f" LIMIT {limit}"
+        # Add date filter conditions if specified
+        params = {"user_id": current_user.id}
+        
+        if date_filter:
+            current_app.logger.info(f"Applying date filter: {date_filter}")
+            from datetime import datetime, timedelta
+            today = datetime.now().date()
             
-        # Execute query directly
-        result = db.session.execute(text(sql), {"user_id": current_user.id})
+            if date_filter == 'last7days':
+                # Last 7 days
+                seven_days_ago = (today - timedelta(days=7)).isoformat()
+                sql += " AND DATE(created_at) >= :start_date"
+                params["start_date"] = seven_days_ago
+            elif date_filter == 'last30days':
+                # Last 30 days
+                thirty_days_ago = (today - timedelta(days=30)).isoformat()
+                sql += " AND DATE(created_at) >= :start_date"
+                params["start_date"] = thirty_days_ago
+        
+        # Add total count query
+        count_sql = sql.replace("SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path", "SELECT COUNT(*) as total")
+        
+        # Add ordering and pagination to main query
+        sql += " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
+        params["limit"] = per_page
+        params["offset"] = offset
+            
+        # Execute count query
+        count_result = db.session.execute(text(count_sql), params)
+        total_count = count_result.fetchone().total
+        
+        # Calculate total pages
+        total_pages = (total_count + per_page - 1) // per_page  # Ceiling division
+            
+        # Execute main query
+        result = db.session.execute(text(sql), params)
         
         # Process results
         violations = []
@@ -383,11 +451,24 @@ def api_list_violations():
                 current_app.logger.warning(f"Error fetching dynamic fields for violation {row.id}: {str(field_err)}")
             
             violations.append(violation)
+        
+        # For dashboard compatibility (limit parameter), return just the violations array
+        if limit is not None:
+            return jsonify(violations)
             
-        return jsonify(violations)
+        # Return data with pagination info for regular violations list
+        return jsonify({
+            'violations': violations,
+            'pagination': {
+                'total': total_count,
+                'page': page,
+                'per_page': per_page,
+                'pages': total_pages
+            }
+        })
     except Exception as e:
         current_app.logger.error(f"Error fetching violations: {str(e)}")
-        return jsonify([])  # Return empty list instead of error to avoid breaking the UI
+        return jsonify({'violations': [], 'pagination': {'total': 0, 'page': 1, 'per_page': 10, 'pages': 0}})
 
 @violation_bp.route('/api/violations/<int:vid>', methods=['GET'])
 @login_required

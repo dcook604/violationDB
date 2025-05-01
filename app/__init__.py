@@ -8,6 +8,7 @@ from flask_cors import CORS
 from .config import Config
 from datetime import timedelta
 from flask.sessions import SecureCookieSessionInterface
+import os.path
 
 # Custom session interface to fix SameSite issue
 class CustomSessionInterface(SecureCookieSessionInterface):
@@ -18,9 +19,16 @@ class CustomSessionInterface(SecureCookieSessionInterface):
 # Configure logging to save errors to flask_error.log
 logging.basicConfig(
     filename='flask_error.log',
-    level=logging.ERROR,
+    level=logging.INFO,  # Change from ERROR to INFO to capture more detailed logs
     format='%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
 )
+
+# Create a console handler to also show logs in the terminal
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]')
+console.setFormatter(formatter)
+logging.getLogger('').addHandler(console)
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -47,6 +55,15 @@ def unauthorized():
         'path': path
     }), 401
 
+# Custom Jinja2 filters
+def basename_filter(path):
+    return os.path.basename(path)
+
+def nl2br_filter(text):
+    if not text:
+        return ""
+    return text.replace('\n', '<br>')
+
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -67,6 +84,10 @@ def create_app(config_class=Config):
         REMEMBER_COOKIE_HTTPONLY=True,
         REMEMBER_COOKIE_DURATION=timedelta(days=31)
     )
+    
+    # Register custom Jinja2 filters
+    app.jinja_env.filters['basename'] = basename_filter
+    app.jinja_env.filters['nl2br'] = nl2br_filter
     
     # Use custom session interface
     app.session_interface = CustomSessionInterface()
@@ -116,5 +137,50 @@ def create_app(config_class=Config):
     app.register_blueprint(violations_blueprint)
     app.register_blueprint(users_blueprint)
     app.register_blueprint(dashboard_blueprint)
+    
+    # Load SMTP settings from database when the app is fully initialized
+    with app.app_context():
+        try:
+            from .models import Settings
+            settings = Settings.get_settings()
+            
+            # Only apply if all required settings are present
+            if (settings.smtp_server and settings.smtp_port and 
+                settings.smtp_username and settings.smtp_password):
+                
+                # Apply settings to app configuration
+                app.config['MAIL_SERVER'] = settings.smtp_server
+                app.config['MAIL_PORT'] = settings.smtp_port
+                app.config['MAIL_USERNAME'] = settings.smtp_username
+                app.config['MAIL_PASSWORD'] = settings.smtp_password
+                app.config['MAIL_USE_TLS'] = settings.smtp_use_tls
+                
+                # Set default sender if available
+                if settings.smtp_from_email:
+                    if settings.smtp_from_name:
+                        sender = f"{settings.smtp_from_name} <{settings.smtp_from_email}>"
+                    else:
+                        sender = settings.smtp_from_email
+                    app.config['MAIL_DEFAULT_SENDER'] = sender
+                
+                # Reinitialize mail with the new configuration
+                mail.init_app(app)
+                
+                app.logger.info(f"SMTP settings loaded from database: {settings.smtp_server}:{settings.smtp_port}")
+            else:
+                missing = []
+                if not settings.smtp_server:
+                    missing.append("SMTP Server")
+                if not settings.smtp_port:
+                    missing.append("SMTP Port")
+                if not settings.smtp_username:
+                    missing.append("SMTP Username")
+                if not settings.smtp_password:
+                    missing.append("SMTP Password")
+                
+                app.logger.warning(f"Could not load SMTP settings from database - missing: {', '.join(missing)}")
+                app.logger.warning("Using default mail settings. Test emails may fail.")
+        except Exception as e:
+            app.logger.error(f"Error loading SMTP settings from database: {str(e)}")
 
     return app

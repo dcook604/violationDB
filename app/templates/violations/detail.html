@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Violation {{ violation.reference }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #1a56db;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1a56db;
+        }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .field {
+            margin-bottom: 10px;
+        }
+        .field-label {
+            font-weight: bold;
+        }
+        .attachment-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .attachment {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .attachment img {
+            max-width: 100%;
+            max-height: 200px;
+            object-fit: contain;
+        }
+        .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+            font-size: 0.9em;
+            color: #666;
+        }
+        .reply-form {
+            margin-top: 30px;
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+            background-color: #f0f7ff;
+        }
+        .form-field {
+            margin-bottom: 15px;
+        }
+        .form-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-field input,
+        .form-field textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .form-field textarea {
+            height: 150px;
+        }
+        .button {
+            background-color: #1a56db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .button:hover {
+            background-color: #0f3d8d;
+        }
+        .replies-section {
+            margin-top: 30px;
+        }
+        .reply {
+            border-left: 3px solid #1a56db;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        .reply-meta {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Violation {{ violation.reference }}</h1>
+    
+    <div class="section">
+        <div class="field">
+            <span class="field-label">Reference:</span> {{ violation.reference }}
+        </div>
+        <div class="field">
+            <span class="field-label">Created At:</span> {{ violation.created_at }}
+        </div>
+        <div class="field">
+            <span class="field-label">Created By:</span> {{ creator.email if creator else 'Unknown' }}
+        </div>
+    </div>
+    
+    {% if dynamic_fields %}
+    <div class="section">
+        <h2>Violation Information</h2>
+        {% for field_name, field_value in dynamic_fields.items() %}
+            {% if field_value and not field_images[field_name] %}
+            <div class="field">
+                <span class="field-label">{{ field_name }}:</span> {{ field_value }}
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if has_images %}
+    <div class="section">
+        <h2>Attachments</h2>
+        {% for field_name, images in field_images.items() %}
+            {% if images %}
+            <div class="field">
+                <span class="field-label">{{ field_name }}:</span>
+                <div class="attachment-grid">
+                    {% for image_url in images %}
+                    <div class="attachment">
+                        <img src="{{ image_url }}" alt="{{ field_name }} attachment">
+                        <div>{{ image_url|basename }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    {% if replies %}
+    <div class="section replies-section">
+        <h2>Responses</h2>
+        {% for reply in replies %}
+        <div class="reply">
+            <div class="reply-meta">
+                <strong>{{ reply.email }}</strong> on {{ reply.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+            </div>
+            <div class="reply-content">
+                {{ reply.response_text|nl2br }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <div class="reply-form">
+        <h2>Reply to this Violation</h2>
+        <form action="{{ url_for('violations.submit_violation_reply', vid=violation.id) }}" method="post">
+            <div class="form-field">
+                <label for="email">Your Email:</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-field">
+                <label for="response">Your Response:</label>
+                <textarea id="response" name="response_text" required></textarea>
+                <div class="hint">You can include up to 2 paragraphs in your response.</div>
+            </div>
+            <button type="submit" class="button">Submit Response</button>
+        </form>
+    </div>
+    
+    <div class="footer">
+        <p>For more information, please contact the property management office.</p>
+        <p>Reference ID: {{ violation.reference }}</p>
+    </div>
+</body>
+</html> 

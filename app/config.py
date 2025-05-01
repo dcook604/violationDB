@@ -1,17 +1,34 @@
 import os
+from dotenv import load_dotenv
+
+basedir = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(os.path.dirname(basedir), '.env'))
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev')
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'mariadb://violationuser:viopass@127.0.0.1:3306/violationdb')
+    # Base configuration
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'development-key-change-me'
+    BASE_DIR = os.path.dirname(basedir)
+    BASE_URL = os.environ.get('BASE_URL') or 'http://localhost:5004'
+    
+    # Database settings
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
+        'sqlite:///' + os.path.join(BASE_DIR, 'app.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    MAIL_SERVER = os.environ.get('MAIL_SERVER', '172.19.0.6')
-    MAIL_PORT = int(os.environ.get('MAIL_PORT', 25))
-    MAIL_USE_TLS = False
-    MAIL_USE_SSL = False
-    MAIL_USERNAME = None
-    MAIL_PASSWORD = None
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'noreply@strata.local')
-    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(os.path.dirname(__file__), 'uploads'))
+    
+    # Email settings
+    MAIL_SERVER = os.environ.get('MAIL_SERVER') or 'localhost'
+    MAIL_PORT = int(os.environ.get('MAIL_PORT') or 25)
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS') is not None
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or 'noreply@example.com'
+    
+    # Upload folder
+    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB limit for uploads
+    
+    # SSL redirect
+    SSL_REDIRECT = False
     
     # Session and Cookie Settings
     SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS

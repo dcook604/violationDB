@@ -1,7 +1,6 @@
 import os
 from flask import current_app, render_template, url_for, g
 from werkzeug.utils import secure_filename
-from weasyprint import HTML
 from flask_mail import Message
 from . import mail
 import json
@@ -72,78 +71,190 @@ def save_uploaded_file(file_storage, folder):
     return os.path.relpath(path, current_app.root_path)
 
 def generate_pdf_from_html(html_content, pdf_path):
-    HTML(string=html_content).write_pdf(pdf_path)
-    return pdf_path
+    """
+    Generate a PDF file from HTML content
+    
+    Args:
+        html_content: HTML content to convert to PDF
+        pdf_path: Path to save the PDF file
+        
+    Returns:
+        str: Path to the generated PDF file
+    """
+    try:
+        # First attempt: Direct conversion using document.render() for WeasyPrint 61+
+        from weasyprint import HTML
+        current_app.logger.info(f"Generating PDF at {pdf_path} using WeasyPrint 61+ API")
+        
+        # Generate HTML document and render
+        html = HTML(string=html_content)
+        document = html.render()
+        
+        # Write to PDF file
+        with open(pdf_path, 'wb') as pdf_file:
+            try:
+                document.write_pdf(pdf_file)
+                current_app.logger.info(f"Successfully generated PDF ({os.path.getsize(pdf_path)} bytes)")
+                return pdf_path
+            except TypeError as err:
+                if "PDF.__init__() takes 1 positional argument but 3 were given" in str(err):
+                    current_app.logger.warning(f"pydyf compatibility issue detected: {err}")
+                    # Close the file and use alternative approach
+                    pdf_file.close()
+                    raise Exception("pydyf compatibility issue - using fallback approach")
+                else:
+                    raise
+            
+    except Exception as e:
+        current_app.logger.error(f"Error in generate_pdf_from_html (attempt 1): {str(e)}")
+        
+        # Second attempt: Using a temporary file and command-line tools
+        try:
+            import tempfile
+            import subprocess
+            
+            current_app.logger.info(f"Trying command-line PDF generation")
+            temp_html = tempfile.NamedTemporaryFile(suffix='.html', delete=False)
+            
+            try:
+                # Write HTML to temp file
+                with open(temp_html.name, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                
+                # Try using wkhtmltopdf command-line tool if available
+                try:
+                    cmd = ['/usr/bin/wkhtmltopdf', temp_html.name, pdf_path]
+                    current_app.logger.info(f"Executing: {' '.join(cmd)}")
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        current_app.logger.info(f"PDF successfully generated using wkhtmltopdf")
+                        return pdf_path
+                    else:
+                        current_app.logger.error(f"wkhtmltopdf error: {result.stderr}")
+                        raise Exception(f"wkhtmltopdf failed: {result.stderr}")
+                except (subprocess.SubprocessError, FileNotFoundError) as e:
+                    current_app.logger.error(f"Could not use wkhtmltopdf: {str(e)}")
+                    raise Exception("Command-line PDF generation failed")
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_html.name):
+                    os.unlink(temp_html.name)
+                    
+        except Exception as e2:
+            current_app.logger.error(f"Error in generate_pdf_from_html (attempt 2): {str(e2)}")
+            raise Exception(f"Failed to generate PDF: {str(e2)}")
 
 def send_email(subject, recipients, body, attachments=None, cc=None, html=None):
     from .models import Settings
+    from flask import current_app
+    import time
     
     # Get settings from the database
     settings = Settings.get_settings()
     
-    # Create a temporary mail instance with settings from the database if they exist
-    if settings.smtp_server:
-        from flask_mail import Mail, Message
-        from flask import current_app
-        import copy
-        
-        # Create a copy of the current app config
-        config = copy.deepcopy(current_app.config)
-        
-        # Override with settings from database
-        config['MAIL_SERVER'] = settings.smtp_server
-        config['MAIL_PORT'] = settings.smtp_port
-        config['MAIL_USERNAME'] = settings.smtp_username
-        config['MAIL_PASSWORD'] = settings.smtp_password
-        config['MAIL_USE_TLS'] = settings.smtp_use_tls
-        if settings.smtp_from_email:
-            config['MAIL_DEFAULT_SENDER'] = settings.smtp_from_name + ' <' + settings.smtp_from_email + '>' if settings.smtp_from_name else settings.smtp_from_email
-        
-        # Store original config values
-        original_server = current_app.config.get('MAIL_SERVER')
-        original_port = current_app.config.get('MAIL_PORT')
-        original_username = current_app.config.get('MAIL_USERNAME')
-        original_password = current_app.config.get('MAIL_PASSWORD')
-        original_tls = current_app.config.get('MAIL_USE_TLS')
-        original_sender = current_app.config.get('MAIL_DEFAULT_SENDER')
-        
-        # Set config to use database settings
-        current_app.config['MAIL_SERVER'] = config['MAIL_SERVER']
-        current_app.config['MAIL_PORT'] = config['MAIL_PORT']
-        current_app.config['MAIL_USERNAME'] = config['MAIL_USERNAME']
-        current_app.config['MAIL_PASSWORD'] = config['MAIL_PASSWORD']
-        current_app.config['MAIL_USE_TLS'] = config['MAIL_USE_TLS']
-        current_app.config['MAIL_DEFAULT_SENDER'] = config.get('MAIL_DEFAULT_SENDER', original_sender)
-        
-        try:
-            # Create message with current settings
-            msg = Message(subject, recipients=recipients, cc=cc, body=body, html=html)
-            attachments = attachments or []
-            for att in attachments:
-                with open(att, 'rb') as f:
-                    msg.attach(os.path.basename(att), 'application/pdf', f.read())
+    # Log the intent to send an email with settings details
+    current_app.logger.info(f"Preparing to send email: subject='{subject}', to={recipients}")
+    current_app.logger.info(f"SMTP Settings: server={settings.smtp_server}, port={settings.smtp_port}, user={settings.smtp_username}, TLS={settings.smtp_use_tls}")
+    
+    try:
+        # Only apply database settings if they're properly configured
+        if settings.smtp_server and settings.smtp_port and settings.smtp_username and settings.smtp_password:
+            from flask_mail import Mail, Message
+            import copy
             
-            # Send with mail instance from app context
-            mail.send(msg)
-        finally:
-            # Restore original config
-            current_app.config['MAIL_SERVER'] = original_server
-            current_app.config['MAIL_PORT'] = original_port
-            current_app.config['MAIL_USERNAME'] = original_username
-            current_app.config['MAIL_PASSWORD'] = original_password
-            current_app.config['MAIL_USE_TLS'] = original_tls
-            current_app.config['MAIL_DEFAULT_SENDER'] = original_sender
-    else:
-        # Use the default mail configuration
-        from flask_mail import Message
-        from . import mail
-        
-        msg = Message(subject, recipients=recipients, cc=cc, body=body, html=html)
-        attachments = attachments or []
-        for att in attachments:
-            with open(att, 'rb') as f:
-                msg.attach(os.path.basename(att), 'application/pdf', f.read())
-        mail.send(msg)
+            # Create a copy of the current app config
+            config = copy.deepcopy(current_app.config)
+            
+            # Override with settings from database
+            config['MAIL_SERVER'] = settings.smtp_server
+            config['MAIL_PORT'] = settings.smtp_port
+            config['MAIL_USERNAME'] = settings.smtp_username
+            config['MAIL_PASSWORD'] = settings.smtp_password
+            config['MAIL_USE_TLS'] = settings.smtp_use_tls
+            if settings.smtp_from_email:
+                config['MAIL_DEFAULT_SENDER'] = settings.smtp_from_name + ' <' + settings.smtp_from_email + '>' if settings.smtp_from_name else settings.smtp_from_email
+            
+            # Store original config values
+            original_server = current_app.config.get('MAIL_SERVER')
+            original_port = current_app.config.get('MAIL_PORT')
+            original_username = current_app.config.get('MAIL_USERNAME')
+            original_password = current_app.config.get('MAIL_PASSWORD')
+            original_tls = current_app.config.get('MAIL_USE_TLS')
+            original_sender = current_app.config.get('MAIL_DEFAULT_SENDER')
+            
+            # Set config to use database settings
+            current_app.config['MAIL_SERVER'] = config['MAIL_SERVER']
+            current_app.config['MAIL_PORT'] = config['MAIL_PORT']
+            current_app.config['MAIL_USERNAME'] = config['MAIL_USERNAME']
+            current_app.config['MAIL_PASSWORD'] = config['MAIL_PASSWORD']
+            current_app.config['MAIL_USE_TLS'] = config['MAIL_USE_TLS']
+            current_app.config['MAIL_DEFAULT_SENDER'] = config.get('MAIL_DEFAULT_SENDER', original_sender)
+            
+            # Debug logging - show what we're using (masking password)
+            current_app.logger.info(f"Using SMTP: {config['MAIL_SERVER']}:{config['MAIL_PORT']} " +
+                              f"with user={config['MAIL_USERNAME']}, " +
+                              f"TLS={config['MAIL_USE_TLS']}")
+            
+            try:
+                # Import mail from app
+                from . import mail
+                
+                # Test direct connection to SMTP server before sending
+                import socket
+                socket_test_start = time.time()
+                current_app.logger.info(f"Testing socket connection to {config['MAIL_SERVER']}:{config['MAIL_PORT']}...")
+                
+                try:
+                    sock = socket.create_connection((config['MAIL_SERVER'], config['MAIL_PORT']), timeout=10)
+                    sock.close()
+                    socket_test_time = time.time() - socket_test_start
+                    current_app.logger.info(f"Socket connection successful ({socket_test_time:.2f}s)")
+                except Exception as sock_err:
+                    current_app.logger.error(f"Socket connection failed: {str(sock_err)}")
+                    raise Exception(f"Cannot connect to SMTP server {config['MAIL_SERVER']}:{config['MAIL_PORT']}: {str(sock_err)}")
+                
+                # Create message with current settings
+                msg = Message(subject, recipients=recipients, cc=cc, body=body, html=html)
+                attachments = attachments or []
+                for att in attachments:
+                    with open(att, 'rb') as f:
+                        msg.attach(os.path.basename(att), 'application/pdf', f.read())
+                
+                # Send with mail instance from app context
+                mail.send(msg)
+                current_app.logger.info("Email sent successfully")
+            except Exception as e:
+                current_app.logger.error(f"Error sending email with custom SMTP settings: {str(e)}")
+                raise
+            finally:
+                # Restore original config
+                current_app.config['MAIL_SERVER'] = original_server
+                current_app.config['MAIL_PORT'] = original_port
+                current_app.config['MAIL_USERNAME'] = original_username
+                current_app.config['MAIL_PASSWORD'] = original_password
+                current_app.config['MAIL_USE_TLS'] = original_tls
+                current_app.config['MAIL_DEFAULT_SENDER'] = original_sender
+        else:
+            # Missing required settings
+            missing = []
+            if not settings.smtp_server:
+                missing.append("SMTP Server")
+            if not settings.smtp_port:
+                missing.append("SMTP Port")
+            if not settings.smtp_username:
+                missing.append("SMTP Username")
+            if not settings.smtp_password:
+                missing.append("SMTP Password")
+            
+            missing_str = ", ".join(missing)
+            error_msg = f"Missing required SMTP settings: {missing_str}"
+            current_app.logger.error(error_msg)
+            raise Exception(error_msg)
+    except Exception as e:
+        current_app.logger.error(f"Email sending failed: {str(e)}")
+        # Re-raise the exception so it can be handled by the caller
+        raise
 
 def create_violation_html(violation, field_defs=None):
     """
@@ -156,7 +267,7 @@ def create_violation_html(violation, field_defs=None):
     Returns:
         tuple: (html_path, html_content)
     """
-    from .models import ViolationFieldValue, FieldDefinition, User
+    from .models import ViolationFieldValue, FieldDefinition, User, ViolationReply
     
     # Create directory for HTML files if it doesn't exist
     html_dir = os.path.join(current_app.config['BASE_DIR'], 'html_violations')
@@ -203,13 +314,17 @@ def create_violation_html(violation, field_defs=None):
     if violation.created_by:
         creator = User.query.get(violation.created_by)
     
+    # Get violation replies
+    replies = ViolationReply.query.filter_by(violation_id=violation.id).order_by(ViolationReply.created_at).all()
+    
     # Prepare template data
     template_data = {
         'violation': violation,
         'dynamic_fields': dynamic_fields,
         'field_images': field_images,
         'has_images': has_images,
-        'creator': creator
+        'creator': creator,
+        'replies': replies
     }
     
     # Render the template
@@ -248,20 +363,124 @@ def generate_violation_pdf(violation, html_content=None):
     pdf_path = os.path.join(pdf_dir, pdf_filename)
     
     try:
-        # Generate PDF from HTML using the more compatible approach
-        document = HTML(string=html_content)
-        document.write_pdf(pdf_path)
+        # First attempt: Using WeasyPrint 61+ with document.render() approach
+        current_app.logger.info(f"Generating PDF for violation {violation.id} at {pdf_path}")
+        from weasyprint import HTML
+        
+        # Generate HTML document and render
+        html = HTML(string=html_content)
+        document = html.render()
+        
+        # Write to PDF file
+        with open(pdf_path, 'wb') as pdf_file:
+            try:
+                document.write_pdf(pdf_file)
+                current_app.logger.info(f"PDF successfully generated at {pdf_path}")
+            except TypeError as err:
+                if "PDF.__init__() takes 1 positional argument but 3 were given" in str(err):
+                    current_app.logger.warning(f"pydyf compatibility issue detected: {err}")
+                    # Close the file and use alternative approach
+                    pdf_file.close()
+                    raise Exception("pydyf compatibility issue - using fallback approach")
+                else:
+                    raise
+                    
     except Exception as e:
-        # If there are parameter issues, try a simpler approach
         current_app.logger.error(f"PDF generation error (attempt 1): {str(e)}")
         try:
-            from weasyprint import HTML as WPHTML
-            WPHTML(string=html_content).write_pdf(target=pdf_path)
+            # Second attempt: Save HTML to temporary file and use a command-line tool
+            import tempfile
+            import subprocess
+            
+            current_app.logger.info(f"Attempting command-line PDF generation")
+            temp_html = tempfile.NamedTemporaryFile(suffix='.html', delete=False)
+            try:
+                # Write HTML to temp file
+                with open(temp_html.name, 'w', encoding='utf-8') as f:
+                    f.write(html_content)
+                
+                # Try using wkhtmltopdf command-line tool if available
+                try:
+                    cmd = ['/usr/bin/wkhtmltopdf', temp_html.name, pdf_path]
+                    current_app.logger.info(f"Executing: {' '.join(cmd)}")
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    
+                    if result.returncode == 0:
+                        current_app.logger.info(f"PDF successfully generated using wkhtmltopdf")
+                    else:
+                        current_app.logger.error(f"wkhtmltopdf error: {result.stderr}")
+                        raise Exception(f"wkhtmltopdf failed: {result.stderr}")
+                except (subprocess.SubprocessError, FileNotFoundError) as e:
+                    current_app.logger.error(f"Could not use wkhtmltopdf: {str(e)}")
+                    raise Exception("Command-line PDF generation failed")
+            finally:
+                # Clean up temporary file
+                if os.path.exists(temp_html.name):
+                    os.unlink(temp_html.name)
+                    
         except Exception as e2:
             current_app.logger.error(f"PDF generation error (attempt 2): {str(e2)}")
-            # Create an empty file to ensure the path exists
-            with open(pdf_path, 'w') as f:
-                f.write("PDF generation failed - this is a placeholder file")
+            # Final fallback: Create a minimal valid PDF with error message
+            try:
+                current_app.logger.info("Creating fallback error PDF")
+                with open(pdf_path, 'w', encoding='utf-8') as f:
+                    f.write(f"""
+                    %PDF-1.4
+                    1 0 obj
+                    << /Type /Catalog
+                       /Pages 2 0 R
+                    >>
+                    endobj
+                    2 0 obj
+                    << /Type /Pages
+                       /Kids [3 0 R]
+                       /Count 1
+                    >>
+                    endobj
+                    3 0 obj
+                    << /Type /Page
+                       /Parent 2 0 R
+                       /Resources << /Font << /F1 4 0 R >> >>
+                       /MediaBox [0 0 612 792]
+                       /Contents 5 0 R
+                    >>
+                    endobj
+                    4 0 obj
+                    << /Type /Font
+                       /Subtype /Type1
+                       /Name /F1
+                       /BaseFont /Helvetica
+                    >>
+                    endobj
+                    5 0 obj
+                    << /Length 68 >>
+                    stream
+                    BT
+                    /F1 12 Tf
+                    100 700 Td
+                    (PDF Generation Error - Technical support has been notified) Tj
+                    ET
+                    endstream
+                    endobj
+                    xref
+                    0 6
+                    0000000000 65535 f
+                    0000000009 00000 n
+                    0000000063 00000 n
+                    0000000135 00000 n
+                    0000000267 00000 n
+                    0000000358 00000 n
+                    trailer
+                    << /Size 6
+                       /Root 1 0 R
+                    >>
+                    startxref
+                    477
+                    %%EOF
+                    """)
+                current_app.logger.info(f"Created fallback PDF at {pdf_path}")
+            except Exception as e3:
+                current_app.logger.error(f"Failed to create error PDF: {str(e3)}")
     
     return pdf_path
 
@@ -338,7 +557,7 @@ Please do not reply to this email.
     
     <p>You can view the full details by <a href="{view_url}">clicking here</a>.</p>
     
-    <p>Please do not reply to this email.</p>
+    <p>To respond to this violation, please view the full details and use the reply form at the bottom of the page.</p>
     """
     
     try:

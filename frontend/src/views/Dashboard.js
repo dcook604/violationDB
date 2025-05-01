@@ -52,25 +52,67 @@ const RecentViolationsTable = ({ violations }) => (
             <th className="px-6 align-middle border border-solid py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left bg-blueGray-50 text-blueGray-500 border-blueGray-100">
               Status
             </th>
+            <th className="px-6 align-middle border border-solid py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left bg-blueGray-50 text-blueGray-500 border-blueGray-100">
+              Documents
+            </th>
           </tr>
         </thead>
         <tbody>
           {violations.map((violation) => (
             <tr key={violation.id}>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
-                {violation.reference}
+                <a href={`/violations/${violation.id}`} className="text-blue-600 hover:underline">
+                  {violation.reference}
+                </a>
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
-                {violation.category}
+                {violation.category || "Not specified"}
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
-                {new Date(violation.created_at).toLocaleDateString()}
+                {violation.created_at ? new Date(violation.created_at).toLocaleDateString() : 'Unknown date'}
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
-                <i className="fas fa-circle text-emerald-500 mr-2"></i> Active
+                <span className="flex items-center">
+                  <span className="inline-block w-3 h-3 rounded-full bg-emerald-500 mr-2"></span>
+                  Active
+                </span>
+              </td>
+              <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
+                <div className="flex space-x-3">
+                  {violation.html_path && (
+                    <a 
+                      href={violation.html_path} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-block px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium hover:bg-green-200"
+                    >
+                      HTML
+                    </a>
+                  )}
+                  {violation.pdf_path && (
+                    <a 
+                      href={violation.pdf_path} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="inline-block px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200"
+                    >
+                      PDF
+                    </a>
+                  )}
+                  {!violation.html_path && !violation.pdf_path && (
+                    <span className="text-gray-400">None</span>
+                  )}
+                </div>
               </td>
             </tr>
           ))}
+          {violations.length === 0 && (
+            <tr>
+              <td colSpan="5" className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4 text-center text-gray-500">
+                No violations found
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -102,7 +144,13 @@ export default function Dashboard() {
         ]);
         
         setStats(statsResponse.data);
-        setRecentViolations(violationsResponse.data);
+        
+        // Handle both old and new API response formats
+        if (violationsResponse.data.violations) {
+          setRecentViolations(violationsResponse.data.violations);
+        } else {
+          setRecentViolations(violationsResponse.data || []);
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         setError('Failed to load dashboard data. Please try again.');

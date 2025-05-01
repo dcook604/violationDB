@@ -291,4 +291,20 @@ class Settings(db.Model):
         return [email.strip() for email in self.notification_emails.split(',') if email.strip()]
         
     def __repr__(self):
-        return f'<Settings id:{self.id} updated:{self.updated_at}>'
+        return f'<Settings id={self.id}>'
+
+class ViolationReply(db.Model):
+    __tablename__ = 'violation_replies'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    violation_id = db.Column(db.Integer, db.ForeignKey('violations.id'), nullable=False)
+    email = db.Column(db.String(255), nullable=False)  # Email of the person replying
+    response_text = db.Column(db.Text, nullable=False)  # The reply content
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(50))  # IP address of the responder for audit
+    
+    # Relationships
+    violation = db.relationship('Violation', backref=db.backref('replies', lazy='dynamic'))
+    
+    def __repr__(self):
+        return f'<ViolationReply id={self.id} for violation_id={self.violation_id}>'

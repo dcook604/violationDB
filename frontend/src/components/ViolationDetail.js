@@ -140,30 +140,11 @@ export default function ViolationDetail() {
       <div className="p-8 max-w-xl mx-auto">
         <h2 className="text-2xl font-bold mb-4">Edit Violation</h2>
         <div className="bg-white shadow rounded-lg p-6">
-          <div className="mb-2">
-            <label className="font-semibold">Category:</label>
-            <Input name="category" value={form.category || ''} onChange={handleChange} className="border p-1 ml-2" />
+          <div className="mb-4">
+            <label className="font-semibold">Reference:</label>
+            <span className="ml-2">{form.reference}</span>
           </div>
-          <div className="mb-2">
-            <label className="font-semibold">Building:</label>
-            <Input name="building" value={form.building || ''} onChange={handleChange} className="border p-1 ml-2" />
-          </div>
-          <div className="mb-2">
-            <label className="font-semibold">Unit Number:</label>
-            <Input name="unit_number" value={form.unit_number || ''} onChange={handleChange} className="border p-1 ml-2" />
-          </div>
-          <div className="mb-2">
-            <label className="font-semibold">Incident Date:</label>
-            <Input name="incident_date" type="date" value={form.incident_date ? form.incident_date.substring(0,10) : ''} onChange={handleChange} className="border p-1 ml-2" />
-          </div>
-          <div className="mb-2">
-            <label className="font-semibold">Subject:</label>
-            <Input name="subject" value={form.subject || ''} onChange={handleChange} className="border p-1 ml-2" />
-          </div>
-          <div className="mb-2">
-            <label className="font-semibold">Details:</label>
-            <textarea name="details" value={form.details || ''} onChange={handleChange} className="border p-1 ml-2 w-full" />
-          </div>
+          
           <div className="mt-4">
             <div className="font-semibold mb-2">Dynamic Fields:</div>
             <ul className="list-disc list-inside">
@@ -196,14 +177,9 @@ export default function ViolationDetail() {
       <h2 className="text-2xl font-bold mb-4">Violation Details</h2>
       <div className="bg-white shadow rounded-lg p-6">
         <div className="mb-2"><span className="font-semibold">Reference:</span> {violation.reference}</div>
-        <div className="mb-2"><span className="font-semibold">Category:</span> {violation.category}</div>
-        <div className="mb-2"><span className="font-semibold">Building:</span> {violation.building}</div>
-        <div className="mb-2"><span className="font-semibold">Unit Number:</span> {violation.unit_number}</div>
-        <div className="mb-2"><span className="font-semibold">Incident Date:</span> {violation.incident_date ? new Date(violation.incident_date).toLocaleDateString() : ''}</div>
-        <div className="mb-2"><span className="font-semibold">Subject:</span> {violation.subject}</div>
-        <div className="mb-2"><span className="font-semibold">Details:</span> {violation.details}</div>
         <div className="mb-2"><span className="font-semibold">Created At:</span> {violation.created_at ? new Date(violation.created_at).toLocaleString() : ''}</div>
         <div className="mb-2"><span className="font-semibold">Created By:</span> {violation.created_by}</div>
+        
         <div className="mt-4">
           <div className="font-semibold mb-2">Dynamic Fields:</div>
           <ul className="list-disc list-inside">
@@ -219,6 +195,7 @@ export default function ViolationDetail() {
             ))}
           </ul>
         </div>
+        
         <div className="mt-6 flex gap-3 flex-wrap">
           <Button onClick={handleViewHtml} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">View as HTML</Button>
           <Button onClick={handleDownloadPdf} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Download PDF</Button>

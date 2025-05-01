@@ -40,7 +40,8 @@ def check_session():
             user_data = {
                 'id': current_user.id,
                 'email': current_user.email,
-                'role': 'admin' if current_user.is_admin else 'user'
+                'role': 'admin' if current_user.is_admin else 'user',
+                'is_admin': current_user.is_admin  # Explicitly include is_admin boolean
             }
             
             # Create response with user data
@@ -135,7 +136,8 @@ def login():
             user_data = {
                 'id': user.id,
                 'email': user.email,
-                'role': 'admin' if current_user.is_admin else 'user'
+                'role': 'admin' if current_user.is_admin else 'user',
+                'is_admin': current_user.is_admin  # Explicitly include is_admin boolean
             }
             
             # Create a response object with proper CORS headers for specific origin
@@ -320,15 +322,39 @@ def set_test_cookie():
     
     return response
 
-@auth.route('/api/auth/session')
+@auth.route('/api/auth/session-alt')
 def session_check():
     if current_user.is_authenticated:
         return jsonify({
             "user": {
                 "id": current_user.id,
                 "email": current_user.email,
-                "is_admin": getattr(current_user, "is_admin", False)
+                "role": 'admin' if current_user.is_admin else 'user',
+                "is_admin": current_user.is_admin
             }
         })
     else:
         return jsonify({"user": None}), 200
+
+@auth.route('/api/auth/user-debug', methods=['GET'])
+@login_required
+def user_debug():
+    """Debug endpoint to check current user details"""
+    try:
+        # Return detailed user information
+        user_data = {
+            'id': current_user.id,
+            'email': current_user.email,
+            'is_admin': current_user.is_admin,
+            'role': current_user.role,
+            'is_active': current_user.is_active,
+            'is_authenticated': current_user.is_authenticated
+        }
+        return jsonify({
+            'user': user_data,
+            'message': 'Debug information retrieved successfully'
+        })
+    except Exception as e:
+        return jsonify({
+            'error': f'Error retrieving debug information: {str(e)}'
+        }), 500
