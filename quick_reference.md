@@ -236,6 +236,132 @@ import DynamicViolationForm from './components/DynamicViolationForm';
 - Don't expose internal error details to clients
 - Favor empty collections over null values for arrays
 
+## Violation Documents
+
+### HTML and PDF Generation
+
+- HTML and PDF files are automatically generated for each violation
+- Both files are stored on the server and referenced in the database
+
+### API Endpoints
+
+- **View HTML**: `/violations/view/{violation_id}`
+  - Public route to view a violation's HTML representation
+  - Generates the HTML file on-demand if it doesn't exist
+
+- **Download PDF**: `/violations/pdf/{violation_id}`
+  - Protected route (requires authentication)
+  - Generates the PDF file on-demand if it doesn't exist
+  - Returns the file with Content-Disposition: attachment
+
+### Frontend Links
+
+- **Violation Detail View**: 
+  - "View as HTML" button
+  - "Download PDF" button
+
+- **Violation List**: 
+  - HTML link in the Actions column
+  - PDF link in the Actions column
+
+- **Dashboard**: 
+  - HTML link in the Documents column
+  - PDF link in the Documents column
+
+### Database Fields
+
+The Violation model includes:
+- `html_path`: String(255) - Path to the HTML file
+- `pdf_path`: String(255) - Path to the PDF file
+
+These paths are included in all API responses where violations are listed.
+
+## System Settings
+
+### SMTP Email Configuration
+- **Location**: Admin-only page at `/admin/settings`
+- **Settings**:
+  - SMTP Server (e.g., smtp.gmail.com)
+  - SMTP Port (e.g., 587 for TLS)
+  - SMTP Username
+  - SMTP Password
+  - Use TLS/SSL (checkbox)
+  - From Email
+  - From Name
+- **Testing**: Send test emails directly from the settings page
+
+### Global Notification Emails
+- **Location**: Admin-only page at `/admin/settings`
+- **Format**: Comma-separated list of email addresses
+- **Control**: Toggle to enable/disable global notifications
+- **Behavior**: When enabled, all violations notifications are sent to these addresses in addition to any violation-specific emails
+
+### API Endpoints
+- `GET /api/admin/settings` - Retrieve current settings (admin only)
+- `PUT /api/admin/settings` - Update settings (admin only)
+- `POST /api/admin/settings/test-email` - Send test email (admin only)
+
+### Settings Model
+```python
+# Key fields in the Settings model
+smtp_server = db.Column(db.String(255))
+smtp_port = db.Column(db.Integer)
+smtp_username = db.Column(db.String(255))
+smtp_password = db.Column(db.String(255))
+smtp_use_tls = db.Column(db.Boolean, default=True)
+smtp_from_email = db.Column(db.String(255))
+smtp_from_name = db.Column(db.String(255))
+notification_emails = db.Column(db.Text)  # Comma-separated
+enable_global_notifications = db.Column(db.Boolean, default=False)
+```
+
+### Example: Using Settings in Code
+```python
+from app.models import Settings
+
+# Get settings
+settings = Settings.get_settings()
+
+# Get list of notification emails
+email_list = settings.get_notification_emails_list()
+```
+
+## Authentication and User Management
+
+### User Roles
+- **Admin**: Full access to all features and violations
+- **Manager**: Can manage violations but not users/settings
+- **User**: Can only access own violations
+
+## Email Configuration
+
+### SMTP Settings
+- **Server**: SMTP server address (e.g., mail.smtp2go.com)
+- **Port**: SMTP port (common: 25, 465, 587, 2525)
+- **Username**: Authentication username
+- **Password**: Authentication password
+- **TLS**: Enable for secure connections (recommended)
+- **From Email**: Default sender email address
+- **From Name**: Optional sender name
+
+### Troubleshooting Commands
+```bash
+# Check network connectivity to SMTP server
+python check_network.py mail.smtp2go.com 2525
+
+# Test SMTP connection with your credentials
+python test_smtp_connection.py mail.smtp2go.com 2525 username password
+
+# Test email sending through Flask
+python test_flask_email.py recipient@example.com
+```
+
+### Common SMTP Ports
+- **25**: Standard SMTP (often blocked by ISPs)
+- **465**: SMTP over SSL
+- **587**: SMTP with STARTTLS
+- **2525**: Alternative SMTP port (useful when 25 is blocked)
+
 ---
 
 *Update this file as new parameters, configurations, or usage examples are added or changed.* 

@@ -9,6 +9,7 @@ import { PrivateRoute, AdminRoute } from './components/Routes';
 import ViolationList from './components/ViolationList';
 import ViolationDetail from './components/ViolationDetail';
 import UserManagement from './components/UserManagement';
+import Settings from './components/Settings';
 import Layout from './components/common/Layout';
 import API from './api';
 
@@ -17,8 +18,15 @@ function NewViolationPage() {
   
   const handleSubmit = async (values) => {
     try {
-      await API.post('/api/violations', values);
-      navigate('/violations');
+      const response = await API.post('/api/violations', values);
+      // Navigate to the newly created violation after successful submission
+      if (response.data && response.data.id) {
+        navigate(`/violations/${response.data.id}`);
+      } else {
+        navigate('/violations');
+      }
+      // Return the response data for file uploads
+      return response.data;
     } catch (error) {
       console.error('Error creating violation:', error);
       alert('Failed to create violation: ' + (error.message || 'Unknown error'));
@@ -48,6 +56,7 @@ function App() {
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><Layout><AdminFieldManager /></Layout></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><Layout><UserManagement /></Layout></AdminRoute>} />
+          <Route path="/admin/settings" element={<AdminRoute><Layout><Settings /></Layout></AdminRoute>} />
           
           {/* Violation Routes */}
           <Route path="/violations/new" element={

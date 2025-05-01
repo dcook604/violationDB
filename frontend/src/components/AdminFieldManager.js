@@ -176,6 +176,7 @@ function AdminFieldManager() {
           <option value="email">Email</option>
           <option value="number">Number</option>
           <option value="date">Date</option>
+          <option value="time">Time</option>
           <option value="select">Select</option>
           <option value="file">File Upload</option>
         </select>

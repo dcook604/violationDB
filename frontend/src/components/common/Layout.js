@@ -76,8 +76,17 @@ export default function Layout({ children }) {
                         to="/admin"
                         className="hover:text-blueGray-500 text-blueGray-700 px-3 py-4 lg:py-2 flex items-center text-xs uppercase font-bold"
                       >
-                        <i className="fas fa-cog text-blueGray-400 mr-2 text-lg"></i>
+                        <i className="fas fa-list text-blueGray-400 mr-2 text-lg"></i>
                         Field Manager
+                      </Link>
+                    </li>
+                    <li className="flex items-center">
+                      <Link
+                        to="/admin/settings"
+                        className="hover:text-blueGray-500 text-blueGray-700 px-3 py-4 lg:py-2 flex items-center text-xs uppercase font-bold"
+                      >
+                        <i className="fas fa-cog text-blueGray-400 mr-2 text-lg"></i>
+                        Settings
                       </Link>
                     </li>
                   </>

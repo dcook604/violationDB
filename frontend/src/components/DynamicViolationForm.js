@@ -17,13 +17,26 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
         // Use the optimized endpoint for active fields only
         const res = await API.get('/api/fields/active');
         setFields(res.data);
-        // Set initial values for new fields if not present
-        const newVals = { ...initialValues };
+        
+        // Set up initial form values with default standard fields
+        const newVals = { 
+          ...initialValues,
+          category: initialValues.category || '',
+          building: initialValues.building || '',
+          unit_number: initialValues.unit_number || '',
+          incident_date: initialValues.incident_date || '',
+          subject: initialValues.subject || '',
+          details: initialValues.details || ''
+        };
+        
+        // Add dynamic fields if they're not already present
         res.data.forEach(f => {
           if (!(f.name in newVals)) newVals[f.name] = '';
         });
+        
         setValues(newVals);
       } catch (err) {
+        console.error('Error fetching fields:', err);
         setErrors({ global: 'Failed to load fields' });
       }
       setLoading(false);
@@ -117,8 +130,31 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
     if (!validate()) return;
     
     try {
-      // First, submit the form data
-      const formData = { ...values };
+      // Organize form data - separating standard fields from dynamic fields
+      const standardFields = {
+        category: values.category || '',
+        building: values.building || '',
+        unit_number: values.unit_number || '',
+        incident_date: values.incident_date || '',
+        subject: values.subject || '',
+        details: values.details || ''
+      };
+      
+      // Extract dynamic fields (any fields not in the standard set)
+      const dynamic_fields = {};
+      Object.keys(values).forEach(key => {
+        if (!['category', 'building', 'unit_number', 'incident_date', 'subject', 'details'].includes(key)) {
+          dynamic_fields[key] = values[key];
+        }
+      });
+      
+      // Combine them for the API request
+      const formData = {
+        ...standardFields,
+        dynamic_fields
+      };
+      
+      console.log('Submitting violation data:', formData);
       const response = await onSubmit(formData);
       
       // If we have file uploads and the form submission returned a violation ID, upload the files
@@ -235,6 +271,10 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
               
               {field.type === 'date' && (
                 <Input type="date" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
+              )}
+              
+              {field.type === 'time' && (
+                <Input type="time" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
               )}
               
               {field.type === 'select' && (
