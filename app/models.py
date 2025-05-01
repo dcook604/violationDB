@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 import argon2
+import uuid
 
 # Create Argon2 password hasher
 ph = argon2.PasswordHasher(
@@ -254,6 +255,102 @@ class User(UserMixin, db.Model):
         self.account_locked_until = None
         db.session.commit()
 
+    # Session management methods
+    def create_session(self, user_agent=None, ip_address=None):
+        """Create a new session for the user
+        
+        Args:
+            user_agent (str): Browser/client user agent
+            ip_address (str): Client IP address
+            
+        Returns:
+            UserSession: The created session
+        """
+        # First cleanup expired sessions
+        self.cleanup_expired_sessions()
+        
+        # Create new session
+        session = UserSession(
+            user_id=self.id,
+            token=str(uuid.uuid4()),
+            user_agent=user_agent,
+            ip_address=ip_address,
+            expires_at=datetime.utcnow() + timedelta(hours=24)  # 24-hour absolute timeout
+        )
+        db.session.add(session)
+        db.session.commit()
+        return session
+    
+    def get_active_sessions(self):
+        """Get all active sessions for this user
+        
+        Returns:
+            list: List of active UserSession objects
+        """
+        return UserSession.query.filter_by(
+            user_id=self.id, 
+            is_active=True
+        ).order_by(UserSession.last_activity.desc()).all()
+    
+    def terminate_other_sessions(self, current_session_id):
+        """Terminate all sessions except the current one
+        
+        Args:
+            current_session_id (int): ID of the current session to keep
+            
+        Returns:
+            int: Number of sessions terminated
+        """
+        sessions = UserSession.query.filter(
+            UserSession.user_id == self.id,
+            UserSession.id != current_session_id,
+            UserSession.is_active == True
+        ).all()
+        
+        count = 0
+        for session in sessions:
+            session.terminate()
+            count += 1
+        
+        db.session.commit()
+        return count
+    
+    def terminate_all_sessions(self):
+        """Terminate all active sessions for this user
+        
+        Returns:
+            int: Number of sessions terminated
+        """
+        sessions = UserSession.query.filter_by(
+            user_id=self.id,
+            is_active=True
+        ).all()
+        
+        count = 0
+        for session in sessions:
+            session.terminate()
+            count += 1
+        
+        db.session.commit()
+        return count
+        
+    def cleanup_expired_sessions(self):
+        """Clean up expired sessions for this user"""
+        now = datetime.utcnow()
+        
+        # Find expired sessions
+        expired_sessions = UserSession.query.filter(
+            UserSession.user_id == self.id,
+            UserSession.is_active == True,
+            UserSession.expires_at < now
+        ).all()
+        
+        # Mark them as inactive
+        for session in expired_sessions:
+            session.terminate()
+            
+        db.session.commit()
+
 class Violation(db.Model):
     __tablename__ = 'violations'
     
@@ -419,3 +516,65 @@ class ViolationReply(db.Model):
     
     def __repr__(self):
         return f'<ViolationReply id={self.id} for violation_id={self.violation_id}>'
+
+class UserSession(db.Model):
+    """Model for tracking user sessions"""
+    __tablename__ = 'user_sessions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    user_agent = db.Column(db.String(255))
+    ip_address = db.Column(db.String(45))  # IPv6 can be up to 45 chars
+    
+    # Relationship to User
+    user = db.relationship('User', backref=db.backref('sessions', lazy='dynamic'))
+    
+    def __init__(self, **kwargs):
+        super(UserSession, self).__init__(**kwargs)
+        if 'expires_at' not in kwargs:
+            self.expires_at = datetime.utcnow() + timedelta(hours=24)
+    
+    def update_activity(self):
+        """Update the last activity timestamp and extend session if needed"""
+        now = datetime.utcnow()
+        self.last_activity = now
+        
+        # If less than 30 minutes remain, extend by another 30 minutes
+        # This implements the sliding window for idle timeout
+        if self.expires_at - now < timedelta(minutes=10):
+            # Only extend up to the maximum 24 hours from creation
+            max_expiry = self.created_at + timedelta(hours=24)
+            new_expiry = now + timedelta(minutes=30)
+            self.expires_at = min(new_expiry, max_expiry)
+            
+        db.session.commit()
+    
+    def is_expired(self):
+        """Check if the session has expired
+        
+        Returns:
+            bool: True if expired
+        """
+        return datetime.utcnow() > self.expires_at
+    
+    def is_idle_timeout(self):
+        """Check if the session has exceeded the idle timeout (30 minutes)
+        
+        Returns:
+            bool: True if idle timeout exceeded
+        """
+        idle_time = datetime.utcnow() - self.last_activity
+        return idle_time > timedelta(minutes=30)
+    
+    def terminate(self):
+        """Terminate this session"""
+        self.is_active = False
+        db.session.commit()
+        
+    def __repr__(self):
+        return f'<UserSession id={self.id} user_id={self.user_id} active={self.is_active}>'

@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 load_dotenv(os.path.join(os.path.dirname(basedir), '.env'))
@@ -33,9 +34,17 @@ class Config:
     # Session and Cookie Settings
     SESSION_COOKIE_SECURE = False  # Set to True in production with HTTPS
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = None  # Required for cross-domain cookies in development
-    REMEMBER_COOKIE_SAMESITE = None  # Required for cross-domain cookies in development
+    SESSION_COOKIE_SAMESITE = 'Lax'  # Changed from None to Lax
+    REMEMBER_COOKIE_SAMESITE = 'Lax'  # Changed from None to Lax
     SESSION_COOKIE_DOMAIN = None  # Allow cookies to work across subdomains
     REMEMBER_COOKIE_DOMAIN = None  # Allow remember cookies to work across subdomains
     SESSION_PROTECTION = 'strong'
-    PERMANENT_SESSION_LIFETIME = 86400  # 24 hours in seconds
+    
+    # Session timeout settings (absolute timeout: 24 hours)
+    PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
+    
+    # Custom application settings
+    # Idle timeout in minutes (user will be logged out after this period of inactivity)
+    IDLE_TIMEOUT_MINUTES = 30
+    # Whether to enforce single session per user
+    ENFORCE_SINGLE_SESSION = True

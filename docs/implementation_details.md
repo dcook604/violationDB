@@ -247,3 +247,64 @@ def unlock_account():
 - Seamless migration during user login
 - No user disruption during transition
 - Multiple hash verification strategies for compatibility 
+
+# Session Management Implementation
+
+## Session Security
+
+### Session Timeouts
+```python
+# Session timeout settings in app/config.py
+PERMANENT_SESSION_LIFETIME = timedelta(hours=24)  # Absolute timeout
+IDLE_TIMEOUT_MINUTES = 30  # Idle timeout in minutes
+```
+
+### User Session Model
+```python
+class UserSession(db.Model):
+    __tablename__ = 'user_sessions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    token = db.Column(db.String(64), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_activity = db.Column(db.DateTime, default=datetime.utcnow)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    user_agent = db.Column(db.String(255))
+    ip_address = db.Column(db.String(45))
+```
+
+## Session Workflows
+
+### Session Creation
+- Token-based session management with secure UUIDs
+- Flask-Login handles authentication 
+- Additional UserSession tracks session details
+- Session tokens stored as HttpOnly cookies
+
+### Session Validation
+- Absolute timeout of 24 hours from creation
+- Idle timeout of 30 minutes since last activity
+- Activity auto-refreshed on any authenticated request
+- Expired sessions are automatically terminated
+
+### Multi-Session Control
+- Option to enforce single session per user
+- Upon login, all other sessions are terminated
+- Users can view and manage their active sessions
+- Admin users can terminate any user's sessions
+
+## API Endpoints
+
+### Session Management Routes
+- `/api/auth/active-sessions` - List all active sessions for current user
+- `/api/auth/terminate-sessions` - Terminate all other sessions
+- `/api/auth/terminate-session/<id>` - Terminate a specific session
+- `/api/auth/session` - Validate current session status
+
+### Session Token Security
+- Session tokens are 128-bit UUIDs stored as HttpOnly cookies
+- Tokens are validated against stored sessions on every request
+- Tokens are invalidated upon logout
+- Cookies cleared on both client and server during logout 

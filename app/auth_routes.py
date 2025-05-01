@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response, session
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, make_response, session, current_app
 from flask_login import login_user, logout_user, login_required, current_user
-from .models import User, AccountLockedError
+from .models import User, AccountLockedError, UserSession
 from werkzeug.security import check_password_hash, generate_password_hash
 from . import db
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, timedelta
 import logging
 
 # Set up logger
@@ -41,6 +41,44 @@ def check_session():
         print(f"Request cookies: {request.cookies}")
         
         if current_user.is_authenticated:
+            # Check for session token in request
+            session_token = request.cookies.get('session_token')
+            
+            if session_token:
+                # Find the session
+                user_session = UserSession.query.filter_by(
+                    token=session_token,
+                    is_active=True
+                ).first()
+                
+                # If session exists, check if it's expired
+                if user_session:
+                    # Check for absolute timeout (24 hours)
+                    if user_session.is_expired():
+                        # Session has expired, force logout
+                        logout_user()
+                        session.clear()
+                        print(f"Session expired for user {current_user.email}")
+                        return jsonify({'error': 'Session expired', 'user': None}), 401
+                    
+                    # Check for idle timeout (30 minutes)
+                    if user_session.is_idle_timeout():
+                        # Session is idle, force logout
+                        logout_user()
+                        session.clear()
+                        user_session.terminate()
+                        print(f"Session idle timeout for user {current_user.email}")
+                        return jsonify({'error': 'Session timeout due to inactivity', 'user': None}), 401
+                    
+                    # Session is valid, update activity
+                    user_session.update_activity()
+                else:
+                    # Session token not found or not active
+                    logout_user()
+                    session.clear()
+                    print(f"Invalid session token for user {current_user.email}")
+                    return jsonify({'error': 'Invalid session', 'user': None}), 401
+            
             user_data = {
                 'id': current_user.id,
                 'email': current_user.email,
@@ -146,6 +184,18 @@ def login():
                 # Set session as permanent
                 session.permanent = True
                 
+                # If configured to enforce single session, terminate other sessions
+                if current_app.config.get('ENFORCE_SINGLE_SESSION', True):
+                    user.terminate_all_sessions()
+                    logger.info(f"Terminated existing sessions for user {email}")
+                
+                # Create a new session for this login
+                user_session = user.create_session(
+                    user_agent=request.headers.get('User-Agent'),
+                    ip_address=request.remote_addr
+                )
+                logger.info(f"Created new session {user_session.id} for user {email}")
+                
                 # Explicitly login user
                 login_user(user, remember=True)
                 logger.info(f"User {email} logged in successfully.")
@@ -172,6 +222,17 @@ def login():
                 if origin and origin in allowed_origins:
                     response.headers['Access-Control-Allow-Origin'] = origin
                     response.headers['Access-Control-Allow-Credentials'] = 'true'
+                
+                # Set session token cookie 
+                response.set_cookie(
+                    'session_token',
+                    user_session.token,
+                    httponly=True,  # Not accessible by JavaScript
+                    secure=current_app.config.get('SESSION_COOKIE_SECURE', False),
+                    samesite=current_app.config.get('SESSION_COOKIE_SAMESITE', 'Lax'),
+                    path='/',
+                    max_age=86400  # 24 hours in seconds
+                )
                 
                 # Manually set a test cookie for troubleshooting
                 response.set_cookie(
@@ -227,12 +288,28 @@ def logout():
     
     try:
         user_email = current_user.email
+        
+        # Terminate the current session
+        session_token = request.cookies.get('session_token')
+        if session_token:
+            user_session = UserSession.query.filter_by(token=session_token).first()
+            if user_session:
+                user_session.terminate()
+        
         logout_user()
         session.clear()
-        print(f"User {user_email} logged out successfully.")
-        return jsonify({'message': 'Logged out successfully'})
+        
+        # Create response
+        response = make_response(jsonify({'message': 'Logged out successfully'}))
+        
+        # Clear the session token cookie
+        response.delete_cookie('session_token')
+        response.delete_cookie('test_auth')
+        
+        logger.info(f"User {user_email} logged out successfully.")
+        return response
     except Exception as e:
-        print(f"Logout error: {str(e)}")
+        logger.error(f"Logout error: {str(e)}")
         return jsonify({'error': 'Logout failed'}), 500
 
 @auth.route('/login', methods=['GET'])
@@ -431,3 +508,106 @@ def unlock_account():
     except Exception as e:
         logger.error(f"Error unlocking account: {str(e)}")
         return jsonify({'error': 'Failed to unlock account'}), 500
+
+@auth.route('/api/auth/active-sessions', methods=['GET', 'OPTIONS'])
+@cors_preflight
+@login_required
+def active_sessions():
+    """Get list of active sessions for the current user"""
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    try:
+        active_sessions = current_user.get_active_sessions()
+        
+        # Get current session token
+        current_token = request.cookies.get('session_token')
+        
+        # Convert sessions to dictionary
+        sessions_data = []
+        for session in active_sessions:
+            sessions_data.append({
+                'id': session.id,
+                'created_at': session.created_at.isoformat(),
+                'last_activity': session.last_activity.isoformat(),
+                'expires_at': session.expires_at.isoformat(),
+                'user_agent': session.user_agent,
+                'ip_address': session.ip_address,
+                'is_current': session.token == current_token
+            })
+            
+        return jsonify({
+            'sessions': sessions_data,
+            'count': len(sessions_data)
+        })
+    except Exception as e:
+        logger.error(f"Error retrieving active sessions: {str(e)}")
+        return jsonify({'error': 'Failed to retrieve sessions'}), 500
+
+@auth.route('/api/auth/terminate-sessions', methods=['POST', 'OPTIONS'])
+@cors_preflight
+@login_required
+def terminate_sessions():
+    """Terminate all other sessions for the current user"""
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    try:
+        current_token = request.cookies.get('session_token')
+        if not current_token:
+            return jsonify({'error': 'No active session found'}), 400
+            
+        # Find the current session
+        current_session = UserSession.query.filter_by(token=current_token).first()
+        if not current_session:
+            return jsonify({'error': 'Current session not found'}), 400
+            
+        # Terminate all other sessions
+        count = current_user.terminate_other_sessions(current_session.id)
+        
+        logger.info(f"User {current_user.email} terminated {count} other sessions")
+        return jsonify({
+            'message': f'Successfully terminated {count} other sessions',
+            'count': count
+        })
+    except Exception as e:
+        logger.error(f"Error terminating sessions: {str(e)}")
+        return jsonify({'error': 'Failed to terminate sessions'}), 500
+
+@auth.route('/api/auth/terminate-session/<int:session_id>', methods=['POST', 'OPTIONS'])
+@cors_preflight
+@login_required
+def terminate_specific_session(session_id):
+    """Terminate a specific session"""
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    try:
+        # Get current session token
+        current_token = request.cookies.get('session_token')
+        current_session = None
+        if current_token:
+            current_session = UserSession.query.filter_by(token=current_token).first()
+        
+        # Don't allow terminating the current session through this endpoint
+        if current_session and current_session.id == session_id:
+            return jsonify({'error': 'Cannot terminate current session. Use logout instead.'}), 400
+            
+        # Find the session to terminate
+        session_to_terminate = UserSession.query.filter_by(
+            id=session_id,
+            user_id=current_user.id,
+            is_active=True
+        ).first()
+        
+        if not session_to_terminate:
+            return jsonify({'error': 'Session not found or already terminated'}), 404
+            
+        # Terminate the session
+        session_to_terminate.terminate()
+        
+        logger.info(f"User {current_user.email} terminated session {session_id}")
+        return jsonify({'message': 'Session terminated successfully'})
+    except Exception as e:
+        logger.error(f"Error terminating session {session_id}: {str(e)}")
+        return jsonify({'error': 'Failed to terminate session'}), 500
