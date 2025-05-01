@@ -27,7 +27,8 @@ const initialFormState = {
   type: 'text',
   required: false,
   options: '',
-  validation: ''
+  validation: '',
+  grid_column: 0 // Default to full width
 };
 
 function AdminFieldManager() {
@@ -46,7 +47,8 @@ function AdminFieldManager() {
       type: field.type,
       required: field.required,
       options: field.options || '',
-      validation: field.validation || ''
+      validation: field.validation || '',
+      grid_column: field.grid_column || 0
     });
   }, []);
 
@@ -180,6 +182,23 @@ function AdminFieldManager() {
         <label className="flex items-center gap-1">
           <input type="checkbox" name="required" checked={form.required} onChange={handleChange} className="accent-blue-600" /> Required
         </label>
+        
+        {/* Add grid column selector */}
+        <div className="ml-2">
+          <label className="text-xs block">Layout Width</label>
+          <select 
+            name="grid_column" 
+            value={form.grid_column} 
+            onChange={handleChange} 
+            className="border p-2 rounded text-sm"
+          >
+            <option value="0">Full Width</option>
+            <option value="6">Half Width</option>
+            <option value="4">Third Width</option>
+            <option value="3">Quarter Width</option>
+          </select>
+        </div>
+
         {form.type === 'select' && (
           <Input name="options" value={form.options || ''} onChange={handleChange} placeholder="Comma-separated options" className="w-48" />
         )}

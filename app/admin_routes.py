@@ -33,7 +33,8 @@ def list_fields():
         'options': f.options,
         'order': f.order,
         'active': f.active,
-        'validation': f.validation
+        'validation': f.validation,
+        'grid_column': f.grid_column
     } for f in fields])
 
 @admin_bp.route('/api/fields', methods=['POST'])
@@ -48,7 +49,8 @@ def create_field():
         options=data.get('options'),
         order=data.get('order', 0),
         active=data.get('active', True),
-        validation=data.get('validation')
+        validation=data.get('validation'),
+        grid_column=data.get('grid_column', 0)
     )
     db.session.add(field)
     db.session.commit()
@@ -70,6 +72,7 @@ def update_field(fid):
     field.order = data.get('order', field.order)
     field.active = data.get('active', field.active)
     field.validation = data.get('validation', field.validation)
+    field.grid_column = data.get('grid_column', field.grid_column)
     db.session.commit()
     
     # Clear field cache after updating a field

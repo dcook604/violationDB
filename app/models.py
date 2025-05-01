@@ -180,6 +180,8 @@ class Violation(db.Model):
     photo_paths = db.Column(db.Text)  # comma-separated
     pdf_paths = db.Column(db.Text)    # comma-separated
     pdf_letter_path = db.Column(db.String(255))
+    html_path = db.Column(db.String(255))  # Path to the generated HTML file
+    pdf_path = db.Column(db.String(255))   # Path to the generated PDF file
     status = db.Column(db.String(20), default=STATUS_ACTIVE)
     resolved_at = db.Column(db.DateTime)
     resolved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
@@ -227,6 +229,7 @@ class FieldDefinition(db.Model):
     order = db.Column(db.Integer, default=0)
     active = db.Column(db.Boolean, default=True)
     validation = db.Column(db.Text)  # JSON-encoded validation rules (optional)
+    grid_column = db.Column(db.Integer, default=0)  # 0 = full width, 1-12 = grid columns for layout
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -246,3 +249,46 @@ class ViolationFieldValue(db.Model):
 
     def __repr__(self):
         return f'<ViolationFieldValue V:{self.violation_id} F:{self.field_definition_id}>'
+
+class Settings(db.Model):
+    __tablename__ = 'settings'
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # SMTP Settings
+    smtp_server = db.Column(db.String(255))
+    smtp_port = db.Column(db.Integer)
+    smtp_username = db.Column(db.String(255))
+    smtp_password = db.Column(db.String(255))
+    smtp_use_tls = db.Column(db.Boolean, default=True)
+    smtp_from_email = db.Column(db.String(255))
+    smtp_from_name = db.Column(db.String(255))
+    
+    # Global Notification Settings
+    notification_emails = db.Column(db.Text)  # Comma-separated list of emails
+    enable_global_notifications = db.Column(db.Boolean, default=False)
+    
+    # Additional settings
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    @classmethod
+    def get_settings(cls):
+        """Get the active settings or create default settings if none exist"""
+        settings = cls.query.first()
+        if not settings:
+            settings = cls()
+            db.session.add(settings)
+            db.session.commit()
+        return settings
+    
+    def get_notification_emails_list(self):
+        """Convert notification_emails string to a list of email addresses"""
+        if not self.notification_emails:
+            return []
+        return [email.strip() for email in self.notification_emails.split(',') if email.strip()]
+        
+    def __repr__(self):
+        return f'<Settings id:{self.id} updated:{self.updated_at}>'

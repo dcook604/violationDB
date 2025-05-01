@@ -160,74 +160,137 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
 
   if (loading) return <div>Loading fields...</div>;
 
-  return (
-    <form onSubmit={handleSubmit}>
-      {fields.map(field => (
-        <div key={field.id} className="mb-3">
-          <label className="block font-semibold mb-1">{field.label}{field.required && ' *'}</label>
+  // Group fields by their grid layout properties
+  const renderFields = () => {
+    // Sort fields by order first
+    const orderedFields = [...fields].sort((a, b) => a.order - b.order);
+    
+    // Track the current row of fields
+    let currentRow = [];
+    let currentRowWidth = 0;
+    const rows = [];
+    
+    // Process each field
+    orderedFields.forEach(field => {
+      // Get the column width (0 = full width/12 columns)
+      const colWidth = field.grid_column || 0;
+      const colSpan = colWidth === 0 ? 12 : colWidth;
+      
+      // If this field is full width or would overflow the row, start a new row
+      if (colSpan === 12 || currentRowWidth + colSpan > 12) {
+        if (currentRow.length > 0) {
+          rows.push([...currentRow]);
+          currentRow = [];
+          currentRowWidth = 0;
+        }
+      }
+      
+      // Add field to current row
+      currentRow.push(field);
+      currentRowWidth += colSpan;
+      
+      // If we've filled the row, add it to rows and reset
+      if (currentRowWidth === 12) {
+        rows.push([...currentRow]);
+        currentRow = [];
+        currentRowWidth = 0;
+      }
+    });
+    
+    // Add any remaining fields in the last row
+    if (currentRow.length > 0) {
+      rows.push(currentRow);
+    }
+    
+    // Render rows and fields
+    return rows.map((row, rowIdx) => (
+      <div key={`row-${rowIdx}`} className="flex flex-wrap mb-2 -mx-2">
+        {row.map(field => {
+          const colWidth = field.grid_column || 0;
+          const colSpan = colWidth === 0 ? 12 : colWidth;
           
-          {field.type === 'text' && (
-            <Input name={field.name} value={values[field.name] || ''} onChange={handleChange} />
-          )}
+          // Calculate Tailwind width classes
+          const widthClass = 
+            colSpan === 12 ? 'w-full' :
+            colSpan === 6 ? 'w-1/2' :
+            colSpan === 4 ? 'w-1/3' :
+            colSpan === 3 ? 'w-1/4' :
+            'w-full';
           
-          {field.type === 'email' && (
-            <Input type="email" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
-          )}
-          
-          {field.type === 'number' && (
-            <Input type="number" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
-          )}
-          
-          {field.type === 'date' && (
-            <Input type="date" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
-          )}
-          
-          {field.type === 'select' && (
-            <select className="border p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" name={field.name} value={values[field.name] || ''} onChange={handleChange}>
-              <option value="">Select...</option>
-              {(field.options ? field.options.split(',') : []).map(opt => (
-                <option key={opt.trim()} value={opt.trim()}>{opt.trim()}</option>
-              ))}
-            </select>
-          )}
-          
-          {field.type === 'file' && (
-            <div>
-              <input 
-                type="file" 
-                className="w-full border p-2 rounded" 
-                onChange={(e) => handleFileChange(field.name, e)} 
-                multiple
-                accept="image/jpeg,image/png,image/gif"
-              />
-              {field.validation && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {(() => {
-                    try {
-                      const validation = JSON.parse(field.validation);
-                      return `Max ${validation.maxFiles} files, ${validation.maxSizePerFile}MB per file`;
-                    } catch (e) {
-                      return 'Max 5 files, 5MB per file';
-                    }
-                  })()}
-                </p>
+          return (
+            <div key={field.id} className={`${widthClass} px-2 mb-3`}>
+              <label className="block font-semibold mb-1">{field.label}{field.required && ' *'}</label>
+              
+              {field.type === 'text' && (
+                <Input name={field.name} value={values[field.name] || ''} onChange={handleChange} />
               )}
-              {fileUploads[field.name] && fileUploads[field.name].length > 0 && (
-                <div className="mt-2">
-                  <p className="text-sm">{fileUploads[field.name].length} file(s) selected</p>
-                  <ul className="text-xs text-gray-500">
-                    {fileUploads[field.name].map((file, idx) => (
-                      <li key={idx}>{file.name} ({Math.round(file.size / 1024)} KB)</li>
-                    ))}
-                  </ul>
+              
+              {field.type === 'email' && (
+                <Input type="email" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
+              )}
+              
+              {field.type === 'number' && (
+                <Input type="number" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
+              )}
+              
+              {field.type === 'date' && (
+                <Input type="date" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
+              )}
+              
+              {field.type === 'select' && (
+                <select className="border p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" name={field.name} value={values[field.name] || ''} onChange={handleChange}>
+                  <option value="">Select...</option>
+                  {(field.options ? field.options.split(',') : []).map(opt => (
+                    <option key={opt.trim()} value={opt.trim()}>{opt.trim()}</option>
+                  ))}
+                </select>
+              )}
+              
+              {field.type === 'file' && (
+                <div>
+                  <input 
+                    type="file" 
+                    className="w-full border p-2 rounded" 
+                    onChange={(e) => handleFileChange(field.name, e)} 
+                    multiple
+                    accept="image/jpeg,image/png,image/gif"
+                  />
+                  {field.validation && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {(() => {
+                        try {
+                          const validation = JSON.parse(field.validation);
+                          return `Max ${validation.maxFiles} files, ${validation.maxSizePerFile}MB per file`;
+                        } catch (e) {
+                          return 'Max 5 files, 5MB per file';
+                        }
+                      })()}
+                    </p>
+                  )}
+                  {fileUploads[field.name] && fileUploads[field.name].length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-sm">{fileUploads[field.name].length} file(s) selected</p>
+                      <ul className="text-xs text-gray-500">
+                        {fileUploads[field.name].map((file, idx) => (
+                          <li key={idx}>{file.name} ({Math.round(file.size / 1024)} KB)</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
+              
+              {errors[field.name] && <div className="text-red-600 text-sm mt-1">{errors[field.name]}</div>}
             </div>
-          )}
-          
-          {errors[field.name] && <div className="text-red-600 text-sm mt-1">{errors[field.name]}</div>}
-        </div>
-      ))}
+          );
+        })}
+      </div>
+    ));
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {renderFields()}
       {errors.global && <div className="text-red-600 text-sm mb-2">{errors.global}</div>}
       <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">{submitLabel}</Button>
     </form>

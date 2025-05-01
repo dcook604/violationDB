@@ -37,12 +37,7 @@ def allowed_file(filename):
 @violation_bp.route('/api/fields', methods=['GET'])
 def api_list_fields():
     # Use cached fields to improve performance
-    active_only = request.args.get('active') == 'true'
-    if active_only:
-        fields = get_cached_fields('active')
-    else:
-        fields = get_cached_fields('all')
-    
+    fields = get_cached_fields('all')
     return jsonify([{
         'id': f.id,
         'name': f.name,
@@ -52,7 +47,8 @@ def api_list_fields():
         'options': f.options,
         'order': f.order,
         'active': f.active,
-        'validation': f.validation
+        'validation': f.validation,
+        'grid_column': f.grid_column
     } for f in fields])
 
 @violation_bp.route('/api/fields/active', methods=['GET'])
@@ -68,7 +64,8 @@ def api_list_active_fields():
         'options': f.options,
         'order': f.order,
         'active': f.active,
-        'validation': f.validation
+        'validation': f.validation,
+        'grid_column': f.grid_column
     } for f in fields])
 
 @violation_bp.route('/api/violations', methods=['POST'])
