@@ -1,29 +1,6 @@
 /* Modern Flask Login Page Styles */
-body.login-bg {
-  background: #e6f2ff;
-  min-height: 100vh;
-  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
-}
 
-.login-card {
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 8px 32px rgba(60, 60, 60, 0.18);
-  padding: 2.5rem 2rem 2rem 2rem;
-  max-width: 400px;
-  width: 100%;
-  margin: 0 auto;
-  transition: box-shadow 0.2s;
-}
-.login-card:focus-within {
-  box-shadow: 0 12px 36px rgba(0, 123, 255, 0.18);
-}
-
-.login-logo {
-  display: block;
-  margin: 0 auto 1.5rem auto;
-  max-width: 120px;
-}
+/* Remove body.login-bg, .login-card, .login-logo as these are now handled in base.html */
 
 .form-floating > .form-control:focus {
   border-color: #007bff;
@@ -79,10 +56,10 @@ body.login-bg {
 }
 
 @media (max-width: 576px) {
-  .login-card {
+  .login-box {
     padding: 1.2rem 0.5rem 1.5rem 0.5rem;
   }
-  .login-logo {
+  .logo {
     max-width: 90px;
   }
 }

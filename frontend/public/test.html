@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Auth Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .section { margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 8px 12px; margin-right: 10px; cursor: pointer; }
+        .output { background: #f5f5f5; padding: 10px; border-radius: 4px; white-space: pre-wrap; margin-top: 10px; }
+        h3 { margin-top: 0; }
+    </style>
+</head>
+<body>
+    <h1>Authentication Test Page</h1>
+    
+    <div class="section">
+        <h3>Login Test</h3>
+        <div>
+            <input id="email" placeholder="Email" value="admin@test.com" />
+            <input id="password" type="password" placeholder="Password" value="admin123" />
+            <button onclick="login()">Login</button>
+        </div>
+        <div class="output" id="login-output"></div>
+    </div>
+
+    <div class="section">
+        <h3>Session Check</h3>
+        <button onclick="checkSession()">Check Session</button>
+        <div class="output" id="session-output"></div>
+    </div>
+
+    <div class="section">
+        <h3>Debug Session</h3>
+        <button onclick="debugSession()">Debug Session</button>
+        <div class="output" id="debug-output"></div>
+    </div>
+
+    <div class="section">
+        <h3>Logout Test</h3>
+        <button onclick="logout()">Logout</button>
+        <div class="output" id="logout-output"></div>
+    </div>
+
+    <div class="section">
+        <h3>Cookies</h3>
+        <div>
+            <button onclick="showCookies()">Show Cookies</button>
+            <button onclick="clearAllCookies()">Clear All Cookies</button>
+            <button onclick="setTestCookies()">Set Test Cookies</button>
+        </div>
+        <div class="output" id="cookies-output"></div>
+    </div>
+
+    <script>
+        // Helper function to make requests
+        async function makeRequest(url, method = 'GET', data = null) {
+            const options = {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include'
+            };
+            
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+            
+            try {
+                const response = await fetch(url, options);
+                return {
+                    status: response.status,
+                    headers: Object.fromEntries([...response.headers.entries()]),
+                    data: await response.json()
+                };
+            } catch (error) {
+                return { error: error.message };
+            }
+        }
+
+        // Login function
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const output = document.getElementById('login-output');
+            
+            output.textContent = 'Logging in...';
+            
+            const result = await makeRequest('/api/auth/login', 'POST', { email, password });
+            output.textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Check session function
+        async function checkSession() {
+            const output = document.getElementById('session-output');
+            output.textContent = 'Checking session...';
+            
+            const result = await makeRequest('/api/auth/session');
+            output.textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Debug session function
+        async function debugSession() {
+            const output = document.getElementById('debug-output');
+            output.textContent = 'Debugging session...';
+            
+            const result = await makeRequest('/api/auth/debug');
+            output.textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Logout function
+        async function logout() {
+            const output = document.getElementById('logout-output');
+            output.textContent = 'Logging out...';
+            
+            const result = await makeRequest('/api/auth/logout', 'POST');
+            output.textContent = JSON.stringify(result, null, 2);
+        }
+
+        // Show all cookies
+        function showCookies() {
+            const output = document.getElementById('cookies-output');
+            output.textContent = document.cookie || "(no cookies)";
+        }
+
+        // Clear all cookies
+        function clearAllCookies() {
+            const cookies = document.cookie.split(";");
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i];
+                const eqPos = cookie.indexOf("=");
+                const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+                document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+            }
+            showCookies();
+        }
+        
+        // Set test cookies via direct API endpoint
+        async function setTestCookies() {
+            const output = document.getElementById('cookies-output');
+            output.textContent = 'Setting test cookies...';
+            
+            const result = await makeRequest('/api/auth/set-test-cookie');
+            output.textContent = JSON.stringify(result, null, 2);
+            
+            // Show cookies after attempt
+            setTimeout(showCookies, 500);
+        }
+    </script>
+</body>
+</html> 

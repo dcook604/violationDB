@@ -145,6 +145,13 @@ class User(UserMixin, db.Model):
 
 class Violation(db.Model):
     __tablename__ = 'violations'
+    
+    # Status constants
+    STATUS_ACTIVE = 'active'
+    STATUS_RESOLVED = 'resolved'
+    STATUS_PENDING = 'pending'
+    VALID_STATUSES = [STATUS_ACTIVE, STATUS_RESOLVED, STATUS_PENDING]
+    
     reference = db.Column(db.String(32), unique=True, nullable=False, index=True)
     extra_fields = db.Column(db.JSON, default=dict)
     id = db.Column(db.Integer, primary_key=True)
@@ -173,4 +180,69 @@ class Violation(db.Model):
     photo_paths = db.Column(db.Text)  # comma-separated
     pdf_paths = db.Column(db.Text)    # comma-separated
     pdf_letter_path = db.Column(db.String(255))
-    status = db.Column(db.String(20), default='unresolved')
+    status = db.Column(db.String(20), default=STATUS_ACTIVE)
+    resolved_at = db.Column(db.DateTime)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.status:
+            self.status = self.STATUS_ACTIVE
+
+    def resolve(self, user_id):
+        """Mark violation as resolved
+        
+        Args:
+            user_id (int): ID of user resolving the violation
+        """
+        self.status = self.STATUS_RESOLVED
+        self.resolved_at = datetime.utcnow()
+        self.resolved_by = user_id
+        db.session.commit()
+
+    def reopen(self):
+        """Reopen a resolved violation"""
+        self.status = self.STATUS_ACTIVE
+        self.resolved_at = None
+        self.resolved_by = None
+        db.session.commit()
+
+    @property
+    def is_resolved(self):
+        """Check if violation is resolved
+        
+        Returns:
+            bool: True if resolved
+        """
+        return self.status == self.STATUS_RESOLVED
+
+class FieldDefinition(db.Model):
+    __tablename__ = 'field_definitions'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True, nullable=False)  # Internal name
+    label = db.Column(db.String(128), nullable=False)  # Display label
+    type = db.Column(db.String(32), nullable=False)  # text, number, date, select, etc.
+    required = db.Column(db.Boolean, default=False)
+    options = db.Column(db.Text)  # JSON-encoded list for select fields
+    order = db.Column(db.Integer, default=0)
+    active = db.Column(db.Boolean, default=True)
+    validation = db.Column(db.Text)  # JSON-encoded validation rules (optional)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<FieldDefinition {self.name} ({self.type})>'
+
+class ViolationFieldValue(db.Model):
+    __tablename__ = 'violation_field_values'
+    id = db.Column(db.Integer, primary_key=True)
+    violation_id = db.Column(db.Integer, db.ForeignKey('violations.id'), nullable=False)
+    field_definition_id = db.Column(db.Integer, db.ForeignKey('field_definitions.id'), nullable=False)
+    value = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    field_definition = db.relationship('FieldDefinition')
+
+    def __repr__(self):
+        return f'<ViolationFieldValue V:{self.violation_id} F:{self.field_definition_id}>'

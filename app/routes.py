@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, jsonify, request, redirect, url_for, flash, current_app
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from .models import Violation
@@ -10,67 +10,25 @@ from datetime import datetime
 bp = Blueprint('main', __name__)
 
 @bp.route('/')
+@bp.route('/dashboard')
 @login_required
 def dashboard():
-    return render_template('dashboard.html', user=current_user)
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
-from flask_login import login_required, current_user
-from werkzeug.utils import secure_filename
-from .models import Violation
-from . import db
-from app.forms import ViolationForm
-import os
-from datetime import datetime
-
-bp = Blueprint('main', __name__)
-
-@bp.route('/')
-@login_required
-def dashboard():
-    return render_template('dashboard.html', user=current_user)
-
-
-
-
-
+    return jsonify({
+        'user': {
+            'id': current_user.id,
+            'email': current_user.email,
+            'role': 'admin' if current_user.is_admin else 'user'
+        }
+    })
 
 # --- Registration ---
 from .forms import RegisterForm
 
-@bp.route('/register', methods=['GET', 'POST'])
+@bp.route('/register')
 def register():
-    from werkzeug.security import generate_password_hash
-    from .models import User
-    form = RegisterForm()
-    if form.validate_on_submit():
-        email = form.email.data
-        password = form.password.data
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered.', 'danger')
-            return redirect(url_for('main.register'))
-        user = User(email=email, password_hash=generate_password_hash(password))
-        db.session.add(user)
-        db.session.commit()
-        flash('Registration successful. Please log in.', 'success')
-        return redirect(url_for('auth.login'))
-    return render_template('register.html', form=form)
-
-
+    return jsonify({'redirect': True, 'location': 'http://localhost:3001/register'}), 200
 
 # --- Password Reset (simple version) ---
-@bp.route('/reset_password', methods=['GET', 'POST'])
+@bp.route('/reset-password')
 def reset_password():
-    from werkzeug.security import generate_password_hash
-    from .models import User
-    if request.method == 'POST':
-        email = request.form['email']
-        user = User.query.filter_by(email=email).first()
-        if not user:
-            flash('Email not found.', 'danger')
-            return redirect(url_for('main.reset_password'))
-        new_password = request.form['new_password']
-        user.password_hash = generate_password_hash(new_password)
-        db.session.commit()
-        flash('Password reset successful. Please log in.', 'success')
-        return redirect(url_for('auth.login'))
-    return render_template('reset_password.html')
+    return jsonify({'redirect': True, 'location': 'http://localhost:3001/reset-password'}), 200
