@@ -143,6 +143,9 @@ def update_settings():
     settings = Settings.get_settings()
     data = request.json or {}
     
+    # Log the incoming data for debugging
+    current_app.logger.info(f"Settings update received: {data}")
+    
     # Update SMTP settings
     if 'smtp_server' in data:
         settings.smtp_server = data['smtp_server']
@@ -153,8 +156,23 @@ def update_settings():
     if 'smtp_password' in data and data['smtp_password']:
         # Only update password if a new one is provided
         settings.smtp_password = data['smtp_password']
+    
+    # Special handling for boolean TLS setting
     if 'smtp_use_tls' in data:
-        settings.smtp_use_tls = data['smtp_use_tls']
+        tls_value = data['smtp_use_tls']
+        # Make sure we convert to proper boolean
+        if isinstance(tls_value, bool):
+            settings.smtp_use_tls = tls_value
+        elif isinstance(tls_value, str):
+            settings.smtp_use_tls = tls_value.lower() in ('true', 't', 'yes', 'y', '1')
+        elif isinstance(tls_value, int):
+            settings.smtp_use_tls = bool(tls_value)
+        else:
+            current_app.logger.warning(f"Received invalid TLS value: {tls_value} (type: {type(tls_value)})")
+        
+        # Log the new TLS value
+        current_app.logger.info(f"TLS setting updated to: {settings.smtp_use_tls}")
+    
     if 'smtp_from_email' in data:
         settings.smtp_from_email = data['smtp_from_email']
     if 'smtp_from_name' in data:
@@ -171,6 +189,13 @@ def update_settings():
     
     db.session.commit()
     
+    # Log all settings after update for debugging
+    current_app.logger.info(f"Settings updated successfully by {current_user.email}")
+    current_app.logger.info(f"SMTP Server: {settings.smtp_server}")
+    current_app.logger.info(f"SMTP Port: {settings.smtp_port}")
+    current_app.logger.info(f"SMTP Username: {settings.smtp_username}")
+    current_app.logger.info(f"TLS Enabled: {settings.smtp_use_tls}")
+    
     return jsonify({
         'message': 'Settings updated successfully',
         'updated_at': settings.updated_at.isoformat() if settings.updated_at else None
@@ -181,12 +206,24 @@ def update_settings():
 def test_email():
     """Send a test email using the current settings"""
     from .utils import send_email
+    import traceback
     
     data = request.json or {}
     recipient = data.get('email') or current_user.email
     
     if not recipient:
         return jsonify({'error': 'No recipient email provided'}), 400
+    
+    # Get the current settings
+    settings = Settings.get_settings()
+    
+    # Log the SMTP configuration for debugging
+    current_app.logger.info(f"Test email requested with SMTP settings:")
+    current_app.logger.info(f"Server: {settings.smtp_server}")
+    current_app.logger.info(f"Port: {settings.smtp_port}")
+    current_app.logger.info(f"Username: {settings.smtp_username}")
+    current_app.logger.info(f"TLS Enabled: {settings.smtp_use_tls}")
+    current_app.logger.info(f"Password: {'Set' if settings.smtp_password else 'Not set'}")
     
     try:
         send_email(
@@ -197,5 +234,28 @@ def test_email():
         )
         return jsonify({'message': f'Test email sent to {recipient}'})
     except Exception as e:
-        current_app.logger.error(f"Error sending test email: {str(e)}")
-        return jsonify({'error': f'Failed to send test email: {str(e)}'}), 500
+        error_msg = str(e)
+        stack_trace = traceback.format_exc()
+        current_app.logger.error(f"Error sending test email: {error_msg}")
+        current_app.logger.error(f"Stack trace: {stack_trace}")
+        
+        # Check for common errors and provide helpful responses
+        if "Connection refused" in error_msg:
+            detailed_msg = (
+                "Connection refused error. Possible causes:\n"
+                "1. SMTP server address or port may be incorrect\n"
+                "2. Firewall may be blocking outgoing connections\n"
+                "3. SMTP server may be down or not accepting connections\n"
+                f"Error details: {error_msg}"
+            )
+        elif "Authentication" in error_msg or "credential" in error_msg.lower():
+            detailed_msg = (
+                "Authentication error. Possible causes:\n"
+                "1. Username or password may be incorrect\n"
+                "2. Account may require specific security settings\n"
+                f"Error details: {error_msg}"
+            )
+        else:
+            detailed_msg = f"Failed to send test email: {error_msg}"
+            
+        return jsonify({'error': detailed_msg}), 500
