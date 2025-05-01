@@ -8,12 +8,14 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(true);
+  const [fileUploads, setFileUploads] = useState({});
 
   useEffect(() => {
     const fetchFields = async () => {
       setLoading(true);
       try {
-        const res = await API.get('/api/fields');
+        // Use the optimized endpoint for active fields only
+        const res = await API.get('/api/fields/active');
         setFields(res.data);
         // Set initial values for new fields if not present
         const newVals = { ...initialValues };
@@ -27,29 +29,133 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
       setLoading(false);
     };
     fetchFields();
-  }, [initialValues]);
+  }, []);
 
   const handleChange = e => {
     const { name, value, type, checked } = e.target;
     setValues(v => ({ ...v, [name]: type === 'checkbox' ? checked : value }));
   };
 
+  const handleFileChange = (fieldName, e) => {
+    const files = Array.from(e.target.files);
+    
+    // Get field definition
+    const fieldDef = fields.find(f => f.name === fieldName);
+    if (!fieldDef) return;
+    
+    // Parse validation rules
+    let validationRules = { maxFiles: 5, maxSizePerFile: 5 };
+    try {
+      if (fieldDef.validation) {
+        validationRules = JSON.parse(fieldDef.validation);
+      }
+    } catch (err) {
+      console.error('Invalid validation JSON', err);
+    }
+    
+    // Validate file count
+    if (files.length > validationRules.maxFiles) {
+      setErrors(prev => ({ 
+        ...prev, 
+        [fieldName]: `Maximum of ${validationRules.maxFiles} files allowed`
+      }));
+      return;
+    }
+    
+    // Validate file sizes
+    const maxSizeBytes = validationRules.maxSizePerFile * 1024 * 1024; // convert MB to bytes
+    const oversizedFiles = files.filter(file => file.size > maxSizeBytes);
+    if (oversizedFiles.length > 0) {
+      setErrors(prev => ({ 
+        ...prev, 
+        [fieldName]: `Files must be smaller than ${validationRules.maxSizePerFile}MB`
+      }));
+      return;
+    }
+    
+    // Store files for later submission
+    setFileUploads(prev => ({
+      ...prev,
+      [fieldName]: files
+    }));
+    
+    // Clear errors if validation passes
+    if (errors[fieldName]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[fieldName];
+        return newErrors;
+      });
+    }
+  };
+
   const validate = () => {
     const errs = {};
     fields.forEach(f => {
-      if (f.required && !values[f.name]) {
+      if (f.required && !values[f.name] && f.type !== 'file') {
         errs[f.name] = `${f.label} is required.`;
       }
+      
+      // Validate required file uploads
+      if (f.type === 'file' && f.required && (!fileUploads[f.name] || fileUploads[f.name].length === 0)) {
+        errs[f.name] = `${f.label} is required.`;
+      }
+      
+      // Validate email format
+      if (f.type === 'email' && values[f.name] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values[f.name])) {
+        errs[f.name] = `Please enter a valid email address.`;
+      }
+
       // Add more type/validation logic as needed
     });
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
     if (!validate()) return;
-    onSubmit(values);
+    
+    try {
+      // First, submit the form data
+      const formData = { ...values };
+      const response = await onSubmit(formData);
+      
+      // If we have file uploads and the form submission returned a violation ID, upload the files
+      const violationId = response?.id;
+      if (violationId && Object.keys(fileUploads).length > 0) {
+        await uploadFiles(violationId);
+      }
+    } catch (err) {
+      setErrors({ global: 'Form submission failed' });
+    }
+  };
+  
+  const uploadFiles = async (violationId) => {
+    for (const [fieldName, files] of Object.entries(fileUploads)) {
+      if (!files || files.length === 0) continue;
+      
+      const formData = new FormData();
+      formData.append('field_name', fieldName);
+      
+      files.forEach(file => {
+        formData.append('files', file);
+      });
+      
+      try {
+        await API.post(`/api/violations/${violationId}/upload`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        });
+      } catch (err) {
+        console.error(`Failed to upload files for ${fieldName}`, err);
+        setErrors(prev => ({ 
+          ...prev,
+          [fieldName]: 'Failed to upload files' 
+        }));
+      }
+    }
   };
 
   if (loading) return <div>Loading fields...</div>;
@@ -59,15 +165,23 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
       {fields.map(field => (
         <div key={field.id} className="mb-3">
           <label className="block font-semibold mb-1">{field.label}{field.required && ' *'}</label>
+          
           {field.type === 'text' && (
             <Input name={field.name} value={values[field.name] || ''} onChange={handleChange} />
           )}
+          
+          {field.type === 'email' && (
+            <Input type="email" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
+          )}
+          
           {field.type === 'number' && (
             <Input type="number" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
           )}
+          
           {field.type === 'date' && (
             <Input type="date" name={field.name} value={values[field.name] || ''} onChange={handleChange} />
           )}
+          
           {field.type === 'select' && (
             <select className="border p-2 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500" name={field.name} value={values[field.name] || ''} onChange={handleChange}>
               <option value="">Select...</option>
@@ -76,6 +190,41 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
               ))}
             </select>
           )}
+          
+          {field.type === 'file' && (
+            <div>
+              <input 
+                type="file" 
+                className="w-full border p-2 rounded" 
+                onChange={(e) => handleFileChange(field.name, e)} 
+                multiple
+                accept="image/jpeg,image/png,image/gif"
+              />
+              {field.validation && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {(() => {
+                    try {
+                      const validation = JSON.parse(field.validation);
+                      return `Max ${validation.maxFiles} files, ${validation.maxSizePerFile}MB per file`;
+                    } catch (e) {
+                      return 'Max 5 files, 5MB per file';
+                    }
+                  })()}
+                </p>
+              )}
+              {fileUploads[field.name] && fileUploads[field.name].length > 0 && (
+                <div className="mt-2">
+                  <p className="text-sm">{fileUploads[field.name].length} file(s) selected</p>
+                  <ul className="text-xs text-gray-500">
+                    {fileUploads[field.name].map((file, idx) => (
+                      <li key={idx}>{file.name} ({Math.round(file.size / 1024)} KB)</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          
           {errors[field.name] && <div className="text-red-600 text-sm mt-1">{errors[field.name]}</div>}
         </div>
       ))}

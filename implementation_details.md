@@ -201,6 +201,112 @@ These patterns help maintain application stability even when the database schema
 - Alternatively, direct connections can be used by setting `baseURL` in the API client
 - Both approaches ensure proper cookie handling for authentication
 
+## Violation HTML and PDF Generation
+
+The system automatically generates HTML and PDF files for violations when they are created or updated. This functionality enhances the user experience by providing easy-to-view and downloadable formats of violation records.
+
+### Implementation Details
+
+1. **HTML Generation**
+   - When a violation is created or updated, the system calls `create_violation_html()` in `utils.py`
+   - This function generates an HTML file using the `violations/detail.html` template
+   - The HTML file is stored in the `html_violations` directory
+   - The relative path to the HTML file is stored in the `html_path` column of the violation record
+
+2. **PDF Generation**
+   - After generating the HTML, the system calls `generate_violation_pdf()` in `utils.py`
+   - This function uses WeasyPrint to convert the HTML content to a PDF file
+   - If WeasyPrint encounters any issues, fallback mechanisms are in place
+   - The PDF file is stored in the `pdf_violations` directory
+   - The relative path to the PDF file is stored in the `pdf_path` column of the violation record
+
+3. **Email Notifications**
+   - When a violation is created, the system sends email notifications using `send_violation_notification()` in `utils.py`
+   - The function looks for email field values in the violation's dynamic fields
+   - Instead of attaching large files, the emails include links to view the HTML version and download the PDF
+   - This approach reduces email size and prevents email delivery issues
+
+4. **Accessing Documents**
+   - HTML files can be viewed at: `/violations/view/{violation_id}`
+   - PDF files can be downloaded at: `/violations/pdf/{violation_id}`
+   - Both endpoints handle generating the files on-demand if they don't exist
+
+### Frontend Integration
+
+The frontend displays HTML and PDF document links in three places:
+1. **Violation Detail View**: Buttons to view HTML and download PDF
+2. **Violation List View**: HTML and PDF links in the actions column
+3. **Dashboard**: Document links in the recent violations table
+
+### Search and Accessibility
+
+- PDF and HTML paths are included in all violation API responses
+- This makes the documents searchable and accessible from any view that lists violations
+- Links are stored as relative paths but rendered as absolute URLs in the frontend
+
+### Database Schema
+
+The Violation model includes these fields for document storage:
+```
+html_path = db.Column(db.String(255))  # Path to the generated HTML file
+pdf_path = db.Column(db.String(255))   # Path to the generated PDF file
+```
+
+## System Settings and Email Configuration
+
+The application includes a settings management system to allow administrators to configure email settings and global notification preferences without modifying code or environment variables.
+
+### Settings Model
+
+The database includes a `Settings` table with the following key fields:
+
+1. **SMTP Configuration**
+   - `smtp_server`: The SMTP server hostname (e.g., smtp.gmail.com)
+   - `smtp_port`: The SMTP server port (e.g., 587 for TLS)
+   - `smtp_username`: SMTP account username
+   - `smtp_password`: SMTP account password (stored as plain text)
+   - `smtp_use_tls`: Whether to use TLS/SSL for email sending
+   - `smtp_from_email`: The default sender email address
+   - `smtp_from_name`: The default sender name
+
+2. **Notification Settings**
+   - `notification_emails`: Comma-separated list of email addresses to receive all violation notifications
+   - `enable_global_notifications`: Whether to send global notifications for all violations
+
+### Dynamic Email Configuration
+
+The email sending system has been enhanced to check the database for SMTP settings before defaulting to the environment configuration:
+
+1. When sending an email, the system first retrieves settings from the database
+2. If SMTP server settings exist in the database, they temporarily override the application config
+3. After sending the email, the original configuration is restored
+4. If no database settings exist, the application falls back to environment variables
+
+### Global Notifications
+
+In addition to sending notification emails to addresses specified in the violation's email fields, the system now supports global notifications:
+
+1. If global notifications are enabled, all violations send notifications to the specified global email addresses
+2. These addresses are added to any violation-specific email addresses
+3. Duplicate email addresses are automatically removed
+4. This feature ensures that designated staff always receive all violation notifications
+
+### Admin Interface
+
+The settings are managed through a dedicated admin interface:
+
+1. **Settings Page**: `/admin/settings` - Only accessible to admin users
+2. **Test Email Feature**: Allows admins to verify email configuration by sending a test email
+3. **Form Validation**: Validates SMTP settings for format and completeness
+4. **Security**: Password field allows leaving the password unchanged if no new value is provided
+
+### Implementation Notes
+
+- Settings are stored in a singleton pattern (only one settings record exists)
+- The `get_settings()` class method ensures a default settings record is created if none exists
+- Email password is stored in plain text in the database, so database security is critical
+- The application dynamically modifies its mail configuration at runtime without requiring a restart
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 

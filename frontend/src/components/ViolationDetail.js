@@ -16,8 +16,18 @@ export default function ViolationDetail() {
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [fields, setFields] = useState([]);
 
   useEffect(() => {
+    // Fetch field definitions to know field types
+    API.get('/api/fields')
+      .then(res => {
+        setFields(res.data);
+      })
+      .catch(err => {
+        console.error('Failed to load field definitions', err);
+      });
+
     API.get(`/api/violations/${id}`)
       .then(res => {
         setViolation(res.data);
@@ -81,6 +91,46 @@ export default function ViolationDetail() {
     setDeleting(false);
   };
 
+  const handleViewHtml = () => {
+    window.open(`${API.defaults.baseURL}/violations/view/${id}`, '_blank');
+  };
+
+  const handleDownloadPdf = () => {
+    window.open(`${API.defaults.baseURL}/violations/pdf/${id}`, '_blank');
+  };
+
+  // Function to determine if a field is a file type
+  const isFileField = (fieldName) => {
+    const fieldDef = fields.find(f => f.name === fieldName);
+    return fieldDef?.type === 'file';
+  };
+
+  // Function to render an uploaded image gallery
+  const renderImageGallery = (fieldName, value) => {
+    if (!value) return null;
+    
+    const imageUrls = value.split(',').filter(Boolean);
+    if (imageUrls.length === 0) return null;
+    
+    return (
+      <div className="mt-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+          {imageUrls.map((url, index) => (
+            <div key={index} className="relative">
+              <a href={`${API.defaults.baseURL}/uploads/${url}`} target="_blank" rel="noopener noreferrer">
+                <img 
+                  src={`${API.defaults.baseURL}/uploads/${url}`} 
+                  alt={`Upload ${index + 1}`} 
+                  className="w-full h-auto rounded object-cover aspect-square"
+                />
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) return <div className="p-8">Loading...</div>;
   if (error) return <div className="p-8 text-red-600">{error}</div>;
   if (!violation) return <div className="p-8">Violation not found.</div>;
@@ -118,9 +168,16 @@ export default function ViolationDetail() {
             <div className="font-semibold mb-2">Dynamic Fields:</div>
             <ul className="list-disc list-inside">
               {Object.entries(form.dynamic_fields || {}).map(([key, value]) => (
-                <li key={key} className="mb-1">
+                <li key={key} className="mb-3">
                   <span className="font-medium">{key}:</span>
-                  <Input name={`dynamic_${key}`} value={value || ''} onChange={handleChange} className="border p-1 ml-2" />
+                  {isFileField(key) ? (
+                    <div>
+                      <p className="text-sm text-gray-500 ml-2">File uploads cannot be edited directly.</p>
+                      {renderImageGallery(key, value)}
+                    </div>
+                  ) : (
+                    <Input name={`dynamic_${key}`} value={value || ''} onChange={handleChange} className="border p-1 ml-2" />
+                  )}
                 </li>
               ))}
             </ul>
@@ -151,16 +208,28 @@ export default function ViolationDetail() {
           <div className="font-semibold mb-2">Dynamic Fields:</div>
           <ul className="list-disc list-inside">
             {Object.entries(violation.dynamic_fields || {}).map(([key, value]) => (
-              <li key={key}><span className="font-medium">{key}:</span> {value}</li>
+              <li key={key} className="mb-3">
+                <span className="font-medium">{key}:</span> 
+                {isFileField(key) ? (
+                  renderImageGallery(key, value)
+                ) : (
+                  <span>{value}</span>
+                )}
+              </li>
             ))}
           </ul>
         </div>
-        {canEditOrDelete && (
-          <div className="mt-4 flex gap-2">
-            <Button onClick={handleEdit} className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Edit</Button>
-            <Button onClick={handleDelete} disabled={deleting} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Delete</Button>
-          </div>
-        )}
+        <div className="mt-6 flex gap-3 flex-wrap">
+          <Button onClick={handleViewHtml} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">View as HTML</Button>
+          <Button onClick={handleDownloadPdf} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Download PDF</Button>
+          
+          {canEditOrDelete && (
+            <>
+              <Button onClick={handleEdit} className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Edit</Button>
+              <Button onClick={handleDelete} disabled={deleting} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Delete</Button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
