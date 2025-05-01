@@ -57,6 +57,18 @@ This file contains technical specifics about the Strata Violation Log applicatio
 - `frontend/src/components/AdminFieldManager.js`: Admin UI for CRUD, reorder, and toggle of field definitions
 - `frontend/src/components/DynamicViolationForm.js`: Dynamic form generator for violations (add/edit)
 
+### Supported Field Types
+The system supports the following dynamic field types:
+- **text**: Standard text input for general use
+- **email**: Email input with validation
+- **number**: Numeric input with validation
+- **date**: Date picker input
+- **time**: Time picker input
+- **select**: Dropdown selection with configurable options
+- **file**: File upload with configurable size and count limitations
+
+Each field type has appropriate validation and is rendered with the correct HTML input element in the dynamic form.
+
 ### API Integration
 - All field management and dynamic form features use `/api/fields` and related endpoints from the Flask backend
 - Axios is used for HTTP requests; base URL is set via environment variable or defaults to `http://localhost:5000`
@@ -216,7 +228,10 @@ The system automatically generates HTML and PDF files for violations when they a
 2. **PDF Generation**
    - After generating the HTML, the system calls `generate_violation_pdf()` in `utils.py`
    - This function uses WeasyPrint to convert the HTML content to a PDF file
-   - If WeasyPrint encounters any issues, fallback mechanisms are in place
+   - WeasyPrint v61+ compatibility: 
+     - Uses local imports to avoid module-level name conflicts
+     - Supports two generation methods: direct HTML string conversion and temporary file approach
+     - Includes fallback mechanism to create a valid PDF placeholder if all generation methods fail
    - The PDF file is stored in the `pdf_violations` directory
    - The relative path to the PDF file is stored in the `pdf_path` column of the violation record
 
@@ -306,6 +321,129 @@ The settings are managed through a dedicated admin interface:
 - The `get_settings()` class method ensures a default settings record is created if none exists
 - Email password is stored in plain text in the database, so database security is critical
 - The application dynamically modifies its mail configuration at runtime without requiring a restart
+
+## SMTP Configuration and Email Handling
+
+### Dynamic SMTP Configuration
+
+The application implements a dynamic SMTP configuration system that allows email settings to be updated without requiring application restarts:
+
+- **Database-Stored Settings**: All SMTP settings (server, port, username, password, TLS, sender details) are stored in the `Settings` table in the database.
+
+- **Two-Level Configuration Approach**:
+  1. **Application Startup**: SMTP settings are loaded from the database into Flask mail configuration during app initialization in `app/__init__.py`.
+  2. **Per-Email Dynamic Loading**: The `send_email` function in `app/utils.py` dynamically loads current SMTP settings from the database for each email operation.
+
+- **Implementation Details**:
+  - Each email send operation temporarily modifies the app's mail configuration with current database settings
+  - Original configuration is restored after each email operation
+  - Connection testing is performed before sending to validate SMTP server availability
+  - Comprehensive logging tracks email operations and any failures
+
+### Email Sending Process
+
+1. When `send_email` is called, it immediately fetches current settings from the database
+2. The function performs socket connection testing to verify SMTP server availability
+3. Flask's mail configuration is temporarily updated with database settings
+4. The email message is created and sent via Flask-Mail
+5. Original mail configuration is restored, regardless of success or failure
+6. All steps are logged for debugging and auditing
+
+### Error Handling
+
+- Socket connection failures trigger detailed error messages
+- Missing SMTP settings are clearly reported with specific missing fields
+- All errors are logged to help diagnose configuration issues
+- Original mail configuration is always restored to prevent configuration corruption
+
+### Security Considerations
+
+- SMTP passwords are stored as plain text in the database (security limitation)
+- Database should be properly secured to protect sensitive credentials
+- TLS is enabled by default for secure connections
+- Debug logs are designed to mask sensitive information
+
+## Violation Reply System
+
+The application includes a comprehensive reply system that allows recipients of violation notifications to provide responses directly through the web interface. This creates a feedback loop between property management and violation subjects.
+
+### Reply Model and Database Schema
+
+The `ViolationReply` model provides storage for responses to violations:
+
+```
+class ViolationReply(db.Model):
+    __tablename__ = 'violation_replies'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    violation_id = db.Column(db.Integer, db.ForeignKey('violations.id'), nullable=False)
+    email = db.Column(db.String(255), nullable=False)  # Email of the person replying
+    response_text = db.Column(db.Text, nullable=False)  # The reply content
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    ip_address = db.Column(db.String(50))  # IP address of the responder for audit
+    
+    # Relationships
+    violation = db.relationship('Violation', backref=db.backref('replies', lazy='dynamic'))
+```
+
+The model is designed to:
+- Track who responded (email address)
+- Record IP address for audit purposes
+- Maintain a timestamp for chronological display
+- Link directly to the parent violation
+
+### Email Notification Implementation
+
+The system sends email notifications when a new reply is submitted:
+
+1. The `notify_about_reply()` function in `violation_routes.py` handles the notification process
+2. Email templates use regular string formatting rather than f-strings when dealing with newline replacements
+3. This approach avoids Python syntax errors with backslash escape sequences in f-strings
+4. Both plain text and HTML email versions are generated for optimal compatibility
+
+### User Interface Integration
+
+1. **Reply Form**:
+   - A responsive form is integrated into the violation detail view
+   - Users must provide their email address for identification
+   - A text area supports multi-paragraph responses
+   - Form submission is processed via standard HTTP POST
+
+2. **Reply Display**:
+   - Responses are displayed chronologically in the violation detail page
+   - Each reply shows the sender's email address and timestamp
+   - Formatting preserves paragraph breaks for readability
+
+### Notification Flow
+
+When a new reply is submitted:
+
+1. The reply is stored in the database and linked to the violation
+2. HTML and PDF documents are regenerated to include the new reply
+3. Email notifications are sent to:
+   - The original creator of the violation
+   - Any global notification recipients configured in settings
+4. Notifications include:
+   - The full text of the reply
+   - A link to view the complete violation details
+   - Information about who submitted the reply
+
+### Implementation Details
+
+The reply system is implemented through these components:
+
+1. **Model**: `ViolationReply` in `models.py`
+2. **View**: Reply form and display in `violations/detail.html`
+3. **Controller**: Reply submission endpoint in `violation_routes.py`
+4. **Notifications**: Reply notification function in `violation_routes.py`
+5. **Documents**: Reply inclusion in violation HTML/PDF via `create_violation_html()`
+
+### Security Considerations
+
+- IP addresses are recorded for audit purposes but not displayed publicly
+- Form validation prevents empty submissions
+- The system does not require authentication to submit replies, making it accessible to all notification recipients
+- Email addresses are displayed alongside replies for accountability
 
 ---
 

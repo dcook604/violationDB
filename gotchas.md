@@ -3,6 +3,7 @@
 This file documents known issues, edge cases, and warnings for the Strata Violation Log application.
 
 ## Known Issues
+- **F-string Backslash Escape Sequences**: Python f-strings cannot contain backslash escape sequences like `\n` in expression parts. These need to be handled separately using regular strings and `.format()` or by pre-formatting the content before including it in the f-string.
 - None documented yet.
 
 ## Edge Cases
@@ -94,6 +95,23 @@ WeasyPrint requires several system dependencies that might not be installed by d
 - In CentOS/RHEL: `yum install gcc python3-devel python3-pip python3-setuptools python3-wheel python3-cffi cairo pango gdk-pixbuf2`
 - In Alpine: `apk add build-base python3-dev py3-pip py3-setuptools py3-wheel py3-cffi cairo pango gdk-pixbuf`
 
+### WeasyPrint Version Compatibility Issues
+
+The application uses WeasyPrint to generate PDF files from HTML. Version 61+ of WeasyPrint has a different API that can cause issues:
+
+- **Error Message**: If you see `PDF.__init__() takes 1 positional argument but 3 were given` in the logs, this indicates a WeasyPrint API incompatibility
+- **Root Cause**: Different versions of WeasyPrint expect different parameter formats when generating PDFs
+- **Solution**: The application has been updated to use local imports and compatible parameter formats
+- **Fallback Mechanism**: If direct HTML-to-PDF conversion fails, the system will:
+  1. Try an alternative approach using temporary HTML files
+  2. Create a valid but minimal PDF file with an error message if all generation methods fail
+  3. Log detailed error information for troubleshooting
+
+If PDF files don't open or show as corrupted in the browser:
+1. Check application logs for "PDF generation error" messages
+2. Verify that the generated PDF is valid using a command-line tool like `pdfinfo` or `file`
+3. Try the alternative PDF generation method by editing a violation (this will regenerate the PDF)
+
 ### PDF Generation Failures
 
 The system has fallback mechanisms for PDF generation failures:
@@ -164,6 +182,38 @@ The system has fallback mechanisms for PDF generation failures:
   - This made it appear as if the checkbox was always returning to "enabled" even when the database stored "disabled".
 - **Empty Password**: When updating other SMTP settings, leaving the password field empty will preserve the existing password, rather than clearing it.
 - **Port Numbers**: Changing the port may trigger an automatic TLS mode based on common conventions (ports 465 and 587 typically use TLS, while 25 often doesn't).
+
+## Violation Reply System
+
+### Reply Form Considerations
+
+- **Missing CSRF Protection**: The reply form does not currently include CSRF protection since it's designed to be accessible without authentication. Consider adding CSRF tokens if security concerns arise.
+- **Email Verification**: The system does not verify that the email provided in the reply form belongs to the sender. Anyone could potentially submit a reply using any email address.
+- **HTML in Responses**: The reply system sanitizes HTML input by default (through template escaping), but responses with formatting that resembles HTML might have their appearance affected.
+
+### Reply Display Issues
+
+- **Timestamp Display**: Reply timestamps are displayed in the server's local timezone. If the server and users are in different timezones, the displayed times may be confusing.
+- **Long Responses**: Very long responses can affect the layout of the violation detail page. The system doesn't currently truncate or paginate responses.
+- **Missing Replies**: If a violation has a large number of replies, it might affect the performance of the detail page loading and PDF generation.
+
+### Email Notification Edge Cases
+
+- **Reply To Original Creator**: If the creator's account has been deleted or their email address has changed, reply notifications might not reach them.
+- **Notification Loops**: Be aware that if global notification emails are set up and people reply from those notification emails, it could create notification loops where everyone keeps getting notified about replies.
+- **Email Formatting**: Multi-paragraph responses in emails might have their formatting altered slightly when rendered in email clients due to how HTML newlines are processed.
+
+### PDF Generation with Replies
+
+- **Large PDFs**: Violations with many replies will generate larger PDF files, which might affect download speeds and viewing performance.
+- **File Size Limits**: Some email systems might reject attachments over certain sizes if PDFs with many replies are attached to emails.
+- **Print Layout**: When printing PDFs with many replies, be aware that the layout might span multiple pages in ways that aren't optimal for reading.
+
+### Database Considerations
+
+- **Reply Storage Growth**: The `violation_replies` table will grow over time as more responses are added. Consider implementing archiving strategies for very old violations.
+- **IP Address Privacy**: IP addresses stored with replies might be considered personal data under privacy regulations like GDPR. Ensure your data retention policies account for this.
+- **Missing Relationships**: If a violation is deleted, all its replies should be deleted as well (cascading delete). This is implemented through the foreign key constraint but verify this behavior in testing.
 
 ---
 

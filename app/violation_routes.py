@@ -1,6 +1,6 @@
-from flask import Blueprint, request, jsonify, current_app, send_from_directory, render_template, abort, send_file
+from flask import Blueprint, request, jsonify, current_app, send_from_directory, render_template, abort, send_file, flash, redirect, url_for
 from flask_login import login_required, current_user
-from .models import Violation, FieldDefinition, ViolationFieldValue
+from .models import Violation, FieldDefinition, ViolationFieldValue, ViolationReply
 from . import db
 import os
 import json
@@ -71,69 +71,89 @@ def api_list_active_fields():
 @violation_bp.route('/api/violations', methods=['POST'])
 @login_required
 def api_create_violation():
-    data = request.json or {}
-    
-    # Generate a reference number if not provided
-    if not data.get('reference'):
-        now = datetime.datetime.now()
-        reference = f"VIO-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
-        data['reference'] = reference
-    
-    # Create new violation
-    violation = Violation(
-        reference=data.get('reference', ''),
-        category=data.get('category', ''),
-        building=data.get('building', ''),
-        unit_number=data.get('unit_number', ''),
-        incident_date=data.get('incident_date'),
-        subject=data.get('subject', ''),
-        details=data.get('details', ''),
-        created_by=current_user.id
-    )
-    
-    db.session.add(violation)
-    db.session.flush()  # Get the violation ID before commit
-    
-    # Process dynamic fields
-    dynamic_fields = data.get('dynamic_fields', {})
-    for field_name, value in dynamic_fields.items():
-        # Use cached field definitions to improve performance
-        field_defs = get_cached_fields('active')
-        field_def = next((f for f in field_defs if f.name == field_name), None)
-        if field_def:
-            db.session.add(ViolationFieldValue(
-                violation_id=violation.id,
-                field_definition_id=field_def.id,
-                value=value
-            ))
-    
-    db.session.commit()
-    
-    # Generate HTML and PDF for the violation
     try:
-        # Get all field definitions for HTML generation, using cache
-        field_defs = get_cached_fields('all')
+        data = request.json or {}
+        current_app.logger.info(f"Received violation data: {json.dumps(data)}")
         
-        # Create the HTML file
-        html_path, html_content = create_violation_html(violation, field_defs)
+        # Generate a reference number if not provided
+        if not data.get('reference'):
+            now = datetime.datetime.now()
+            reference = f"VIO-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+            data['reference'] = reference
         
-        # Generate the PDF file
-        pdf_path = generate_violation_pdf(violation, html_content)
+        # Create new violation with better checking of data
+        violation = Violation(
+            reference=data.get('reference', ''),
+            category=data.get('category', ''),
+            building=data.get('building', ''),
+            unit_number=data.get('unit_number', ''),
+            incident_date=data.get('incident_date'),
+            incident_time=data.get('incident_time'),
+            subject=data.get('subject', ''),
+            details=data.get('details', ''),
+            created_by=current_user.id
+        )
         
-        # Send email notification
-        send_violation_notification(violation, html_path)
+        # Log violation data for debugging
+        current_app.logger.info(f"Created violation record: reference={violation.reference}, category={violation.category}")
         
-        # Store the HTML and PDF paths in the database
-        violation.html_path = os.path.relpath(html_path, current_app.config['BASE_DIR'])
-        violation.pdf_path = os.path.relpath(pdf_path, current_app.config['BASE_DIR'])
+        db.session.add(violation)
+        db.session.flush()  # Get the violation ID before commit
+        
+        # Process dynamic fields
+        dynamic_fields = data.get('dynamic_fields', {})
+        current_app.logger.info(f"Processing dynamic fields: {json.dumps(dynamic_fields)}")
+        
+        # Track which fields were processed successfully
+        processed_fields = []
+        
+        for field_name, value in dynamic_fields.items():
+            # Use cached field definitions to improve performance
+            field_defs = get_cached_fields('active')
+            field_def = next((f for f in field_defs if f.name == field_name), None)
+            if field_def:
+                db.session.add(ViolationFieldValue(
+                    violation_id=violation.id,
+                    field_definition_id=field_def.id,
+                    value=value
+                ))
+                processed_fields.append(field_name)
+            else:
+                current_app.logger.warning(f"Field definition not found for: {field_name}")
+        
         db.session.commit()
+        current_app.logger.info(f"Saved violation {violation.id} with {len(processed_fields)} dynamic fields")
+        
+        # Generate HTML and PDF for the violation
+        try:
+            # Get all field definitions for HTML generation, using cache
+            field_defs = get_cached_fields('all')
+            
+            # Create the HTML file
+            html_path, html_content = create_violation_html(violation, field_defs)
+            
+            # Generate the PDF file
+            pdf_path = generate_violation_pdf(violation, html_content)
+            
+            # Send email notification
+            send_violation_notification(violation, html_path)
+            
+            # Store the HTML and PDF paths in the database
+            violation.html_path = os.path.relpath(html_path, current_app.config['BASE_DIR'])
+            violation.pdf_path = os.path.relpath(pdf_path, current_app.config['BASE_DIR'])
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.error(f"Error generating violation files: {str(e)}")
+        
+        return jsonify({
+            'id': violation.id,
+            'message': 'Violation created successfully',
+            'processed_fields': processed_fields
+        }), 201
     except Exception as e:
-        current_app.logger.error(f"Error generating violation files: {str(e)}")
-    
-    return jsonify({
-        'id': violation.id,
-        'message': 'Violation created successfully'
-    }), 201
+        current_app.logger.error(f"Error creating violation: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': f'Failed to create violation: {str(e)}'}), 500
 
 @violation_bp.route('/violations/view/<int:vid>')
 def view_violation_html(vid):
@@ -309,20 +329,46 @@ def api_list_violations():
         # Process results
         violations = []
         for row in result:
+            # Safely handle created_at which might be a string or datetime
+            created_at = None
+            try:
+                if isinstance(row.created_at, str):
+                    created_at = row.created_at
+                elif row.created_at:
+                    created_at = row.created_at.isoformat()
+            except Exception as err:
+                current_app.logger.warning(f"Error formatting created_at: {str(err)}")
+                created_at = str(row.created_at) if row.created_at else None
+                
             violation = {
                 'id': row.id,
                 'reference': row.reference or '',
                 'category': row.category or '',
                 'building': row.building or '',
                 'unit_number': row.unit_number or '',
-                'created_at': row.created_at.isoformat() if row.created_at else None,
+                'created_at': created_at,
                 'created_by': row.created_by,
                 'subject': row.subject or '',
                 'details': row.details or '',
                 'html_path': f"/violations/view/{row.id}" if row.html_path else None,
                 'pdf_path': f"/violations/pdf/{row.id}" if row.pdf_path else None,
-                'dynamic_fields': {}  # We'll skip dynamic fields for now
+                'dynamic_fields': {}
             }
+            
+            # Fetch dynamic fields for this violation
+            try:
+                field_values = ViolationFieldValue.query.filter_by(violation_id=row.id).all()
+                dynamic_fields = {}
+                
+                for fv in field_values:
+                    field = FieldDefinition.query.get(fv.field_definition_id)
+                    if field:
+                        dynamic_fields[field.name] = fv.value
+                        
+                violation['dynamic_fields'] = dynamic_fields
+            except Exception as field_err:
+                current_app.logger.warning(f"Error fetching dynamic fields for violation {row.id}: {str(field_err)}")
+            
             violations.append(violation)
             
         return jsonify(violations)
@@ -342,20 +388,45 @@ def api_violation_detail(vid):
         field = FieldDefinition.query.get(fv.field_definition_id)
         if field:
             dynamic_fields[field.name] = fv.value
+            
+    # Safely handle created_at which might be a string or datetime
+    created_at = None
+    try:
+        if hasattr(v, 'created_at'):
+            if isinstance(v.created_at, str):
+                created_at = v.created_at
+            elif v.created_at:
+                created_at = v.created_at.isoformat()
+    except Exception as err:
+        current_app.logger.warning(f"Error formatting created_at for violation {v.id}: {str(err)}")
+        created_at = str(v.created_at) if hasattr(v, 'created_at') and v.created_at else None
+            
+    # Safely handle incident_date which might be a string or datetime
+    incident_date = None
+    try:
+        if v.incident_date:
+            if isinstance(v.incident_date, str):
+                incident_date = v.incident_date
+            else:
+                incident_date = v.incident_date.isoformat()
+    except Exception as err:
+        current_app.logger.warning(f"Error formatting incident_date for violation {v.id}: {str(err)}")
+        incident_date = str(v.incident_date) if v.incident_date else None
+            
     result = {
         'id': v.id,
         'reference': v.reference,
         'category': v.category,
         'building': v.building,
         'unit_number': v.unit_number,
-        'incident_date': v.incident_date.isoformat() if v.incident_date else None,
+        'incident_date': incident_date,
         'subject': v.subject,
         'details': v.details,
-        'created_at': v.created_at.isoformat() if hasattr(v, 'created_at') and v.created_at else None,
+        'created_at': created_at,
         'created_by': v.created_by,
         'dynamic_fields': dynamic_fields,
-        'html_path': f"/violations/view/{v.id}" if hasattr(v, 'html_path') else None,
-        'pdf_path': f"/violations/pdf/{v.id}" if hasattr(v, 'pdf_path') else None
+        'html_path': f"/violations/view/{v.id}" if hasattr(v, 'html_path') and v.html_path else None,
+        'pdf_path': f"/violations/pdf/{v.id}" if hasattr(v, 'pdf_path') and v.pdf_path else None
     }
     return jsonify(result)
 
@@ -411,3 +482,140 @@ def api_violation_field_values(vid):
         'field_definition_id': v.field_definition_id,
         'value': v.value
     } for v in values])
+
+@violation_bp.route('/violations/<int:vid>/reply', methods=['POST'])
+def submit_violation_reply(vid):
+    """Handle replies submitted via the HTML view"""
+    from .models import ViolationReply
+    
+    violation = Violation.query.get_or_404(vid)
+    
+    # Get form data
+    email = request.form.get('email')
+    response_text = request.form.get('response_text')
+    
+    if not email or not response_text:
+        flash('Email and response are required.')
+        return redirect(url_for('violations.view_violation_html', vid=vid))
+    
+    # Create new reply
+    reply = ViolationReply(
+        violation_id=vid,
+        email=email,
+        response_text=response_text,
+        ip_address=request.remote_addr
+    )
+    
+    db.session.add(reply)
+    db.session.commit()
+    
+    # Regenerate HTML after adding reply
+    try:
+        html_path, html_content = create_violation_html(violation)
+        pdf_path = generate_violation_pdf(violation, html_content)
+        
+        # Store the updated HTML and PDF paths
+        violation.html_path = os.path.relpath(html_path, current_app.config['BASE_DIR'])
+        violation.pdf_path = os.path.relpath(pdf_path, current_app.config['BASE_DIR'])
+        db.session.commit()
+        
+        # Send notification about the new reply
+        try:
+            notify_about_reply(reply)
+        except Exception as e:
+            current_app.logger.error(f"Error sending reply notification: {str(e)}")
+    
+    except Exception as e:
+        current_app.logger.error(f"Error regenerating files after reply: {str(e)}")
+    
+    flash('Your response has been recorded.')
+    return redirect(url_for('violations.view_violation_html', vid=vid))
+
+def notify_about_reply(reply):
+    """Send notification about a new violation reply"""
+    from .models import User, Settings
+    
+    # Get the violation
+    violation = Violation.query.get(reply.violation_id)
+    if not violation:
+        current_app.logger.error(f"Violation {reply.violation_id} not found for reply notification")
+        return False
+    
+    # Get the creator
+    creator = None
+    if violation.created_by:
+        creator = User.query.get(violation.created_by)
+    
+    # Get email recipients (creator + global notifications)
+    recipients = []
+    
+    # Add creator email if available
+    if creator and creator.email:
+        recipients.append(creator.email)
+    
+    # Add global notification emails
+    settings = Settings.get_settings()
+    if settings.enable_global_notifications and settings.notification_emails:
+        global_emails = settings.get_notification_emails_list()
+        recipients.extend(global_emails)
+    
+    # Remove duplicates
+    recipients = list(dict.fromkeys(recipients))
+    
+    if not recipients:
+        current_app.logger.info(f"No recipients for reply notification on violation {violation.id}")
+        return False
+    
+    # Prepare email
+    subject = f"New Response to Violation {violation.reference}"
+    view_url = f"{current_app.config.get('BASE_URL', 'http://localhost:5004')}/violations/view/{violation.id}"
+    
+    # Email body
+    body_text = f"""A new response has been added to violation {violation.reference}.
+
+From: {reply.email}
+Date: {reply.created_at.strftime('%Y-%m-%d %H:%M:%S')}
+
+Response:
+{reply.response_text}
+
+You can view the full details at:
+{view_url}
+"""
+    
+    # Using a regular string instead of f-string to avoid backslash issues
+    html_body = """
+    <p>A new response has been added to violation {reference}.</p>
+    
+    <p><strong>From:</strong> {email}<br>
+    <strong>Date:</strong> {date}</p>
+    
+    <p><strong>Response:</strong><br>
+    {response_br}</p>
+    
+    <p>You can view the full details by <a href="{url}">clicking here</a>.</p>
+    """
+    
+    # Format the string separately
+    response_with_br = reply.response_text.replace('\n', '<br>')
+    html_body = html_body.format(
+        reference=violation.reference,
+        email=reply.email,
+        date=reply.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+        response_br=response_with_br,
+        url=view_url
+    )
+    
+    # Send the email
+    try:
+        from .utils import send_email
+        send_email(
+            subject=subject,
+            recipients=recipients,
+            body=body_text,
+            html=html_body
+        )
+        return True
+    except Exception as e:
+        current_app.logger.error(f"Error sending reply notification email: {str(e)}")
+        return False
