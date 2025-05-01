@@ -160,6 +160,8 @@ The system has fallback mechanisms for PDF generation failures:
 ### SMTP Settings UI Issues
 
 - **TLS/SSL Checkbox**: If the TLS/SSL checkbox doesn't seem to save its state correctly, ensure you're clicking directly on the checkbox (not just the label) and verify in the logs that the setting is being updated. This has been fixed in the latest version.
+  - The issue was that the API's GET endpoint used `or True` as a default value, causing database 'false' values to be overridden.
+  - This made it appear as if the checkbox was always returning to "enabled" even when the database stored "disabled".
 - **Empty Password**: When updating other SMTP settings, leaving the password field empty will preserve the existing password, rather than clearing it.
 - **Port Numbers**: Changing the port may trigger an automatic TLS mode based on common conventions (ports 465 and 587 typically use TLS, while 25 often doesn't).
 

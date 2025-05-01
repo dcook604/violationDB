@@ -122,17 +122,25 @@ def get_settings():
     """Get the current settings"""
     settings = Settings.get_settings()
     
+    # Log the value being read from the database for debugging
+    current_app.logger.info(f"Reading settings from database")
+    current_app.logger.info(f"SMTP Server: {settings.smtp_server}")
+    current_app.logger.info(f"SMTP Port: {settings.smtp_port}")
+    current_app.logger.info(f"SMTP Username: {settings.smtp_username}")
+    current_app.logger.info(f"TLS Enabled (DB value): {settings.smtp_use_tls}")
+    
     # Don't include the password in the response
+    # Important: Use appropriate handling for boolean fields
     return jsonify({
         'id': settings.id,
         'smtp_server': settings.smtp_server or '',
         'smtp_port': settings.smtp_port or 25,
         'smtp_username': settings.smtp_username or '',
-        'smtp_use_tls': settings.smtp_use_tls or True,
+        'smtp_use_tls': bool(settings.smtp_use_tls),  # Convert to proper boolean
         'smtp_from_email': settings.smtp_from_email or '',
         'smtp_from_name': settings.smtp_from_name or '',
         'notification_emails': settings.notification_emails or '',
-        'enable_global_notifications': settings.enable_global_notifications or False,
+        'enable_global_notifications': bool(settings.enable_global_notifications),  # Convert to proper boolean
         'updated_at': settings.updated_at.isoformat() if settings.updated_at else None
     })
 
