@@ -166,6 +166,41 @@ We've implemented defensive coding patterns throughout the API to handle potenti
 
 These patterns help maintain application stability even when the database schema doesn't perfectly match the ORM models. This is particularly important during development and after schema migrations.
 
+## API Configuration and Server Management
+
+### API Client Setup
+- The frontend API client uses a direct connection to the backend server on port 5004
+- Configuration in `frontend/src/api.js` sets `baseURL: 'http://localhost:5004'`
+- All API requests include credentials (`withCredentials: true`) for cookie-based authentication
+- Comprehensive error handling for different response scenarios (redirects, unauthorized, network errors)
+
+### Server Management
+- Both frontend and backend use fixed ports:
+  - Flask backend: Port 5004
+  - React frontend: Port 3001
+- A reset script (`reset_servers.sh`) provides automated server management:
+  - Stops any existing processes on these ports
+  - Cleans up stray processes
+  - Starts both servers with proper logging
+  - Verifies the backend is accessible
+
+### CORS Configuration
+- The backend CORS settings allow credentials and specific origins
+- Flask app has custom session interface with `SameSite=Lax` for cookie security
+- All authentication endpoints support OPTIONS requests for preflight CORS checks
+
+### Authentication Flow
+- Session check: `/api/auth/session` endpoint validates current authentication status
+- Login: `/api/auth/login` accepts user credentials and sets session cookies
+- Logout: `/api/auth/logout` clears session data
+- All endpoints return consistent JSON responses and proper HTTP status codes
+
+### Proxy Configuration
+- During development, the frontend uses `setupProxy.js` to proxy API requests to the backend
+- The proxy preserves paths, handles cookies, and supports cross-origin requests
+- Alternatively, direct connections can be used by setting `baseURL` in the API client
+- Both approaches ensure proper cookie handling for authentication
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 

@@ -141,3 +141,52 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for all major design and architectural 
 
 ## Contact
 For questions, suggestions, or onboarding help, see project maintainers or open an issue.
+
+## Running the Application
+
+### Development Setup (Recommended)
+
+The easiest way to run the application is using the provided server management script:
+
+```bash
+# Make the script executable
+chmod +x reset_servers.sh
+
+# Run the script to start both backend and frontend
+./reset_servers.sh
+```
+
+This script will:
+1. Kill any existing processes on ports 5004 (backend) and 3001 (frontend)
+2. Start the Flask backend on port 5004
+3. Start the React frontend on port 3001
+4. Verify that both servers are running
+5. Create log files for both servers
+
+You can then access:
+- Frontend: http://localhost:3001
+- Backend API: http://localhost:5004
+
+### Manual Setup
+
+If you prefer to start the servers manually:
+
+**Backend (Flask)**
+```bash
+source .venv/bin/activate
+python run.py  # Runs on port 5004
+```
+
+**Frontend (React)**
+```bash
+cd frontend
+npm start  # Runs on port 3001
+```
+
+### Troubleshooting
+
+If you encounter issues with the servers:
+- Check `flask.log` for backend errors
+- Check `frontend/react.log` for frontend errors
+- Run `lsof -i -P -n | grep LISTEN` to see what's running on which ports
+- Use the reset script to stop and restart everything

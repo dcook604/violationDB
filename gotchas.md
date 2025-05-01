@@ -63,6 +63,27 @@ Specific issues:
 - Implement proper database versioning
 - Consider soft schema validation on application startup
 
+## Authentication and API Troubleshooting
+
+### Common Authentication Issues
+- **Gateway Timeout (504) Errors**: If the frontend proxy is misconfigured, it may attempt to proxy to incorrect endpoints or use the wrong port. Use the direct API connection method in `api.js` (set `baseURL`) to bypass proxy issues.
+- **CORS Errors**: Ensure the backend CORS configuration allows the frontend origin and that `credentials: include` or `withCredentials: true` is set for all API requests.
+- **Cookie Not Set/Sent**: Authentication depends on cookies being properly set and sent. Ensure:
+  - `SameSite=Lax` is configured on backend cookies
+  - Frontend and backend domains align (both on localhost or same domain)
+  - `withCredentials` is set for AJAX requests
+  - Session cookie configuration matches browser security requirements
+
+### API Endpoint Troubleshooting
+- Always test endpoints directly (e.g., with curl or browser) before integrating with frontend
+- HTTP status 405 (Method Not Allowed) when accessing POST endpoints via GET indicates the endpoint exists but requires the correct method
+- For authentication issues, check both Flask logs and browser network tab for full request/response details
+
+### Server Management
+- Never run multiple instances of the Flask server on the same port
+- Use the provided `reset_servers.sh` script to ensure clean server restarts
+- Always check logs (`flask.log` and `frontend/react.log`) when troubleshooting issues
+
 ---
 
 *Update this file immediately when new issues, bugs, or edge cases are discovered.* 

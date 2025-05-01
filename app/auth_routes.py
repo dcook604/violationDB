@@ -319,3 +319,16 @@ def set_test_cookie():
     print("Test cookie response headers:", dict(response.headers))
     
     return response
+
+@auth.route('/api/auth/session')
+def session_check():
+    if current_user.is_authenticated:
+        return jsonify({
+            "user": {
+                "id": current_user.id,
+                "email": current_user.email,
+                "is_admin": getattr(current_user, "is_admin", False)
+            }
+        })
+    else:
+        return jsonify({"user": None}), 200
