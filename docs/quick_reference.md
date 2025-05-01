@@ -93,4 +93,61 @@ user.set_role('manager')
 | 403        | Insufficient permissions     | Verify user role            |
 | 404        | User not found              | Verify user ID              |
 | 409        | Email already exists        | Use different email         |
-| 500        | Database operation failed   | Check logs for details      | 
+| 500        | Database operation failed   | Check logs for details      |
+
+## PDF Generation
+
+### PDF Generation Methods
+```python
+# Generate PDF from violation
+pdf_data = generate_pdf(html_content)
+
+# Handle PDF generation with fallbacks
+try:
+    pdf_data = generate_pdf(html_content)
+    # Return PDF data
+except PDFGenerationError:
+    # Handle PDF generation failure
+```
+
+### PDF Generation Options
+| Method | Implementation | Fallback Order |
+|--------|---------------|----------------|
+| Direct | Memory buffer | Primary method |
+| Temp File | File system | First fallback |
+| wkhtmltopdf | External tool | Second fallback |
+
+## Violations List
+
+### Pagination Parameters
+```python
+# API pagination parameters
+page = request.args.get('page', 1, type=int)
+per_page = request.args.get('per_page', 10, type=int)
+
+# Calculate offset
+offset = (page - 1) * per_page
+```
+
+### Date Filtering Options
+| Filter | Value | Description |
+|--------|-------|-------------|
+| All Time | 'all' | No date filtering |
+| Last 7 Days | '7days' | Violations from past week |
+| Last 30 Days | '30days' | Violations from past month |
+
+### Example API Request
+```
+GET /api/violations?page=1&per_page=10&date_filter=7days
+```
+
+### Response Format
+```json
+{
+    "violations": [...],
+    "total": 45,
+    "page": 1,
+    "per_page": 10,
+    "pages": 5
+}
+``` 

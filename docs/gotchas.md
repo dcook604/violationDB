@@ -67,3 +67,32 @@
    - Validate all form inputs server-side
    - Handle malformed data gracefully
    - Prevent role escalation attacks 
+
+## PDF Generation Issues
+
+### WeasyPrint Compatibility
+1. **WeasyPrint 61.2 and pydyf Issues**
+   - WeasyPrint 61.2 has known compatibility issues with the pydyf library
+   - Direct rendering to memory buffer may fail with certain versions
+   - If upgrading WeasyPrint, ensure thorough testing of PDF generation
+
+2. **Fallback Mechanisms**
+   - The system implements multiple fallback methods for PDF generation
+   - Fallbacks occur in this order: direct rendering → temporary file approach → wkhtmltopdf
+   - Each fallback attempt is logged for debugging purposes
+
+3. **Error Handling**
+   - All PDF generation attempts are wrapped in try/except blocks
+   - Failed attempts are logged with detailed error messages
+   - Final fallback failure raises PDFGenerationError
+
+### Dynamic Fields in PDFs
+1. **File Type Fields**
+   - File type fields require special handling in PDF generation
+   - URLs for uploaded files must be absolute in PDF context
+   - Test PDF generation with various file upload scenarios
+
+2. **Large Content**
+   - Very large or complex violations may cause PDF generation to slow down
+   - Extremely large violations may exceed memory limits during PDF generation
+   - Consider implementing timeout handling for PDF generation 
