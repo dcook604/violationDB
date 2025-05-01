@@ -4,5 +4,7 @@
 			"path": "/home/violation"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"git.ignoreLimitWarning": true
+	}
 }

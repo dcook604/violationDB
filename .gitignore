@@ -1,29 +1,76 @@
 # Python
-venv/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+*.log
 
-# IDE/tools
-.cache/
-.windsurf-server/
-.codeium/
-*.sqlite
-*.db
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# OS
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
 Thumbs.db
 
+# Local development
+instance/
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+cypress/screenshots/
+cypress/videos/
+
+# System files
+.bash_history
+.python_history
+.cache/
+.config/
+.local/
+.pki/
+.npm/
+.cursor/
+.cursor-server/
+.windsurf-server/
+
+# Database
+*.db
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
 # Other
-.env
 .env.*
 *.log
 
 # Ignore large files and artifacts
-*.so
-*.bin
 *.exe
 *.dll
 *.zip

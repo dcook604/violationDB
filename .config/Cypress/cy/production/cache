@@ -1,0 +1,11 @@
+{
+  "PROJECT_PREFERENCES": {
+    "frontend": {
+      "lastBrowser": {
+        "name": "electron",
+        "channel": "stable"
+      }
+    }
+  },
+  "PROJECTS": []
+}
