@@ -4,6 +4,7 @@ This file documents known issues, edge cases, and warnings for the Strata Violat
 
 ## Known Issues
 - **F-string Backslash Escape Sequences**: Python f-strings cannot contain backslash escape sequences like `\n` in expression parts. These need to be handled separately using regular strings and `.format()` or by pre-formatting the content before including it in the f-string.
+- **SQLite Date Handling**: SQLite expects Python date objects for date columns, not strings. Empty strings or incorrectly formatted date strings passed to date columns will cause a "SQLite Date type only accepts Python date objects as input" error. All date fields must be preprocessed to either valid date objects or None before being passed to the database.
 - None documented yet.
 
 ## Edge Cases

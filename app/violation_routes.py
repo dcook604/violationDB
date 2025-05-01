@@ -81,13 +81,26 @@ def api_create_violation():
             reference = f"VIO-{now.strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
             data['reference'] = reference
         
+        # Process incident_date to handle empty strings and convert to proper date object
+        incident_date = data.get('incident_date')
+        if incident_date == '' or incident_date is None:
+            incident_date = None
+        elif isinstance(incident_date, str):
+            try:
+                # Try to parse the date string into a datetime object
+                incident_date = datetime.datetime.fromisoformat(incident_date.replace('Z', '+00:00')).date()
+            except (ValueError, TypeError):
+                # If parsing fails, set to None to avoid database errors
+                current_app.logger.warning(f"Invalid incident_date format: {incident_date}, setting to None")
+                incident_date = None
+        
         # Create new violation with better checking of data
         violation = Violation(
             reference=data.get('reference', ''),
             category=data.get('category', ''),
             building=data.get('building', ''),
             unit_number=data.get('unit_number', ''),
-            incident_date=data.get('incident_date'),
+            incident_date=incident_date,
             incident_time=data.get('incident_time'),
             subject=data.get('subject', ''),
             details=data.get('details', ''),
