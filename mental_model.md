@@ -120,6 +120,42 @@ The application follows the Notus React theme design system, which is built on t
    - Confirmation required
    - Clear warning states
 
+## Secure Access Model
+
+The system follows a security-first approach for providing access to violation information:
+
+### Basic Security Principles
+
+1. **Least Privilege**: Users only see what they are authorized to view
+2. **Defense in Depth**: Multiple layers of protection (authentication, tokens, access logs)
+3. **Data Privacy**: Personal information is protected throughout the system
+4. **Secure By Default**: All access routes require proper authorization
+
+### Secure URL Architecture
+
+Rather than using predictable, sequential URLs that could be enumerated, the system uses a secure token-based approach:
+
+1. **Internal ID vs Public ID**: Each violation has an internal sequential ID for database operations and a UUID-based public ID for external references
+
+2. **Token-Based Access**:
+   - All public URLs use cryptographically signed tokens
+   - Tokens contain the violation ID and a timestamp
+   - Tokens expire after 24 hours automatically
+
+3. **Access Workflow**:
+   ```
+   [User] <- Email with secure token URL <- [System]
+   [User] -> Request with token -> [System]
+   [System] -> Validate token, log access -> [Display Violation]
+   ```
+
+4. **Comprehensive Logging**:
+   - All access attempts are recorded (IP, user agent, timestamp)
+   - Invalid tokens are logged as security warnings
+   - Access logs can be reviewed for suspicious activity
+
+This approach ensures that even when sharing violation information with external parties via email, the system maintains high security standards while providing a seamless user experience.
+
 ---
 
 *Update this file as new conceptual insights are discovered or the application's mental model evolves.* 

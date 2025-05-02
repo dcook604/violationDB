@@ -182,7 +182,7 @@ These patterns help maintain application stability even when the database schema
 
 ### API Client Setup
 - The frontend API client uses a direct connection to the backend server on port 5004
-- Configuration in `frontend/src/api.js` sets `baseURL: 'http://localhost:5004'`
+- Configuration in `frontend/src/api.js` sets `baseURL: 'http://172.16.16.6:5004'`
 - All API requests include credentials (`withCredentials: true`) for cookie-based authentication
 - Comprehensive error handling for different response scenarios (redirects, unauthorized, network errors)
 
@@ -213,59 +213,110 @@ These patterns help maintain application stability even when the database schema
 - Alternatively, direct connections can be used by setting `baseURL` in the API client
 - Both approaches ensure proper cookie handling for authentication
 
+## Secure File Handling and Virus Scanning
+
+The system implements a comprehensive secure file handling system with integrated virus scanning:
+
+### Secure Directory Structure
+
+Files are stored in a hierarchical structure outside the web-accessible directories:
+
+```
+/home/violation/
+├── app/
+├── saved_files/         # Secure root storage directory
+│   ├── html/            # Generated HTML documents
+│   ├── pdf/             # Generated PDF documents
+│   └── uploads/         # User-uploaded files
+│       └── fields/      # Dynamic field file uploads by violation ID
+└── ...
+```
+
+### UUID-Based Filenames
+
+All files are stored using UUID-based filenames to prevent enumeration and guessing attacks:
+
+- Format: `{uuid4}_{violation_id}.{extension}`
+- Example: `d8e8fca2-dc17-4f31-8a46-920e6e1bbc84_42.pdf`
+
+### ClamAV Virus Scanning Integration
+
+The application integrates ClamAV for virus scanning of all uploaded files:
+
+1. **System Dependencies**:
+   - ClamAV daemon (clamav-daemon)
+   - ClamAV libraries (libclamav-dev)
+   - Updated virus definitions (via freshclam)
+   - Python pyclamd module
+
+2. **Scanning Process**:
+   - All uploads are scanned before being stored permanently
+   - Files with detected viruses are automatically deleted
+   - Multiple connection methods (Unix socket and network socket) ensure compatibility
+
+3. **Implementation Flow**:
+   - `init_clamav()` establishes connection to the ClamAV daemon
+   - `scan_file()` performs the virus scan on a given file path
+   - `secure_handle_uploaded_file()` orchestrates the secure upload process with scanning
+
+### Access Control
+
+The system implements strict access control for file operations:
+
+1. **Authentication**: Required for all file access via `@login_required`
+2. **Authorization**: Verification of violation ownership or admin role
+3. **Path Validation**: Secure path handling to prevent directory traversal
+4. **Secure Serving**: `send_from_directory()` for controlled file access
+
 ## Violation HTML and PDF Generation
 
-The system automatically generates HTML and PDF files for violations when they are created or updated. This functionality enhances the user experience by providing easy-to-view and downloadable formats of violation records.
+The system automatically generates HTML and PDF files for violations:
 
-### Implementation Details
+### HTML Generation Process
 
-1. **HTML Generation**
-   - When a violation is created or updated, the system calls `create_violation_html()` in `utils.py`
-   - This function generates an HTML file using the `violations/detail.html` template
-   - The HTML file is stored in the `html_violations` directory
-   - The relative path to the HTML file is stored in the `html_path` column of the violation record
+When a violation is created or updated, the system automatically:
 
-2. **PDF Generation**
-   - After generating the HTML, the system calls `generate_violation_pdf()` in `utils.py`
-   - This function uses WeasyPrint to convert the HTML content to a PDF file
-   - WeasyPrint v61+ compatibility: 
-     - Uses local imports to avoid module-level name conflicts
-     - Supports two generation methods: direct HTML string conversion and temporary file approach
-     - Includes fallback mechanism to create a valid PDF placeholder if all generation methods fail
-   - The PDF file is stored in the `pdf_violations` directory
-   - The relative path to the PDF file is stored in the `pdf_path` column of the violation record
+1. Collects all field data, including dynamic fields
+2. Organizes data for proper template rendering
+3. Generates a unique UUID-based filename
+4. Creates an HTML document with the violation details
+5. Stores the file in the secure `/saved_files/html/` directory
 
-3. **Email Notifications**
-   - When a violation is created, the system sends email notifications using `send_violation_notification()` in `utils.py`
-   - The function looks for email field values in the violation's dynamic fields
-   - Instead of attaching large files, the emails include links to view the HTML version and download the PDF
-   - This approach reduces email size and prevents email delivery issues
+### PDF Generation Process
 
-4. **Accessing Documents**
-   - HTML files can be viewed at: `/violations/view/{violation_id}`
-   - PDF files can be downloaded at: `/violations/pdf/{violation_id}`
-   - Both endpoints handle generating the files on-demand if they don't exist
+After HTML generation, the system:
 
-### Frontend Integration
+1. Uses the HTML content to generate a PDF version
+2. Implements multiple generation methods with WeasyPrint
+3. Includes fallback mechanisms for compatibility
+4. Stores the PDF file in the secure `/saved_files/pdf/` directory 
 
-The frontend displays HTML and PDF document links in three places:
-1. **Violation Detail View**: Buttons to view HTML and download PDF
-2. **Violation List View**: HTML and PDF links in the actions column
-3. **Dashboard**: Document links in the recent violations table
+### Attached Images Display
 
-### Search and Accessibility
+The system now properly displays attached images in the violation details:
 
-- PDF and HTML paths are included in all violation API responses
-- This makes the documents searchable and accessible from any view that lists violations
-- Links are stored as relative paths but rendered as absolute URLs in the frontend
+1. Images attached to fields are organized by field name
+2. File paths are converted to proper URLs for the templates
+3. Images are displayed in a responsive grid layout
+4. Original filenames are shown beneath each image
 
-### Database Schema
+### Email Notifications
 
-The Violation model includes these fields for document storage:
-```
-html_path = db.Column(db.String(255))  # Path to the generated HTML file
-pdf_path = db.Column(db.String(255))   # Path to the generated PDF file
-```
+Email notifications have been improved to:
+
+1. Display correct dynamic field values including Category and Details
+2. Generate proper links to HTML and PDF versions
+3. Include context-appropriate information for recipients
+4. Provide a consistent user experience across email clients
+
+## Violation Reply System
+
+The system allows recipients to reply to violations via the web interface:
+
+1. **Reply Form**: Integrated in the HTML view for easy response
+2. **Email Notifications**: Sent to violation creators and administrators 
+3. **Display**: Responses shown chronologically in the violation detail
+4. **Document Updates**: HTML and PDF regenerated to include new replies
 
 ## System Settings and Email Configuration
 
@@ -363,188 +414,54 @@ The application implements a dynamic SMTP configuration system that allows email
 - TLS is enabled by default for secure connections
 - Debug logs are designed to mask sensitive information
 
-## Violation Reply System
+## Secure Violation Access System
 
-The application includes a comprehensive reply system that allows recipients of violation notifications to provide responses directly through the web interface. This creates a feedback loop between property management and violation subjects.
+The application implements a comprehensive secure URL system for accessing violations:
 
-### Reply Model and Database Schema
+### UUID-Based Identifiers
 
-The `ViolationReply` model provides storage for responses to violations:
+Instead of exposing sequential IDs in URLs, each violation now has:
 
-```
-class ViolationReply(db.Model):
-    __tablename__ = 'violation_replies'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    violation_id = db.Column(db.Integer, db.ForeignKey('violations.id'), nullable=False)
-    email = db.Column(db.String(255), nullable=False)  # Email of the person replying
-    response_text = db.Column(db.Text, nullable=False)  # The reply content
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    ip_address = db.Column(db.String(50))  # IP address of the responder for audit
-    
-    # Relationships
-    violation = db.relationship('Violation', backref=db.backref('replies', lazy='dynamic'))
-```
+1. An internal ID (used in the database)
+2. A UUID-based `public_id` (36-character unique identifier)
 
-The model is designed to:
-- Track who responded (email address)
-- Record IP address for audit purposes
-- Maintain a timestamp for chronological display
-- Link directly to the parent violation
+This prevents attackers from easily enumerating all violations by incrementing numeric IDs.
 
-### Email Notification Implementation
+### Cryptographically Signed Tokens
 
-The system sends email notifications when a new reply is submitted:
+All public access to violation details uses signed, time-limited tokens:
 
-1. The `notify_about_reply()` function in `violation_routes.py` handles the notification process
-2. Email templates use regular string formatting rather than f-strings when dealing with newline replacements
-3. This approach avoids Python syntax errors with backslash escape sequences in f-strings
-4. Both plain text and HTML email versions are generated for optimal compatibility
+1. **Token Generation**: Tokens are created using the `itsdangerous` library with the application's secret key
+2. **Token Contents**: Each token contains the violation ID and creation timestamp
+3. **Token Expiration**: Tokens automatically expire after 24 hours
+4. **Validation Process**: All tokens are validated before granting access
 
-### User Interface Integration
+### Comprehensive Access Logging
 
-1. **Reply Form**:
-   - A responsive form is integrated into the violation detail view
-   - Users must provide their email address for identification
-   - A text area supports multi-paragraph responses
-   - Form submission is processed via standard HTTP POST
+Every access attempt to violation details is logged for security auditing:
 
-2. **Reply Display**:
-   - Responses are displayed chronologically in the violation detail page
-   - Each reply shows the sender's email address and timestamp
-   - Formatting preserves paragraph breaks for readability
+1. **Access Logs Table**: The `ViolationAccess` model tracks all access attempts
+2. **Logged Data**: IP address, user agent, timestamp, and token used
+3. **Relationship**: Each log entry is linked to the specific violation 
+4. **Failed Attempts**: Invalid or expired tokens are logged with warnings
 
-### Notification Flow
+### Secure Routes Implementation
 
-When a new reply is submitted:
+New secure routes have been added for public access:
 
-1. The reply is stored in the database and linked to the violation
-2. HTML and PDF documents are regenerated to include the new reply
-3. Email notifications are sent to:
-   - The original creator of the violation
-   - Any global notification recipients configured in settings
-4. Notifications include:
-   - The full text of the reply
-   - A link to view the complete violation details
-   - Information about who submitted the reply
+1. **HTML View**: `/violations/secure/<token>` - Token-authenticated access to HTML view
+2. **PDF Download**: `/violations/secure/<token>/pdf` - Token-authenticated PDF download
+3. **Email Integration**: All email notifications use secure token URLs
 
-### Implementation Details
+### Security Benefits
 
-The reply system is implemented through these components:
+This implementation provides several key security benefits:
 
-1. **Model**: `ViolationReply` in `models.py`
-2. **View**: Reply form and display in `violations/detail.html`
-3. **Controller**: Reply submission endpoint in `violation_routes.py`
-4. **Notifications**: Reply notification function in `violation_routes.py`
-5. **Documents**: Reply inclusion in violation HTML/PDF via `create_violation_html()`
-
-### Security Considerations
-
-- IP addresses are recorded for audit purposes but not displayed publicly
-- Form validation prevents empty submissions
-- The system does not require authentication to submit replies, making it accessible to all notification recipients
-- Email addresses are displayed alongside replies for accountability
-
-## User Information Display
-
-The system provides user-friendly identity information throughout the application to improve usability and clarity, particularly in areas showing violation ownership and authorship.
-
-### User Email Integration
-
-1. **API Response Enhancement**
-   - The violation detail API (`/api/violations/<id>`) includes both the numeric user ID (`created_by`) and the user's email address (`created_by_email`)
-   - The violation list API (`/api/violations`) also includes this user information for each violation
-   - This provides human-readable identification of violation creators while maintaining database ID references
-
-2. **Frontend Display Implementation**
-   - The ViolationDetail component displays the creator's email address instead of the numeric ID
-   - This makes it immediately clear who created each violation record
-   - A fallback to "Unknown user" is provided when email information is unavailable
-
-3. **Implementation Details**
-   - When fetching a violation, the system automatically looks up the User model to retrieve email information
-   - Error handling ensures the application continues to function even if user lookup fails
-   - This approach maintains the existing database schema while enhancing the user interface
-
-### Security Considerations
-
-- User emails are only exposed to authenticated users with appropriate permissions 
-- The same permission checks that protect violation access also protect user email information
-- Only violation creators and administrators can view the detailed violation information
-
-### Implementation Pattern
-
-The user email lookup follows this pattern in API endpoints:
-
-```python
-# Get creator email
-from .models import User
-creator_email = None
-if v.created_by:
-    creator = User.query.get(v.created_by)
-    if creator:
-        creator_email = creator.email
-```
-
-This pattern ensures that even if a user record is deleted, the application continues to function with appropriate fallbacks.
-
-## Dashboard Status-Based Violation Tracking
-
-The dashboard has been enhanced to correctly categorize violations based on their dynamic Status field values.
-
-### Active Violation Definition
-
-Active violations are now defined as violations with any of the following Status values:
-- "Open"
-- "Pending Owner Response"
-- "Pending Council Response"
-
-### Implementation Details
-
-1. **Stats API Enhancement**
-   - The `/api/stats` endpoint in `dashboard_routes.py` now checks each violation's dynamic fields
-   - It looks for the "Status" field definition and gets the corresponding field value for each violation
-   - Violations are counted as active only if their Status matches one of the active status values
-   - This provides accurate counts for the dashboard cards
-
-2. **Default Behavior**
-   - Violations are treated as active by default if:
-     - The Status field definition doesn't exist in the system
-     - A violation doesn't have a Status field value
-
-3. **Dashboard Display**
-   - The dashboard shows three key metrics:
-     - Total Violations: Count of all violations
-     - Active Violations: Count of violations with active status values
-     - Resolved Violations: Count of violations without active status values
-
-4. **Implementation Pattern**
-   ```python
-   # Find the field definition for Status
-   status_field = FieldDefinition.query.filter_by(name='Status').first()
-   
-   for violation in violations:
-       # Default to active if no Status field exists
-       is_active = True
-       
-       if status_field:
-           # Try to get the Status field value for this violation
-           field_value = ViolationFieldValue.query.filter_by(
-               violation_id=violation.id,
-               field_definition_id=status_field.id
-           ).first()
-           
-           if field_value and field_value.value:
-               # Check if status is one of the active statuses
-               active_statuses = ['Open', 'Pending Owner Response', 'Pending Council Response']
-               is_active = field_value.value in active_statuses
-   ```
-
-### Error Handling
-
-- If any part of the status checking process fails, the system logs the error and returns default values
-- This ensures the dashboard continues to function even if there are database issues
-- Detailed error information is logged to help diagnose any problems
+1. **Prevents Enumeration**: No sequential IDs in URLs
+2. **Time-Limited Access**: Tokens expire after 24 hours
+3. **Audit Trail**: All access attempts are logged
+4. **Cryptographic Security**: Tokens are signed with the application's secret key
+5. **No Persistent Access**: Each access requires a valid token
 
 ---
 

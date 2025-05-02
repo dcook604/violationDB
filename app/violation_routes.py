@@ -7,7 +7,7 @@ import json
 from sqlalchemy import text
 from werkzeug.utils import secure_filename
 import uuid
-from .utils import create_violation_html, generate_violation_pdf, send_violation_notification, get_cached_fields, clear_field_cache
+from .utils import create_violation_html, generate_violation_pdf, send_violation_notification, get_cached_fields, clear_field_cache, secure_handle_uploaded_file, generate_secure_access_token, validate_secure_access_token, log_violation_access
 import datetime
 
 violation_bp = Blueprint('violations', __name__)
@@ -95,23 +95,36 @@ def api_create_violation():
                 incident_date = None
         
         # Create new violation with better checking of data
-        violation = Violation(
-            reference=data.get('reference', ''),
-            category=data.get('category', ''),
-            building=data.get('building', ''),
-            unit_number=data.get('unit_number', ''),
-            incident_date=incident_date,
-            incident_time=data.get('incident_time'),
-            subject=data.get('subject', ''),
-            details=data.get('details', ''),
-            created_by=current_user.id
-        )
+        violation_data = {
+            'reference': data.get('reference', ''),
+            'category': data.get('category', ''),
+            'building': data.get('building', ''),
+            'unit_number': data.get('unit_number', ''),
+            'incident_date': incident_date,
+            'incident_time': data.get('incident_time'),
+            'subject': data.get('subject', ''),
+            'details': data.get('details', ''),
+            'created_by': current_user.id
+        }
+        
+        # Generate a UUID for public_id if the column exists
+        try:
+            violation = Violation(**violation_data)
+            db.session.add(violation)
+            db.session.flush()  # Get the violation ID before commit
+        except Exception as e:
+            # If there's an error with public_id, try without it
+            if 'public_id' in str(e):
+                current_app.logger.warning(f"Error with public_id field, creating violation without it: {str(e)}")
+                # Create without public_id if the column doesn't exist yet
+                violation = Violation(**{k: v for k, v in violation_data.items() if k != 'public_id'})
+                db.session.add(violation)
+                db.session.flush()  # Get the violation ID before commit
+            else:
+                raise  # Re-raise if it's not related to public_id
         
         # Log violation data for debugging
         current_app.logger.info(f"Created violation record: reference={violation.reference}, category={violation.category}")
-        
-        db.session.add(violation)
-        db.session.flush()  # Get the violation ID before commit
         
         # Process dynamic fields
         dynamic_fields = data.get('dynamic_fields', {})
@@ -189,219 +202,251 @@ def view_violation_html(vid):
     violation = Violation.query.get_or_404(vid)
     
     # Check if an HTML file already exists
-    html_dir = os.path.join(current_app.config['BASE_DIR'], 'html_violations')
-    html_path = os.path.join(html_dir, f'violation_{vid}.html')
-    
-    # If the file doesn't exist, create it
-    if not os.path.exists(html_path):
+    if not violation.html_path:
         try:
+            # Generate a new HTML file if it doesn't exist
             html_path, _ = create_violation_html(violation)
+            if not html_path:
+                abort(500)  # Internal Server Error
         except Exception as e:
-            current_app.logger.error(f"Error generating HTML: {str(e)}")
-            abort(500, description="Could not generate HTML view")
+            current_app.logger.error(f"Error generating HTML for violation {vid}: {str(e)}")
+            abort(500)  # Internal Server Error
+    else:
+        # Get the directory and filename
+        html_full_path = os.path.join(current_app.config['BASE_DIR'], violation.html_path)
+        if not os.path.exists(html_full_path):
+            try:
+                # Re-generate if the file doesn't exist at the stored path
+                html_path, _ = create_violation_html(violation)
+                if not html_path:
+                    abort(500)  # Internal Server Error
+            except Exception as e:
+                current_app.logger.error(f"Error regenerating HTML for violation {vid}: {str(e)}")
+                abort(500)  # Internal Server Error
     
-    # Serve the HTML file
-    return send_file(html_path)
+    # Get the directory and filename from the path
+    html_dir = os.path.dirname(os.path.join(current_app.config['BASE_DIR'], violation.html_path))
+    html_filename = os.path.basename(violation.html_path)
+    
+    # Serve the file
+    return send_from_directory(html_dir, html_filename)
 
 @violation_bp.route('/violations/pdf/<int:vid>')
 @login_required
 def download_violation_pdf(vid):
-    """Download the PDF for a violation"""
+    """Download a violation PDF - requires authentication"""
     violation = Violation.query.get_or_404(vid)
     
-    # Only allow access if admin or owner
+    # Check if the user has permission to view this violation
     if not (current_user.is_admin or violation.created_by == current_user.id):
-        abort(403)
+        return jsonify({'error': 'Forbidden'}), 403
     
     # Check if a PDF file already exists
-    pdf_dir = os.path.join(current_app.config['BASE_DIR'], 'pdf_violations')
-    pdf_path = os.path.join(pdf_dir, f'violation_{vid}.pdf')
-    
-    # If the file doesn't exist or is empty, create it
-    if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
+    if not violation.pdf_path:
         try:
-            current_app.logger.info(f"Generating PDF for violation {vid}")
-            pdf_path = generate_violation_pdf(violation)
+            # Generate the HTML first if needed
+            if not violation.html_path:
+                html_path, html_content = create_violation_html(violation)
+            else:
+                # Read the existing HTML content
+                html_full_path = os.path.join(current_app.config['BASE_DIR'], violation.html_path)
+                if os.path.exists(html_full_path):
+                    with open(html_full_path, 'r', encoding='utf-8') as f:
+                        html_content = f.read()
+                else:
+                    # Re-generate HTML if file is missing
+                    html_path, html_content = create_violation_html(violation)
             
-            # Verify the PDF was generated and is not empty
-            if not os.path.exists(pdf_path) or os.path.getsize(pdf_path) == 0:
-                current_app.logger.error(f"Generated PDF is empty or missing: {pdf_path}")
-                abort(500, description="Could not generate valid PDF")
+            # Generate the PDF using the HTML content
+            pdf_path = generate_violation_pdf(violation, html_content)
+            if not pdf_path:
+                abort(500)  # Internal Server Error
         except Exception as e:
-            current_app.logger.error(f"Error generating PDF: {str(e)}")
-            abort(500, description="Could not generate PDF")
+            current_app.logger.error(f"Error generating PDF for violation {vid}: {str(e)}")
+            abort(500)  # Internal Server Error
+    else:
+        # Check if the file exists at the stored path
+        pdf_full_path = os.path.join(current_app.config['BASE_DIR'], violation.pdf_path)
+        if not os.path.exists(pdf_full_path):
+            try:
+                # Re-generate if the file doesn't exist
+                if not violation.html_path:
+                    html_path, html_content = create_violation_html(violation)
+                else:
+                    # Read the existing HTML content
+                    html_full_path = os.path.join(current_app.config['BASE_DIR'], violation.html_path)
+                    if os.path.exists(html_full_path):
+                        with open(html_full_path, 'r', encoding='utf-8') as f:
+                            html_content = f.read()
+                    else:
+                        # Re-generate HTML if file is missing
+                        html_path, html_content = create_violation_html(violation)
+                
+                # Generate the PDF using the HTML content
+                pdf_path = generate_violation_pdf(violation, html_content)
+                if not pdf_path:
+                    abort(500)  # Internal Server Error
+            except Exception as e:
+                current_app.logger.error(f"Error regenerating PDF for violation {vid}: {str(e)}")
+                abort(500)  # Internal Server Error
     
-    # Serve the PDF file
-    try:
-        return send_file(
-            pdf_path, 
-            download_name=f"violation_{violation.reference}.pdf",
-            as_attachment=True,
-            mimetype='application/pdf'
-        )
-    except Exception as e:
-        current_app.logger.error(f"Error sending PDF file: {str(e)}")
-        abort(500, description="Error delivering PDF file")
+    # Get the directory and filename from the path
+    pdf_dir = os.path.dirname(os.path.join(current_app.config['BASE_DIR'], violation.pdf_path))
+    pdf_filename = os.path.basename(violation.pdf_path)
+    
+    # Serve the file
+    return send_from_directory(
+        pdf_dir,
+        pdf_filename,
+        as_attachment=True,
+        download_name=f"violation_{violation.reference}.pdf"
+    )
 
 @violation_bp.route('/api/violations/<int:vid>/upload', methods=['POST'])
 @login_required
 def api_upload_files(vid):
-    violation = Violation.query.get_or_404(vid)
-    if not (current_user.is_admin or violation.created_by == current_user.id):
-        return jsonify({'error': 'Forbidden'}), 403
-    
-    if 'files' not in request.files:
-        current_app.logger.error(f"No files part in request for violation {vid}")
-        return jsonify({'error': 'No files part'}), 400
-    
-    files = request.files.getlist('files')
-    if not files or files[0].filename == '':
-        current_app.logger.error(f"No files selected for violation {vid}")
-        return jsonify({'error': 'No files selected'}), 400
-    
-    field_name = request.form.get('field_name')
-    if not field_name:
-        current_app.logger.error(f"No field name provided for violation {vid}")
-        return jsonify({'error': 'Field name is required'}), 400
-    
-    # Log received files for debugging
-    current_app.logger.info(f"Received {len(files)} files for violation {vid}, field {field_name}")
-    for file in files:
-        current_app.logger.info(f"File: {file.filename}, Content-Type: {file.content_type}")
-    
-    # Get the field definition to check validation rules, using cached fields
-    all_fields = get_cached_fields('all')
-    field_def = next((f for f in all_fields if f.name == field_name), None)
-    if not field_def:
-        current_app.logger.error(f"Field '{field_name}' not found for violation {vid}")
-        return jsonify({'error': 'Field not found'}), 404
-    
-    # Check validation rules
-    max_files = 5
-    max_size_mb = 5
-    
-    if field_def.validation:
-        try:
-            validation = json.loads(field_def.validation)
-            max_files = validation.get('maxFiles', 5)
-            max_size_mb = validation.get('maxSizePerFile', 5)
-        except Exception as e:
-            current_app.logger.error(f"Error parsing validation rules: {str(e)}")
-    
-    if len(files) > max_files:
-        current_app.logger.error(f"Too many files: {len(files)}, max allowed: {max_files}")
-        return jsonify({'error': f'Maximum of {max_files} files allowed'}), 400
-    
-    # Create folder for this violation if it doesn't exist
-    violation_folder = os.path.join(UPLOAD_FOLDER, f'violation_{vid}')
+    """Handle file uploads for a violation with virus scanning"""
     try:
-        os.makedirs(violation_folder, exist_ok=True)
-        current_app.logger.info(f"Created/verified upload folder: {violation_folder}")
-    except Exception as e:
-        current_app.logger.error(f"Failed to create upload folder {violation_folder}: {str(e)}")
-        return jsonify({'error': 'Server error: Could not create upload folder'}), 500
-    
-    # Save files and record paths
-    saved_files = []
-    max_size_bytes = max_size_mb * 1024 * 1024
-    
-    for file in files:
-        if not allowed_file(file.filename):
-            current_app.logger.error(f"Invalid file type: {file.filename}")
-            return jsonify({'error': 'Invalid file type. Only jpg, jpeg, png, and gif are allowed'}), 400
+        # Get the violation
+        violation = Violation.query.get_or_404(vid)
         
-        # Check file size (best effort since content_length might not be reliable)
-        file.seek(0, os.SEEK_END)
-        file_size = file.tell()
-        file.seek(0)  # Reset file pointer
+        # Check if the user has permission to modify this violation
+        if not (current_user.is_admin or violation.created_by == current_user.id):
+            return jsonify({'error': 'Forbidden'}), 403
         
-        if file_size > max_size_bytes:
-            current_app.logger.error(f"File too large: {file_size} bytes, max allowed: {max_size_bytes}")
-            return jsonify({'error': f'File too large. Maximum size is {max_size_mb}MB'}), 400
+        # Get the field name from query parameters
+        field_name = request.args.get('field')
+        if not field_name:
+            return jsonify({'error': 'No field name provided'}), 400
         
-        # Generate unique filename
-        original_filename = secure_filename(file.filename)
-        extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'jpg'
-        unique_filename = f"{uuid.uuid4().hex}.{extension}"
+        # Get the field definition
+        field_def = FieldDefinition.query.filter_by(name=field_name).first()
+        if not field_def:
+            return jsonify({'error': f'Field definition not found for {field_name}'}), 404
         
-        file_path = os.path.join(violation_folder, unique_filename)
+        # Check if there are files in the request
+        if 'files' not in request.files:
+            return jsonify({'error': 'No files in request'}), 400
         
+        # Process each file
+        saved_files = []
+        errors = []
+        
+        for file in request.files.getlist('files'):
+            if not file or not file.filename:
+                continue
+                
+            if not allowed_file(file.filename):
+                errors.append(f"File {file.filename} has an invalid file type")
+                continue
+            
+            # Use the secure file handling function with virus scanning
+            success, result = secure_handle_uploaded_file(file, vid, field_name)
+            
+            if success:
+                # Add the relative path to saved files
+                saved_files.append(result)
+            else:
+                # Add the error message
+                errors.append(f"Error with {file.filename}: {result}")
+        
+        if not saved_files and errors:
+            return jsonify({'error': '; '.join(errors)}), 400
+        
+        # Store the file paths in the database
         try:
-            file.save(file_path)
-            current_app.logger.info(f"Saved file to {file_path}")
-            
-            # Verify the file was saved and has content
-            if not os.path.exists(file_path):
-                current_app.logger.error(f"File doesn't exist after save: {file_path}")
-                return jsonify({'error': 'Server error: Failed to save file'}), 500
-            
-            if os.path.getsize(file_path) == 0:
-                current_app.logger.error(f"File is empty after save: {file_path}")
-                os.remove(file_path)  # Remove empty file
-                return jsonify({'error': 'Server error: Empty file after save'}), 500
-            
-            # Store the path relative to the upload folder
-            relative_path = os.path.join(f'violation_{vid}', unique_filename)
-            saved_files.append(relative_path)
-            current_app.logger.info(f"Added file to saved_files: {relative_path}")
-            
-        except Exception as e:
-            current_app.logger.error(f"Error saving file {file.filename}: {str(e)}")
-            return jsonify({'error': f'Failed to save file: {str(e)}'}), 500
-    
-    # Store the file paths in the database
-    try:
-        field_value = ViolationFieldValue.query.filter_by(
-            violation_id=vid,
-            field_definition_id=field_def.id
-        ).first()
-        
-        if field_value:
-            # Append to existing files if any
-            existing_files = field_value.value.split(',') if field_value.value else []
-            # Remove empty strings that might have been in the split
-            existing_files = [f for f in existing_files if f.strip()]
-            field_value.value = ','.join(existing_files + saved_files)
-            current_app.logger.info(f"Updated field value with {len(saved_files)} new files, total: {len(existing_files) + len(saved_files)}")
-        else:
-            # Create new field value
-            db.session.add(ViolationFieldValue(
+            field_value = ViolationFieldValue.query.filter_by(
                 violation_id=vid,
-                field_definition_id=field_def.id,
-                value=','.join(saved_files)
-            ))
-            current_app.logger.info(f"Created new field value with {len(saved_files)} files")
+                field_definition_id=field_def.id
+            ).first()
+            
+            if field_value:
+                # Append to existing files if any
+                existing_files = field_value.value.split(',') if field_value.value else []
+                # Remove empty strings that might have been in the split
+                existing_files = [f for f in existing_files if f.strip()]
+                field_value.value = ','.join(existing_files + saved_files)
+            else:
+                # Create new field value
+                db.session.add(ViolationFieldValue(
+                    violation_id=vid,
+                    field_definition_id=field_def.id,
+                    value=','.join(saved_files)
+                ))
+            
+            db.session.commit()
+        except Exception as e:
+            current_app.logger.error(f"Database error storing file paths: {str(e)}")
+            db.session.rollback()
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
         
-        db.session.commit()
-        current_app.logger.info(f"Committed database changes for field {field_name}")
-    except Exception as e:
-        current_app.logger.error(f"Database error storing file paths: {str(e)}")
-        db.session.rollback()
-        return jsonify({'error': f'Database error: {str(e)}'}), 500
-    
-    # Regenerate the HTML and PDF after adding files
-    try:
-        # Refresh the violation object from the database to ensure it's bound to the current session
-        violation = Violation.query.get(vid)
-        html_path, html_content = create_violation_html(violation)
-        pdf_path = generate_violation_pdf(violation, html_content)
+        # Regenerate the HTML and PDF after adding files
+        try:
+            # Refresh the violation object from the database to ensure it's bound to the current session
+            violation = Violation.query.get(vid)
+            html_path, html_content = create_violation_html(violation)
+            pdf_path = generate_violation_pdf(violation, html_content)
+        except Exception as e:
+            current_app.logger.error(f"Error updating violation files after upload: {str(e)}")
         
-        # Store the updated HTML and PDF paths
-        violation.html_path = os.path.relpath(html_path, current_app.config['BASE_DIR'])
-        violation.pdf_path = os.path.relpath(pdf_path, current_app.config['BASE_DIR'])
-        db.session.commit()
-        current_app.logger.info(f"Updated HTML/PDF paths after file upload")
+        return jsonify({
+            'message': 'Files uploaded successfully',
+            'files': saved_files,
+            'warnings': errors if errors else None
+        })
     except Exception as e:
-        current_app.logger.error(f"Error updating violation files after upload: {str(e)}")
-    
-    return jsonify({
-        'message': 'Files uploaded successfully',
-        'files': saved_files
-    })
+        current_app.logger.error(f"Error in file upload: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @violation_bp.route('/uploads/<path:filename>')
+@login_required
 def get_uploaded_file(filename):
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    """Securely serve uploaded files with access control"""
+    try:
+        # Extract violation ID from the path
+        path_parts = filename.split('/')
+        
+        # Check if this is a new-style path (saved_files/uploads/...)
+        if 'saved_files' in path_parts:
+            # Find the index of 'uploads' in the path
+            if 'uploads' in path_parts:
+                uploads_index = path_parts.index('uploads')
+                # Check if there's a violation folder after 'uploads'
+                if len(path_parts) > uploads_index + 2 and path_parts[uploads_index + 2].startswith('violation_'):
+                    violation_folder = path_parts[uploads_index + 2]
+                    try:
+                        violation_id = int(violation_folder.replace('violation_', ''))
+                    except ValueError:
+                        abort(404)  # Not found
+                else:
+                    abort(404)  # Not found
+            else:
+                abort(404)  # Not found
+        # Old-style path (direct upload folder)
+        elif len(path_parts) >= 1 and path_parts[0].startswith('violation_'):
+            try:
+                violation_id = int(path_parts[0].replace('violation_', ''))
+            except ValueError:
+                abort(404)  # Not found
+        else:
+            abort(404)  # Not found
+        
+        # Check if the user has permission to access this violation's files
+        violation = Violation.query.get_or_404(violation_id)
+        if not (current_user.is_admin or violation.created_by == current_user.id):
+            abort(403)  # Forbidden
+        
+        # Determine the base directory
+        if 'saved_files' in path_parts:
+            # New-style path
+            base_dir = os.path.join(current_app.config['BASE_DIR'])
+            return send_from_directory(base_dir, filename)
+        else:
+            # Old-style path (compatibility)
+            return send_from_directory(UPLOAD_FOLDER, filename)
+    except Exception as e:
+        current_app.logger.error(f"Error serving uploaded file {filename}: {str(e)}")
+        abort(500)  # Internal server error
 
 @violation_bp.route('/api/violations', methods=['GET'])
 @login_required
@@ -767,9 +812,12 @@ def notify_about_reply(reply):
         current_app.logger.info(f"No recipients for reply notification on violation {violation.id}")
         return False
     
+    # Generate secure URLs
+    secure_urls = send_secure_urls(violation)
+    view_url = secure_urls['html_url']
+    
     # Prepare email
     subject = f"New Response to Violation {violation.reference}"
-    view_url = f"{current_app.config.get('BASE_URL', 'http://localhost:5004')}/violations/view/{violation.id}"
     
     # Email body
     body_text = f"""A new response has been added to violation {violation.reference}.
@@ -782,6 +830,8 @@ Response:
 
 You can view the full details at:
 {view_url}
+
+This link is valid for 24 hours and your access will be logged for security purposes.
 """
     
     # Using a regular string instead of f-string to avoid backslash issues
@@ -795,6 +845,7 @@ You can view the full details at:
     {response_br}</p>
     
     <p>You can view the full details by <a href="{url}">clicking here</a>.</p>
+    <p><small>This link is valid for 24 hours and your access will be logged for security purposes.</small></p>
     """
     
     # Format the string separately
@@ -820,3 +871,161 @@ You can view the full details at:
     except Exception as e:
         current_app.logger.error(f"Error sending reply notification email: {str(e)}")
         return False
+
+@violation_bp.route('/violations/secure/<token>')
+def view_secure_violation(token):
+    """Public route to securely view a violation with token authentication"""
+    # Validate the token and get violation ID
+    violation_id = validate_secure_access_token(token)
+    if not violation_id:
+        current_app.logger.warning(f"Invalid or expired token attempted: {token}")
+        abort(403)  # Forbidden
+    
+    # Get the violation (try with ID first, then with public_id if not found)
+    violation = Violation.query.get(violation_id)
+    if not violation:
+        # If not found by ID, try finding by public_id
+        violation = Violation.query.filter_by(public_id=violation_id).first()
+        if not violation:
+            current_app.logger.warning(f"Violation not found for ID or public_id: {violation_id}")
+            abort(404)  # Not found
+    
+    # Log the access
+    log_violation_access(violation.id, token, request)
+    
+    # Check if an HTML file already exists
+    if not violation.html_path:
+        try:
+            # Generate a new HTML file if it doesn't exist
+            html_path, _ = create_violation_html(violation)
+            if not html_path:
+                abort(500)  # Internal Server Error
+        except Exception as e:
+            current_app.logger.error(f"Error generating HTML for violation {violation.id}: {str(e)}")
+            abort(500)  # Internal Server Error
+    else:
+        # Get the directory and filename
+        html_full_path = os.path.join(current_app.config['BASE_DIR'], violation.html_path)
+        if not os.path.exists(html_full_path):
+            try:
+                # Re-generate if the file doesn't exist at the stored path
+                html_path, _ = create_violation_html(violation)
+                if not html_path:
+                    abort(500)  # Internal Server Error
+            except Exception as e:
+                current_app.logger.error(f"Error regenerating HTML for violation {violation.id}: {str(e)}")
+                abort(500)  # Internal Server Error
+    
+    # Get the directory and filename from the path
+    html_dir = os.path.dirname(os.path.join(current_app.config['BASE_DIR'], violation.html_path))
+    html_filename = os.path.basename(violation.html_path)
+    
+    # Serve the file
+    return send_from_directory(html_dir, html_filename)
+
+@violation_bp.route('/violations/secure/<token>/pdf')
+def download_secure_violation_pdf(token):
+    """Download a violation PDF with token authentication"""
+    # Validate the token and get violation ID
+    violation_id = validate_secure_access_token(token)
+    if not violation_id:
+        current_app.logger.warning(f"Invalid or expired token attempted for PDF: {token}")
+        abort(403)  # Forbidden
+    
+    # Get the violation (try with ID first, then with public_id if not found)
+    violation = Violation.query.get(violation_id)
+    if not violation:
+        # If not found by ID, try finding by public_id
+        violation = Violation.query.filter_by(public_id=violation_id).first()
+        if not violation:
+            current_app.logger.warning(f"Violation not found for ID or public_id: {violation_id}")
+            abort(404)  # Not found
+    
+    # Log the access
+    log_violation_access(violation.id, token, request)
+    
+    # Check if a PDF file already exists
+    if not violation.pdf_path:
+        try:
+            # Generate the HTML first if needed
+            if not violation.html_path:
+                html_path, html_content = create_violation_html(violation)
+            else:
+                # Read the existing HTML content
+                html_full_path = os.path.join(current_app.config['BASE_DIR'], violation.html_path)
+                if os.path.exists(html_full_path):
+                    with open(html_full_path, 'r', encoding='utf-8') as f:
+                        html_content = f.read()
+                else:
+                    # Re-generate HTML if file is missing
+                    html_path, html_content = create_violation_html(violation)
+            
+            # Generate the PDF using the HTML content
+            pdf_path = generate_violation_pdf(violation, html_content)
+            if not pdf_path:
+                abort(500)  # Internal Server Error
+        except Exception as e:
+            current_app.logger.error(f"Error generating PDF for violation {violation.id}: {str(e)}")
+            abort(500)  # Internal Server Error
+    else:
+        # Check if the file exists at the stored path
+        pdf_full_path = os.path.join(current_app.config['BASE_DIR'], violation.pdf_path)
+        if not os.path.exists(pdf_full_path):
+            try:
+                # Re-generate if the file doesn't exist
+                if not violation.html_path:
+                    html_path, html_content = create_violation_html(violation)
+                else:
+                    # Read the existing HTML content
+                    html_full_path = os.path.join(current_app.config['BASE_DIR'], violation.html_path)
+                    if os.path.exists(html_full_path):
+                        with open(html_full_path, 'r', encoding='utf-8') as f:
+                            html_content = f.read()
+                    else:
+                        # Re-generate HTML if file is missing
+                        html_path, html_content = create_violation_html(violation)
+                
+                # Generate the PDF using the HTML content
+                pdf_path = generate_violation_pdf(violation, html_content)
+                if not pdf_path:
+                    abort(500)  # Internal Server Error
+            except Exception as e:
+                current_app.logger.error(f"Error regenerating PDF for violation {violation.id}: {str(e)}")
+                abort(500)  # Internal Server Error
+    
+    # Get the directory and filename from the path
+    pdf_dir = os.path.dirname(os.path.join(current_app.config['BASE_DIR'], violation.pdf_path))
+    pdf_filename = os.path.basename(violation.pdf_path)
+    
+    # Serve the file
+    return send_from_directory(
+        pdf_dir,
+        pdf_filename,
+        as_attachment=True,
+        download_name=f"violation_{violation.reference}.pdf"
+    )
+
+def send_secure_urls(violation):
+    """Generate secure URLs for a violation
+    
+    Args:
+        violation: The violation object
+        
+    Returns:
+        dict: Dictionary with secure URLs
+    """
+    # Generate token for this violation
+    token = generate_secure_access_token(violation.id)
+    
+    # Get base URL
+    base_url = current_app.config.get('BASE_URL', f"http://{request.host}")
+    
+    # Create secure URLs
+    html_url = f"{base_url}/violations/secure/{token}"
+    pdf_url = f"{base_url}/violations/secure/{token}/pdf"
+    
+    return {
+        'html_url': html_url,
+        'pdf_url': pdf_url,
+        'token': token
+    }

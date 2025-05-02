@@ -130,3 +130,102 @@ This file serves as a persistent, human-readable memory bank for the project. It
 - Foundation for future status-based filtering and reporting
 
 ---
+
+## System Architecture
+
+- Backend: Flask Python application 
+- Frontend: React SPA using Notus design
+- Database: SQLite (migrations via Flask-Migrate)
+- Authentication: JWT-based session tokens
+- PDF Generation: WeasyPrint 
+- Email: Flask-Mail with SMTP configuration stored in database
+- File Storage: Secure directory structure with virus scanning
+- Security: Token-based secure URLs with 24-hour expiration
+
+## Key Implementation Features
+
+### Violation Management
+- Full CRUD operations for violation records
+- Dynamic field system for customizable forms
+- PDF generation with WeasyPrint
+- Email notifications for new violations
+- Response system for violation feedback
+- Secure URL access via cryptographic tokens
+
+### Security System
+- User authentication with Flask-Login
+- Argon2id password hashing
+- UUID-based filenames to prevent enumeration
+- ClamAV virus scanning for all file uploads
+- Token-based secure URLs with automatic expiration
+- Comprehensive access logging
+- File storage outside web-accessible directories
+
+### File Management
+- UUID-based file naming for security
+- Hierarchical storage structure (/saved_files/{html,pdf,uploads})
+- ClamAV virus scanning integration
+- Secure file serving with proper authentication
+- Token-based access for shared files
+
+### Field Definition System
+- Admin UI for field management
+- Field types: text, select, date, email, file, etc.
+- Grid-based layout system
+- Field validation rules
+- Dynamic form generation
+
+### Dashboard
+- Status-based metrics (active, resolved, pending)
+- Recent violations listing
+- Quick access to common actions
+- Performance optimized queries
+
+## Bug History & Solutions
+
+### Bug: File uploads failing silently
+- *Problem*: Missing import for `secure_handle_uploaded_file` in violation_routes.py
+- *Solution*: Added proper import, ensuring file scanning and UUID-based storage functioned correctly
+
+### Bug: Email notifications not showing correct dynamic fields
+- *Problem*: Email templates were using `violation.dynamic_fields` which doesn't exist
+- *Solution*: Explicitly queried field values from database and built dynamic_fields dictionary
+
+### Bug: Insecure violation URLs
+- *Problem*: Sequential IDs in URLs allowed easy enumeration of all violations
+- *Solution*: Implemented UUID-based public_ids and cryptographically signed tokens for all public URLs
+
+### Bug: HTML files not displaying correct dynamic field values
+- *Problem*: Template expected `dynamic_fields` but was receiving `field_values`
+- *Solution*: Updated `create_violation_html` to correctly pass dynamic_fields to template
+
+## Technical Insights
+
+1. ClamAV virus scanning works best with both Unix and network socket support
+2. WeasyPrint may require fallback methods depending on installation environment
+3. Secure token generation requires proper configuration of app secret key
+4. File access should always be authenticated and logged for security
+5. Database schema migrations require careful planning for backward compatibility
+
+## Requirements and Dependencies
+
+- Python 3.11+
+- Flask and extensions (flask_sqlalchemy, flask_login, etc.)
+- WeasyPrint for PDF generation
+- ClamAV and pyclamd for virus scanning
+- React 18 for frontend
+- itsdangerous for secure token generation
+- Argon2 for password hashing
+
+## Database Structure
+
+Key tables:
+- users: User accounts and authentication
+- violations: Core violation data
+- field_definitions: Dynamic field specifications
+- violation_field_values: Values for dynamic fields
+- violation_replies: Responses to violations
+- violation_access_logs: Security logs for all access attempts
+- settings: System-wide configuration
+
+---

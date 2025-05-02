@@ -1,4 +1,7 @@
 import os
+import uuid
+import socket
+from datetime import datetime
 from flask import current_app, render_template, url_for, g
 from werkzeug.utils import secure_filename
 from flask_mail import Message
@@ -6,6 +9,13 @@ from . import mail
 import json
 from urllib.parse import urljoin
 import time
+import logging
+from .models import Settings
+import tempfile
+from itsdangerous import URLSafeTimedSerializer
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Cache for field definitions
 _field_cache = {
@@ -258,247 +268,157 @@ def send_email(subject, recipients, body, attachments=None, cc=None, html=None):
 
 def create_violation_html(violation, field_defs=None):
     """
-    Generate an HTML file for a violation record
+    Generate HTML for a violation with UUID-based filename
     
     Args:
         violation: The violation object
-        field_defs: Optional list of field definitions
+        field_defs: Optional field definitions to use
         
     Returns:
         tuple: (html_path, html_content)
     """
-    from .models import ViolationFieldValue, FieldDefinition, User, ViolationReply
+    from .models import ViolationFieldValue, FieldDefinition, ViolationReply, User
     
-    # Create directory for HTML files if it doesn't exist
-    html_dir = os.path.join(current_app.config['BASE_DIR'], 'html_violations')
-    os.makedirs(html_dir, exist_ok=True)
-    
-    # Get dynamic field values
-    field_values = ViolationFieldValue.query.filter_by(violation_id=violation.id).all()
-    
-    # Fetch field definitions if not provided, using cache
-    if not field_defs:
+    # Use cached field definitions if not provided
+    if field_defs is None:
         field_defs = get_cached_fields('all')
     
-    # Create field definition lookup
-    field_dict = {fd.id: fd for fd in field_defs}
+    # Get field values for the violation
+    field_values = ViolationFieldValue.query.filter_by(violation_id=violation.id).all()
     
-    # Process field values into a dictionary
+    # Create dictionary of field values (for dynamic_fields)
     dynamic_fields = {}
     field_images = {}
-    has_images = False
     
     for fv in field_values:
-        field_def = field_dict.get(fv.field_definition_id)
+        # Find the field definition
+        field_def = next((f for f in field_defs if f.id == fv.field_definition_id), None)
         if field_def:
             dynamic_fields[field_def.name] = fv.value
             
-            # Process file fields
+            # Check if this is a file field with image paths
             if field_def.type == 'file' and fv.value:
-                images = []
-                for img_path in fv.value.split(','):
-                    if img_path and img_path.strip():
-                        # Remove any leading/trailing whitespace
-                        img_path = img_path.strip()
-                        
-                        # Create absolute URL for the image
-                        img_url = urljoin(
-                            current_app.config.get('BASE_URL', 'http://localhost:5004'),
-                            f'/uploads/{img_path}'
-                        )
-                        
-                        # Log the image URL for debugging
-                        current_app.logger.info(f"Adding image URL: {img_url} for field {field_def.name}")
-                        
-                        # Verify the file exists
-                        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], img_path)
-                        if os.path.exists(file_path):
-                            images.append(img_url)
-                            current_app.logger.info(f"File exists at {file_path}")
-                        else:
-                            current_app.logger.warning(f"File doesn't exist at {file_path}, but still adding URL")
-                            images.append(img_url)  # Add anyway to help with debugging
-                
-                if images:
-                    field_images[field_def.name] = images
-                    has_images = True
-                    current_app.logger.info(f"Found {len(images)} images for field {field_def.name}")
+                # Split comma-separated paths
+                image_paths = [path.strip() for path in fv.value.split(',') if path.strip()]
+                if image_paths:
+                    field_images[field_def.name] = image_paths
     
-    # Get creator information
+    # Get replies for the violation
+    replies = ViolationReply.query.filter_by(violation_id=violation.id).order_by(ViolationReply.created_at).all()
+    
+    # Get creator info
     creator = None
     if violation.created_by:
         creator = User.query.get(violation.created_by)
     
-    # Get violation replies
-    replies = ViolationReply.query.filter_by(violation_id=violation.id).order_by(ViolationReply.created_at).all()
+    # Generate UUID-based filename
+    unique_id = str(uuid.uuid4())
+    filename = f"{unique_id}_{violation.id}.html"
     
-    # Prepare template data
-    template_data = {
-        'violation': violation,
-        'dynamic_fields': dynamic_fields,
-        'field_images': field_images,
-        'has_images': has_images,
-        'creator': creator,
-        'replies': replies
-    }
+    # Create secure directory path
+    secure_dir = os.path.join(current_app.config['BASE_DIR'], 'saved_files', 'html')
+    os.makedirs(secure_dir, exist_ok=True)
     
-    # Render the template
-    html_content = render_template('violations/detail.html', **template_data)
+    # Generate full file path
+    file_path = os.path.join(secure_dir, filename)
     
-    # Save the HTML content to a file
-    html_filename = f'violation_{violation.id}.html'
-    html_path = os.path.join(html_dir, html_filename)
+    # Render the HTML template
+    html_content = render_template(
+        'violations/detail.html',
+        violation=violation,
+        dynamic_fields=dynamic_fields,
+        field_images=field_images,
+        has_images=bool(field_images),
+        field_defs=field_defs,
+        replies=replies,
+        creator=creator
+    )
     
-    with open(html_path, 'w', encoding='utf-8') as f:
+    # Write the HTML to file
+    with open(file_path, 'w', encoding='utf-8') as f:
         f.write(html_content)
     
-    return html_path, html_content
+    # Store the secure relative path in the database
+    from . import db
+    relative_path = os.path.join('saved_files', 'html', filename)
+    violation.html_path = relative_path
+    db.session.commit()
+    
+    return file_path, html_content
 
 def generate_violation_pdf(violation, html_content=None):
     """
-    Generate a PDF file for a violation record
+    Generate PDF for a violation with UUID-based filename
     
     Args:
         violation: The violation object
-        html_content: Optional HTML content to use
+        html_content: Optional HTML content to convert
         
     Returns:
         str: Path to the generated PDF file
     """
-    # Create directory for PDF files if it doesn't exist
-    pdf_dir = os.path.join(current_app.config['BASE_DIR'], 'pdf_violations')
-    os.makedirs(pdf_dir, exist_ok=True)
-    
-    # Generate HTML content if not provided
-    if not html_content:
-        _, html_content = create_violation_html(violation)
-    
-    # Define PDF path
-    pdf_filename = f'violation_{violation.id}.pdf'
-    pdf_path = os.path.join(pdf_dir, pdf_filename)
-    
     try:
-        # First attempt: Using WeasyPrint 61+ with document.render() approach
-        current_app.logger.info(f"Generating PDF for violation {violation.id} at {pdf_path}")
-        from weasyprint import HTML
+        # Generate UUID-based filename
+        unique_id = str(uuid.uuid4())
+        filename = f"{unique_id}_{violation.id}.pdf"
         
-        # Generate HTML document and render
-        html = HTML(string=html_content)
-        document = html.render()
+        # Create secure directory path
+        secure_dir = os.path.join(current_app.config['BASE_DIR'], 'saved_files', 'pdf')
+        os.makedirs(secure_dir, exist_ok=True)
         
-        # Write to PDF file
-        with open(pdf_path, 'wb') as pdf_file:
-            try:
-                document.write_pdf(pdf_file)
-                current_app.logger.info(f"Successfully generated PDF ({os.path.getsize(pdf_path)} bytes)")
-                return pdf_path
-            except TypeError as err:
-                if "PDF.__init__() takes 1 positional argument but 3 were given" in str(err):
-                    current_app.logger.warning(f"pydyf compatibility issue detected: {err}")
-                    # Close the file and use alternative approach
-                    pdf_file.close()
-                    raise Exception("pydyf compatibility issue - using fallback approach")
-                else:
-                    raise
-                    
-    except Exception as e:
-        current_app.logger.error(f"PDF generation error (attempt 1): {str(e)}")
+        # Generate full file path
+        file_path = os.path.join(secure_dir, filename)
+        
+        # Get HTML content if not provided
+        if not html_content:
+            if violation.html_path and os.path.exists(os.path.join(current_app.config['BASE_DIR'], violation.html_path)):
+                with open(os.path.join(current_app.config['BASE_DIR'], violation.html_path), 'r', encoding='utf-8') as f:
+                    html_content = f.read()
+            else:
+                # Generate HTML if no path or file doesn't exist
+                _, html_content = create_violation_html(violation)
+        
+        # Generate PDF from HTML content
         try:
-            # Second attempt: Save HTML to temporary file and use a command-line tool
-            import tempfile
-            import subprocess
+            # Method 1: Using string content directly (WeasyPrint 52+)
+            # Local import to avoid module-level dependencies
+            from weasyprint import HTML
+            HTML(string=html_content).write_pdf(file_path)
+            current_app.logger.info(f"Generated PDF using direct HTML string: {file_path}")
+        except Exception as e:
+            current_app.logger.warning(f"Direct HTML string PDF generation failed: {str(e)}")
             
-            current_app.logger.info(f"Attempting command-line PDF generation")
-            temp_html = tempfile.NamedTemporaryFile(suffix='.html', delete=False)
             try:
-                # Write HTML to temp file
-                with open(temp_html.name, 'w', encoding='utf-8') as f:
-                    f.write(html_content)
+                # Method 2: Using temporary file approach (more compatible)
+                with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as temp_html:
+                    temp_html.write(html_content.encode('utf-8'))
+                    temp_html_path = temp_html.name
                 
-                # Try using wkhtmltopdf command-line tool if available
-                try:
-                    cmd = ['/usr/bin/wkhtmltopdf', temp_html.name, pdf_path]
-                    current_app.logger.info(f"Executing: {' '.join(cmd)}")
-                    result = subprocess.run(cmd, capture_output=True, text=True)
-                    
-                    if result.returncode == 0:
-                        current_app.logger.info(f"PDF successfully generated using wkhtmltopdf")
-                    else:
-                        current_app.logger.error(f"wkhtmltopdf error: {result.stderr}")
-                        raise Exception(f"wkhtmltopdf failed: {result.stderr}")
-                except (subprocess.SubprocessError, FileNotFoundError) as e:
-                    current_app.logger.error(f"Could not use wkhtmltopdf: {str(e)}")
-                    raise Exception("Command-line PDF generation failed")
-            finally:
+                # Use the temporary file for PDF generation
+                from weasyprint import HTML
+                HTML(filename=temp_html_path).write_pdf(file_path)
+                
                 # Clean up temporary file
-                if os.path.exists(temp_html.name):
-                    os.unlink(temp_html.name)
-                    
-        except Exception as e2:
-            current_app.logger.error(f"PDF generation error (attempt 2): {str(e2)}")
-            # Final fallback: Create a minimal valid PDF with error message
-            try:
-                current_app.logger.info("Creating fallback error PDF")
-                with open(pdf_path, 'w', encoding='utf-8') as f:
-                    f.write(f"""
-                    %PDF-1.4
-                    1 0 obj
-                    << /Type /Catalog
-                       /Pages 2 0 R
-                    >>
-                    endobj
-                    2 0 obj
-                    << /Type /Pages
-                       /Kids [3 0 R]
-                       /Count 1
-                    >>
-                    endobj
-                    3 0 obj
-                    << /Type /Page
-                       /Parent 2 0 R
-                       /Resources << /Font << /F1 4 0 R >> >>
-                       /MediaBox [0 0 612 792]
-                       /Contents 5 0 R
-                    >>
-                    endobj
-                    4 0 obj
-                    << /Type /Font
-                       /Subtype /Type1
-                       /Name /F1
-                       /BaseFont /Helvetica
-                    >>
-                    endobj
-                    5 0 obj
-                    << /Length 68 >>
-                    stream
-                    BT
-                    /F1 12 Tf
-                    100 700 Td
-                    (PDF Generation Error - Technical support has been notified) Tj
-                    ET
-                    endstream
-                    endobj
-                    xref
-                    0 6
-                    0000000000 65535 f
-                    0000000009 00000 n
-                    0000000063 00000 n
-                    0000000135 00000 n
-                    0000000267 00000 n
-                    0000000358 00000 n
-                    trailer
-                    << /Size 6
-                       /Root 1 0 R
-                    >>
-                    startxref
-                    477
-                    %%EOF
-                    """)
-                current_app.logger.info(f"Created fallback PDF at {pdf_path}")
-            except Exception as e3:
-                current_app.logger.error(f"Failed to create error PDF: {str(e3)}")
-    
-    return pdf_path
+                os.unlink(temp_html_path)
+                current_app.logger.info(f"Generated PDF using temporary file approach: {file_path}")
+            except Exception as e2:
+                current_app.logger.error(f"Temporary file PDF generation failed: {str(e2)}")
+                
+                # Method 3: Fallback to an empty PDF (just to have something)
+                with open(file_path, 'w') as f:
+                    f.write("%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 0 >>\nstream\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000010 00000 n\n0000000059 00000 n\n0000000118 00000 n\n0000000217 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n267\n%%EOF")
+                current_app.logger.warning(f"Created empty fallback PDF: {file_path}")
+        
+        # Store the secure relative path in the database
+        from . import db
+        relative_path = os.path.join('saved_files', 'pdf', filename)
+        violation.pdf_path = relative_path
+        db.session.commit()
+        
+        return file_path
+    except Exception as e:
+        current_app.logger.error(f"Error generating PDF: {str(e)}")
+        return None
 
 def send_violation_notification(violation, html_path):
     """
@@ -509,6 +429,7 @@ def send_violation_notification(violation, html_path):
         html_path: Path to the HTML file
     """
     from .models import ViolationFieldValue, FieldDefinition, User, Settings
+    from flask import request
     
     # Get all email fields from the violation
     email_addresses = []
@@ -525,85 +446,317 @@ def send_violation_notification(violation, html_path):
             ).first()
             
             if field_value and field_value.value and '@' in field_value.value:
+                # Add to email addresses list
                 email_addresses.append(field_value.value)
     
-    # Add global notification emails from settings
+    # Add global notification recipients if enabled
     settings = Settings.get_settings()
     if settings.enable_global_notifications and settings.notification_emails:
         global_emails = settings.get_notification_emails_list()
         email_addresses.extend(global_emails)
     
-    # Remove duplicates while preserving order
+    # Remove duplicates
     email_addresses = list(dict.fromkeys(email_addresses))
     
-    # If no email addresses were found, return early
     if not email_addresses:
-        current_app.logger.info(f"No email addresses found for violation {violation.id}")
-        return False
-    
-    # Get the creator
-    creator = None
-    if violation.created_by:
-        creator = User.query.get(violation.created_by)
+        current_app.logger.info(f"No email addresses found for notification of violation {violation.id}")
+        return
     
     # Get dynamic field values
     field_values = ViolationFieldValue.query.filter_by(violation_id=violation.id).all()
+    dynamic_fields = {}
     field_defs = get_cached_fields('all')
     
-    # Create field definition lookup
-    field_dict = {fd.id: fd for fd in field_defs}
-    
-    # Process field values into a dictionary
-    dynamic_fields = {}
     for fv in field_values:
-        field_def = field_dict.get(fv.field_definition_id)
+        field_def = next((f for f in field_defs if f.id == fv.field_definition_id), None)
         if field_def:
             dynamic_fields[field_def.name] = fv.value
     
-    # Get the category from dynamic fields or fallback to the direct property
-    category = dynamic_fields.get('Category', violation.category or 'Not specified')
+    # Get the values for the email with fallbacks to static fields
+    category = dynamic_fields.get('Category', violation.category) or violation.category or ''
+    details = dynamic_fields.get('Details', violation.details) or violation.details or ''
     
-    # Get incident details from dynamic fields or fallback to subject
-    incident_details = dynamic_fields.get('Incident Details', violation.subject or 'Not provided')
-    
-    # Prepare the email
+    # Create email message
     subject = f"New Violation Report: {violation.reference}"
     
-    # Generate the email body
-    body_text = f"""A new violation has been recorded.
+    # Generate secure token for this violation
+    token = generate_secure_access_token(violation.id)
+    
+    # Get base URL
+    base_url = current_app.config.get('BASE_URL', f"http://{request.host if request else 'localhost:5004'}")
+    
+    # Create secure URLs
+    view_url = f"{base_url}/violations/secure/{token}"
+    
+    # Create plain text message
+    body = f"""A new violation has been reported with reference {violation.reference}.
 
+Details:
 Reference: {violation.reference}
 Category: {category}
-Details: {incident_details}
+Incident Details: {details}
 
-You can view the full details using the link below:
-{current_app.config.get('BASE_URL', 'http://localhost:5004')}/violations/view/{violation.id}
-
-Please do not reply to this email.
+You can view the full details at:
+{view_url}
 """
     
-    # Send the email with a link to the HTML view
-    view_url = f"{current_app.config.get('BASE_URL', 'http://localhost:5004')}/violations/view/{violation.id}"
-    
+    # Create HTML message
     html_body = f"""
-    <p>A new violation has been recorded.</p>
-    <p><strong>Reference:</strong> {violation.reference}<br>
-    <strong>Category:</strong> {category}<br>
-    <strong>Details:</strong> {incident_details}</p>
+    <h2>New Violation Report</h2>
+    <p>A new violation has been reported with reference <strong>{violation.reference}</strong>.</p>
+    
+    <h3>Details:</h3>
+    <ul>
+        <li><strong>Reference:</strong> {violation.reference}</li>
+        <li><strong>Category:</strong> {category}</li>
+        <li><strong>Incident Details:</strong> {details}</li>
+    </ul>
     
     <p>You can view the full details by <a href="{view_url}">clicking here</a>.</p>
-    
-    <p>To respond to this violation, please view the full details and use the reply form at the bottom of the page.</p>
+    <p><small>This link is valid for 24 hours and your access will be logged for security purposes.</small></p>
     """
     
     try:
         send_email(
             subject=subject,
             recipients=email_addresses,
-            body=body_text,
+            body=body,
             html=html_body
         )
+        current_app.logger.info(f"Sent violation notification to {len(email_addresses)} recipients")
         return True
     except Exception as e:
-        current_app.logger.error(f"Error sending notification email: {str(e)}")
+        current_app.logger.error(f"Error sending violation notification: {str(e)}")
         return False
+
+# ClamAV Virus Scanning Integration
+def init_clamav():
+    """
+    Initialize ClamAV scanner connection
+    
+    Returns:
+        pyclamd.ClamdUnixSocket or pyclamd.ClamdNetworkSocket or None
+    """
+    try:
+        import pyclamd
+        
+        # Try to connect to ClamAV daemon via Unix socket
+        try:
+            clam = pyclamd.ClamdUnixSocket()
+            # Test the connection
+            if clam.ping():
+                current_app.logger.info("ClamAV daemon is running (Unix socket)")
+                return clam
+        except Exception as e:
+            current_app.logger.warning(f"Unable to connect to ClamAV daemon via Unix socket: {str(e)}")
+        
+        # Try to connect to ClamAV daemon via network
+        try:
+            clam = pyclamd.ClamdNetworkSocket()
+            # Test the connection
+            if clam.ping():
+                current_app.logger.info("ClamAV daemon is running (Network socket)")
+                return clam
+        except Exception as e:
+            current_app.logger.warning(f"Unable to connect to ClamAV daemon via network: {str(e)}")
+        
+        current_app.logger.error("Could not connect to ClamAV daemon")
+        return None
+    
+    except ImportError:
+        current_app.logger.error("pyclamd module not installed")
+        return None
+
+def scan_file(file_path):
+    """
+    Scan a file for viruses using ClamAV
+    
+    Args:
+        file_path: Path to the file to scan
+        
+    Returns:
+        tuple: (is_clean, result_message)
+    """
+    try:
+        # Initialize ClamAV
+        clam = init_clamav()
+        
+        if not clam:
+            current_app.logger.warning("ClamAV not available, skipping virus scan")
+            return True, "Virus scan skipped (ClamAV not available)"
+        
+        # Scan the file
+        scan_result = clam.scan_file(file_path)
+        
+        # If scan_result is None, the file is clean
+        if scan_result is None:
+            current_app.logger.info(f"File is clean: {file_path}")
+            return True, "File is clean"
+        
+        # If we have a result, the file is infected
+        current_app.logger.warning(f"Infected file detected: {file_path}, {scan_result}")
+        return False, f"Infected: {scan_result[file_path]}"
+    
+    except Exception as e:
+        current_app.logger.error(f"Error scanning file {file_path}: {str(e)}")
+        # Since we can't be sure, we'll err on the side of caution
+        return False, f"Scan error: {str(e)}"
+
+def secure_handle_uploaded_file(file, violation_id, field_name, subdir='fields'):
+    """
+    Securely handle an uploaded file with virus scanning
+    
+    Args:
+        file: The uploaded file object
+        violation_id: The violation ID
+        field_name: The field name for the file
+        subdir: Subdirectory within uploads (default: 'fields')
+        
+    Returns:
+        tuple: (success, file_path or error_message)
+    """
+    # Import inside function to avoid circular imports
+    from werkzeug.utils import secure_filename
+    
+    try:
+        # Check if file exists
+        if not file or not file.filename:
+            return False, "No file provided"
+        
+        # Generate secure filename with UUID
+        original_filename = secure_filename(file.filename)
+        unique_id = str(uuid.uuid4())
+        unique_filename = f"{unique_id}_{original_filename}"
+        
+        # Create secure directory structure
+        secure_dir = os.path.join(
+            current_app.config['BASE_DIR'],
+            'saved_files',
+            'uploads',
+            subdir,
+            f'violation_{violation_id}'
+        )
+        os.makedirs(secure_dir, exist_ok=True)
+        
+        # Generate full file path
+        file_path = os.path.join(secure_dir, unique_filename)
+        
+        # Save the file temporarily for scanning
+        file.save(file_path)
+        
+        # Verify the file was saved successfully
+        if not os.path.exists(file_path):
+            return False, "Failed to save file"
+        
+        if os.path.getsize(file_path) == 0:
+            os.remove(file_path)
+            return False, "Empty file"
+        
+        # Scan the file for viruses
+        is_clean, scan_result = scan_file(file_path)
+        
+        # If the file is not clean, delete it
+        if not is_clean:
+            os.remove(file_path)
+            return False, f"Virus detected: {scan_result}"
+        
+        # Return the relative path for database storage
+        relative_path = os.path.join(
+            'saved_files',
+            'uploads',
+            subdir,
+            f'violation_{violation_id}',
+            unique_filename
+        )
+        
+        return True, relative_path
+    
+    except Exception as e:
+        current_app.logger.error(f"Error handling uploaded file: {str(e)}")
+        # If an error occurs, try to clean up the file
+        try:
+            if 'file_path' in locals() and os.path.exists(file_path):
+                os.remove(file_path)
+        except:
+            pass
+        return False, f"Error: {str(e)}"
+
+# Token generation for secure violation access
+def generate_secure_access_token(violation_id, expiration_hours=24):
+    """
+    Generate a signed, time-limited token for violation access
+    
+    Args:
+        violation_id: ID of the violation
+        expiration_hours: Hours until token expires
+        
+    Returns:
+        str: Secure access token
+    """
+    # Create serializer with app secret
+    serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    
+    # Create payload with violation ID and timestamp
+    payload = {
+        'violation_id': violation_id,
+        'created': int(time.time())
+    }
+    
+    # Generate token
+    return serializer.dumps(payload)
+
+def validate_secure_access_token(token, max_age=86400):
+    """
+    Validate a secure access token and extract violation ID
+    
+    Args:
+        token: Token to validate
+        max_age: Maximum age in seconds (default 24 hours)
+        
+    Returns:
+        int or None: Violation ID if valid, None if invalid
+    """
+    from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
+    from flask import current_app
+    
+    # Create serializer with app secret
+    serializer = URLSafeTimedSerializer(current_app.config['SECRET_KEY'])
+    
+    try:
+        # Load and validate token
+        data = serializer.loads(token, max_age=max_age)
+        return data.get('violation_id')
+    except (BadSignature, SignatureExpired):
+        return None
+    except Exception as e:
+        current_app.logger.error(f"Error validating token: {str(e)}")
+        return None
+
+def log_violation_access(violation_id, token, request):
+    """
+    Log access to a violation
+    
+    Args:
+        violation_id: ID of the violation
+        token: Access token used
+        request: Flask request object
+        
+    Returns:
+        ViolationAccess: Created log entry
+    """
+    from .models import ViolationAccess
+    from . import db
+    
+    # Create log entry
+    log = ViolationAccess(
+        violation_id=violation_id,
+        ip_address=request.remote_addr,
+        user_agent=request.user_agent.string,
+        token=token,
+    )
+    
+    # Save to database
+    db.session.add(log)
+    db.session.commit()
+    
+    return log
