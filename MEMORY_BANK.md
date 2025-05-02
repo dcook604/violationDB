@@ -76,3 +76,57 @@ This file serves as a persistent, human-readable memory bank for the project. It
 - Test isolation is handled via in-memory SQLite in pytest fixtures.
 
 ---
+
+## [2025-05-03] User Identification Enhancements
+
+### Issue Addressed
+- Violation details were displaying numeric user IDs (e.g., "Created By: 1") rather than user email addresses, making it difficult to identify who created violations.
+
+### Solution Implemented
+- Enhanced API endpoints to include user email addresses alongside user IDs in violation responses:
+  - Added creator email lookup to `/api/violations/<id>` endpoint
+  - Added creator email lookup to `/api/violations` endpoint for lists
+- Updated frontend components to display email addresses instead of IDs:
+  - Modified ViolationDetail component to show creator's email
+  - Added fallback to "Unknown user" when email is unavailable
+- Maintained backward compatibility by preserving original user ID fields
+
+### Technical Implementation
+- User lookup is done at the API level, not requiring database schema changes
+- Error handling ensures the system works even if user records are deleted
+- Documentation updated in `implementation_details.md` and `mental_model.md`
+
+### Benefits
+- Improved user experience with human-readable identification
+- Enhanced traceability for violation records
+- Consistent with existing email-based identification in replies
+
+---
+
+## [2025-05-03] Dashboard Status-Based Counting
+
+### Issue Addressed
+- Dashboard was showing all violations as "Active" regardless of their status
+- No way to track resolved violations separately from active ones
+
+### Solution Implemented
+- Enhanced the dashboard statistics API (`/api/stats`) to count violations based on their Status field value
+- Defined specific status values that indicate an active violation:
+  - "Open"
+  - "Pending Owner Response" 
+  - "Pending Council Response"
+- Any other status values are counted as resolved violations
+
+### Technical Implementation
+- Added Status field check in the `dashboard_routes.py` for each violation
+- First finds the Status field definition from FieldDefinition table
+- For each violation, checks its corresponding field value
+- Categorizes violations as active or resolved based on status value
+- Added appropriate error handling to ensure dashboard functions even if database issues occur
+
+### Benefits
+- More accurate dashboard statistics
+- Better workflow tracking with clear distinction between active and resolved violations
+- Foundation for future status-based filtering and reporting
+
+---

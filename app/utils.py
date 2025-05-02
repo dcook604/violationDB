@@ -297,17 +297,32 @@ def create_violation_html(violation, field_defs=None):
             if field_def.type == 'file' and fv.value:
                 images = []
                 for img_path in fv.value.split(','):
-                    if img_path.strip():
+                    if img_path and img_path.strip():
+                        # Remove any leading/trailing whitespace
+                        img_path = img_path.strip()
+                        
                         # Create absolute URL for the image
                         img_url = urljoin(
                             current_app.config.get('BASE_URL', 'http://localhost:5004'),
                             f'/uploads/{img_path}'
                         )
-                        images.append(img_url)
+                        
+                        # Log the image URL for debugging
+                        current_app.logger.info(f"Adding image URL: {img_url} for field {field_def.name}")
+                        
+                        # Verify the file exists
+                        file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], img_path)
+                        if os.path.exists(file_path):
+                            images.append(img_url)
+                            current_app.logger.info(f"File exists at {file_path}")
+                        else:
+                            current_app.logger.warning(f"File doesn't exist at {file_path}, but still adding URL")
+                            images.append(img_url)  # Add anyway to help with debugging
                 
                 if images:
                     field_images[field_def.name] = images
                     has_images = True
+                    current_app.logger.info(f"Found {len(images)} images for field {field_def.name}")
     
     # Get creator information
     creator = None
@@ -531,6 +546,26 @@ def send_violation_notification(violation, html_path):
     if violation.created_by:
         creator = User.query.get(violation.created_by)
     
+    # Get dynamic field values
+    field_values = ViolationFieldValue.query.filter_by(violation_id=violation.id).all()
+    field_defs = get_cached_fields('all')
+    
+    # Create field definition lookup
+    field_dict = {fd.id: fd for fd in field_defs}
+    
+    # Process field values into a dictionary
+    dynamic_fields = {}
+    for fv in field_values:
+        field_def = field_dict.get(fv.field_definition_id)
+        if field_def:
+            dynamic_fields[field_def.name] = fv.value
+    
+    # Get the category from dynamic fields or fallback to the direct property
+    category = dynamic_fields.get('Category', violation.category or 'Not specified')
+    
+    # Get incident details from dynamic fields or fallback to subject
+    incident_details = dynamic_fields.get('Incident Details', violation.subject or 'Not provided')
+    
     # Prepare the email
     subject = f"New Violation Report: {violation.reference}"
     
@@ -538,8 +573,8 @@ def send_violation_notification(violation, html_path):
     body_text = f"""A new violation has been recorded.
 
 Reference: {violation.reference}
-Category: {violation.category}
-Subject: {violation.subject}
+Category: {category}
+Details: {incident_details}
 
 You can view the full details using the link below:
 {current_app.config.get('BASE_URL', 'http://localhost:5004')}/violations/view/{violation.id}
@@ -553,8 +588,8 @@ Please do not reply to this email.
     html_body = f"""
     <p>A new violation has been recorded.</p>
     <p><strong>Reference:</strong> {violation.reference}<br>
-    <strong>Category:</strong> {violation.category}<br>
-    <strong>Subject:</strong> {violation.subject}</p>
+    <strong>Category:</strong> {category}<br>
+    <strong>Details:</strong> {incident_details}</p>
     
     <p>You can view the full details by <a href="{view_url}">clicking here</a>.</p>
     

@@ -16,7 +16,6 @@ export default function UserManagement() {
   const [form, setForm] = useState({ email: '', role: 'user', is_active: true });
   const [password, setPassword] = useState('');
   const [defaultPassword, setDefaultPassword] = useState('changeme123');
-  const [useCustomPassword, setUseCustomPassword] = useState(false);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
 
@@ -53,7 +52,6 @@ export default function UserManagement() {
     } else if (type === 'add') {
       setForm({ email: '', role: 'user', is_active: true });
       setDefaultPassword('changeme123');
-      setUseCustomPassword(false);
     } else if (type === 'password') {
       setPassword('');
     }
@@ -70,15 +68,11 @@ export default function UserManagement() {
     try {
       if (modalType === 'add') {
         // Include password in the creation payload
-        const userPayload = { ...form, password: useCustomPassword ? password : defaultPassword };
+        const userPayload = { ...form, password: defaultPassword };
         const res = await API.post('/api/users', userPayload);
         
-        // Show success message with password info if default was used
-        if (!useCustomPassword) {
-          setSuccess(`User ${form.email} created successfully with password: ${defaultPassword}`);
-        } else {
-          setSuccess(`User ${form.email} created successfully with custom password`);
-        }
+        // Show success message with password info
+        setSuccess(`User ${form.email} created successfully with password: ${defaultPassword}`);
       } else if (modalType === 'edit' && selectedUser) {
         await API.put(`/api/users/${selectedUser.id}`, form);
         setSuccess(`User ${form.email} updated successfully`);
@@ -209,64 +203,42 @@ export default function UserManagement() {
             {modalType === 'add' && (
               <div className="mb-4">
                 <label className="block font-semibold mb-1">Password</label>
-                <div className="mb-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <input 
-                      type="radio" 
-                      id="defaultPwd" 
-                      checked={!useCustomPassword} 
-                      onChange={() => setUseCustomPassword(false)} 
-                      className="accent-blue-600" 
-                    />
-                    <label htmlFor="defaultPwd" className="font-medium">Use default password</label>
-                  </div>
-                  <Input 
-                    name="defaultPassword"
-                    value={defaultPassword} 
-                    onChange={e => setDefaultPassword(e.target.value)}
-                    disabled={useCustomPassword}
-                    className={useCustomPassword ? "bg-gray-100" : ""}
-                  />
-                </div>
-                <div className="mb-2">
-                  <div className="flex items-center gap-2 mb-2">
-                    <input 
-                      type="radio" 
-                      id="customPwd" 
-                      checked={useCustomPassword} 
-                      onChange={() => setUseCustomPassword(true)} 
-                      className="accent-blue-600" 
-                    />
-                    <label htmlFor="customPwd" className="font-medium">Use custom password</label>
-                  </div>
-                  <Input 
-                    name="password"
-                    type="password" 
-                    value={password} 
-                    onChange={e => setPassword(e.target.value)}
-                    disabled={!useCustomPassword}
-                    className={!useCustomPassword ? "bg-gray-100" : ""}
-                    placeholder="Enter custom password"
-                  />
-                </div>
+                <Input 
+                  name="defaultPassword"
+                  value={defaultPassword} 
+                  onChange={e => setDefaultPassword(e.target.value)}
+                  placeholder="Initial password for user"
+                />
               </div>
             )}
-            <div className="mb-2 flex items-center gap-2">
-              <input type="checkbox" name="is_active" checked={form.is_active} onChange={handleChange} className="accent-blue-600" />
-              <label className="font-semibold">Active</label>
+            <div className="mb-2">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  checked={form.is_active}
+                  onChange={handleChange}
+                  className="accent-blue-600"
+                />
+                <span>Active</span>
+              </label>
             </div>
           </form>
+        )}
+        {modalType === 'delete' && (
+          <p>Are you sure you want to delete user {selectedUser?.email}?</p>
         )}
         {modalType === 'password' && (
           <form onSubmit={e => { e.preventDefault(); handleChangePassword(); }}>
             <div className="mb-2">
               <label className="block font-semibold mb-1">New Password</label>
-              <Input name="password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+              <Input 
+                type="password" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+              />
             </div>
           </form>
-        )}
-        {modalType === 'delete' && (
-          <div>Are you sure you want to delete user <b>{selectedUser?.email}</b>?</div>
         )}
       </Modal>
     </div>

@@ -16,6 +16,45 @@ The Strata Violation Log is designed to manage, track, and resolve violations wi
 - Access violation records based on user role.
 - Admins can manage users and resolve violations.
 
+## System Identity Design Philosophy
+
+The system prioritizes human-readable identifiers throughout the interface to enhance usability and reduce errors:
+
+1. **User Identification**: 
+   - Email addresses serve as primary user identifiers across the system
+   - Violation records display creator email addresses rather than numeric IDs
+   - This helps administrators and users quickly recognize the source of violations
+
+2. **Record Traceability**:
+   - Each violation is clearly associated with its creator
+   - Responses to violations include email identifiers
+   - This creates accountability and clear communication channels
+
+3. **Communication Clarity**:
+   - All notifications include human-readable identifiers
+   - System responses show who created or modified records
+   - This ensures users can easily understand the context of each record
+
+## Violation Status Workflow
+
+Violations follow a defined lifecycle managed through the "Status" dynamic field:
+
+1. **Active Statuses**:
+   - **Open**: Initial status for new violations requiring attention
+   - **Pending Owner Response**: Awaiting response from the property owner
+   - **Pending Council Response**: Awaiting response from the strata council
+
+2. **Resolution Path**:
+   - Violations move through different statuses as they progress toward resolution
+   - The dashboard distinguishes between active and resolved violations
+   - Statistics provide visibility into the current system state
+
+3. **Status-based Metrics**:
+   - The dashboard counts violations by status category
+   - Active violations (Open, Pending Owner Response, Pending Council Response)
+   - Resolved violations (any other status value)
+   - This provides clear progress tracking for violation management
+
 ## Dynamic Violation Fields (Extension)
 
 To support evolving requirements, the system allows admin users to define custom fields for violations. These fields are dynamic and can be managed (added, edited, reordered, toggled) via an admin interface. Each violation record can store values for these custom fields, enabling flexible data capture without code changes.

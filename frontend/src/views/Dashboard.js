@@ -66,7 +66,7 @@ const RecentViolationsTable = ({ violations }) => (
                 </a>
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
-                {violation.category || "Not specified"}
+                {violation.category || violation.dynamic_fields?.Category || "Not specified"}
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
                 {violation.created_at ? new Date(violation.created_at).toLocaleDateString() : 'Unknown date'}
@@ -81,7 +81,7 @@ const RecentViolationsTable = ({ violations }) => (
                 <div className="flex space-x-3">
                 {violation.html_path && (
                   <a 
-                    href={violation.html_path} 
+                    href={`http://172.16.16.6:5004${violation.html_path}`} 
                     target="_blank" 
                     rel="noopener noreferrer" 
                       className="inline-block px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium hover:bg-green-200"
@@ -91,7 +91,7 @@ const RecentViolationsTable = ({ violations }) => (
                 )}
                 {violation.pdf_path && (
                   <a 
-                    href={violation.pdf_path} 
+                    href={`http://172.16.16.6:5004${violation.pdf_path}`} 
                     target="_blank" 
                     rel="noopener noreferrer" 
                       className="inline-block px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200"

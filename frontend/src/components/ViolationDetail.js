@@ -17,6 +17,8 @@ export default function ViolationDetail() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [fields, setFields] = useState([]);
+  const [replies, setReplies] = useState([]);
+  const [loadingReplies, setLoadingReplies] = useState(false);
 
   useEffect(() => {
     // Fetch field definitions to know field types
@@ -36,6 +38,9 @@ export default function ViolationDetail() {
           dynamic_fields: { ...res.data.dynamic_fields }
         });
         setLoading(false);
+        
+        // After loading the violation, fetch replies
+        fetchReplies();
       })
       .catch(err => {
         if (err.response && err.response.status === 403) {
@@ -46,6 +51,19 @@ export default function ViolationDetail() {
         setLoading(false);
       });
   }, [id]);
+  
+  const fetchReplies = () => {
+    setLoadingReplies(true);
+    API.get(`/api/violations/${id}/replies`)
+      .then(res => {
+        setReplies(res.data);
+        setLoadingReplies(false);
+      })
+      .catch(err => {
+        console.error('Failed to load replies:', err);
+        setLoadingReplies(false);
+      });
+  };
 
   const canEditOrDelete = violation && user && (user.role === 'admin' || user.email === violation.created_by || user.id === violation.created_by);
 
@@ -131,6 +149,13 @@ export default function ViolationDetail() {
     );
   };
 
+  // Format date for display
+  const formatDate = (isoDate) => {
+    if (!isoDate) return '';
+    const date = new Date(isoDate);
+    return date.toLocaleString();
+  };
+
   if (loading) return <div className="p-8">Loading...</div>;
   if (error) return <div className="p-8 text-red-600">{error}</div>;
   if (!violation) return <div className="p-8">Violation not found.</div>;
@@ -145,22 +170,48 @@ export default function ViolationDetail() {
             <span className="ml-2">{form.reference}</span>
           </div>
           
+          {/* Display Category and Incident Details prominently for editing */}
+          <div className="mt-3 p-3 bg-gray-100 rounded-md">
+            <div className="mb-3">
+              <label className="font-semibold">Category:</label>
+              <Input 
+                name="dynamic_Category" 
+                value={form.dynamic_fields?.Category || ''} 
+                onChange={handleChange} 
+                className="border p-1 ml-2 w-full mt-1" 
+              />
+            </div>
+            <div className="mb-2">
+              <label className="font-semibold">Details:</label>
+              <textarea
+                name="dynamic_Incident Details"
+                value={form.dynamic_fields?.['Incident Details'] || ''}
+                onChange={handleChange}
+                className="border p-1 ml-2 w-full mt-1 h-24"
+              />
+            </div>
+          </div>
+          
           <div className="mt-4">
-            <div className="font-semibold mb-2">Dynamic Fields:</div>
+            <div className="font-semibold mb-2">Additional Information:</div>
             <ul className="list-disc list-inside">
-              {Object.entries(form.dynamic_fields || {}).map(([key, value]) => (
-                <li key={key} className="mb-3">
-                  <span className="font-medium">{key}:</span>
-                  {isFileField(key) ? (
-                    <div>
-                      <p className="text-sm text-gray-500 ml-2">File uploads cannot be edited directly.</p>
-                      {renderImageGallery(key, value)}
-                    </div>
-                  ) : (
-                    <Input name={`dynamic_${key}`} value={value || ''} onChange={handleChange} className="border p-1 ml-2" />
-                  )}
-                </li>
-              ))}
+              {Object.entries(form.dynamic_fields || {}).map(([key, value]) => {
+                // Skip Category and Incident Details as they're already displayed above
+                if (key === 'Category' || key === 'Incident Details') return null;
+                return (
+                  <li key={key} className="mb-3">
+                    <span className="font-medium">{key}:</span>
+                    {isFileField(key) ? (
+                      <div>
+                        <p className="text-sm text-gray-500 ml-2">File uploads cannot be edited directly.</p>
+                        {renderImageGallery(key, value)}
+                      </div>
+                    ) : (
+                      <Input name={`dynamic_${key}`} value={value || ''} onChange={handleChange} className="border p-1 ml-2" />
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
           <div className="mt-4 flex gap-2">
@@ -178,23 +229,63 @@ export default function ViolationDetail() {
       <div className="bg-white shadow rounded-lg p-6">
         <div className="mb-2"><span className="font-semibold">Reference:</span> {violation.reference}</div>
         <div className="mb-2"><span className="font-semibold">Created At:</span> {violation.created_at ? new Date(violation.created_at).toLocaleString() : ''}</div>
-        <div className="mb-2"><span className="font-semibold">Created By:</span> {violation.created_by}</div>
+        <div className="mb-2"><span className="font-semibold">Created By:</span> {violation.created_by_email || 'Unknown user'}</div>
+        
+        {/* Display Category and Incident Details prominently */}
+        <div className="mt-3 p-3 bg-gray-100 rounded-md">
+          <div className="mb-2">
+            <span className="font-semibold">Category:</span> {violation.dynamic_fields?.Category || violation.category || 'Not specified'}
+          </div>
+          {violation.dynamic_fields?.['Incident Details'] && (
+            <div className="mb-2">
+              <span className="font-semibold">Details:</span> {violation.dynamic_fields['Incident Details']}
+            </div>
+          )}
+        </div>
         
         <div className="mt-4">
-          <div className="font-semibold mb-2">Dynamic Fields:</div>
+          <div className="font-semibold mb-2">Additional Information:</div>
           <ul className="list-disc list-inside">
-            {Object.entries(violation.dynamic_fields || {}).map(([key, value]) => (
-              <li key={key} className="mb-3">
-                <span className="font-medium">{key}:</span> 
-                {isFileField(key) ? (
-                  renderImageGallery(key, value)
-                ) : (
-                  <span>{value}</span>
-                )}
-              </li>
-            ))}
+            {Object.entries(violation.dynamic_fields || {}).map(([key, value]) => {
+              // Skip Category and Incident Details as they're already displayed above
+              if (key === 'Category' || key === 'Incident Details') return null;
+              return (
+                <li key={key} className="mb-3">
+                  <span className="font-medium">{key}:</span> 
+                  {isFileField(key) ? (
+                    renderImageGallery(key, value)
+                  ) : (
+                    <span>{value}</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
+        
+        {/* Display Responses/Replies */}
+        {replies.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">Responses</h3>
+            <div className="space-y-4">
+              {replies.map(reply => (
+                <div key={reply.id} className="border-l-4 border-blue-500 pl-4 py-2">
+                  <div className="text-sm text-gray-600 mb-1">
+                    <strong>{reply.email}</strong> on {formatDate(reply.created_at)}
+                  </div>
+                  <div className="whitespace-pre-line">{reply.response_text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {loadingReplies && (
+          <div className="mt-4 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <p className="mt-2 text-sm text-gray-500">Loading responses...</p>
+          </div>
+        )}
         
         <div className="mt-6 flex gap-3 flex-wrap">
           <Button onClick={handleViewHtml} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">View as HTML</Button>

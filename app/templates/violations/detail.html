@@ -105,6 +105,12 @@
             font-size: 0.9em;
             margin-bottom: 5px;
         }
+        .important-field {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -120,13 +126,38 @@
         <div class="field">
             <span class="field-label">Created By:</span> {{ creator.email if creator else 'Unknown' }}
         </div>
+        
+        {% if dynamic_fields %}
+            <div class="important-field">
+                <div class="field">
+                    <span class="field-label">Category:</span> {{ dynamic_fields.get('Category', violation.category) or 'Not specified' }}
+                </div>
+            </div>
+            
+            {% if dynamic_fields.get('Incident Details') %}
+            <div class="important-field">
+                <div class="field">
+                    <span class="field-label">Details:</span> {{ dynamic_fields.get('Incident Details') }}
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
+            <div class="important-field">
+                <div class="field">
+                    <span class="field-label">Category:</span> {{ violation.category or 'Not specified' }}
+                </div>
+                <div class="field">
+                    <span class="field-label">Details:</span> {{ violation.subject or 'Not provided' }}
+                </div>
+            </div>
+        {% endif %}
     </div>
     
     {% if dynamic_fields %}
     <div class="section">
-        <h2>Violation Information</h2>
+        <h2>Additional Information</h2>
         {% for field_name, field_value in dynamic_fields.items() %}
-            {% if field_value and not field_images[field_name] %}
+            {% if field_value and field_name != 'Category' and field_name != 'Incident Details' and not field_images[field_name] %}
             <div class="field">
                 <span class="field-label">{{ field_name }}:</span> {{ field_value }}
             </div>

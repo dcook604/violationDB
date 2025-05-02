@@ -127,7 +127,7 @@ export default function ViolationList() {
             {violations.map(v => (
               <tr key={v.id} className="hover:bg-gray-50">
                 <td className="px-3 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{v.reference}</td>
-                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{v.category}</td>
+                <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{v.dynamic_fields?.Category || v.category}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">{v.building}</td>
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                   {v.created_at ? new Date(v.created_at).toLocaleDateString() : ''}

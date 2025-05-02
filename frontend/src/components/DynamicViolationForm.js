@@ -168,27 +168,51 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
   };
   
   const uploadFiles = async (violationId) => {
+    console.log(`Starting uploads for violation ${violationId}. Fields to upload:`, Object.keys(fileUploads));
+    
     for (const [fieldName, files] of Object.entries(fileUploads)) {
-      if (!files || files.length === 0) continue;
+      if (!files || files.length === 0) {
+        console.log(`No files to upload for field ${fieldName}`);
+        continue;
+      }
+      
+      console.log(`Uploading ${files.length} file(s) for field ${fieldName}:`, 
+        files.map(f => `${f.name} (${Math.round(f.size/1024)} KB)`));
       
       const formData = new FormData();
       formData.append('field_name', fieldName);
       
-      files.forEach(file => {
-        formData.append('files', file);
+      // Clear any existing files from FormData (not strictly necessary but good practice)
+      if (formData.has('files')) {
+        formData.delete('files');
+      }
+      
+      // Append each file individually to the FormData
+      files.forEach((file, index) => {
+        formData.append('files', file, file.name);
+        console.log(`Added file ${index+1}/${files.length} to FormData: ${file.name}`);
       });
       
+      // Log keys in FormData for debugging
+      console.log(`FormData keys: ${[...formData.keys()].join(', ')}`);
+      
       try {
-        await API.post(`/api/violations/${violationId}/upload`, formData, {
+        console.log(`Sending upload request to /api/violations/${violationId}/upload`);
+        const response = await API.post(`/api/violations/${violationId}/upload`, formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         });
+        console.log(`Upload successful for ${fieldName}:`, response.data);
       } catch (err) {
-        console.error(`Failed to upload files for ${fieldName}`, err);
+        console.error(`Failed to upload files for ${fieldName}:`, err);
+        if (err.response) {
+          console.error(`Server responded with status ${err.response.status}:`, 
+            err.response.data || 'No response data');
+        }
         setErrors(prev => ({ 
           ...prev,
-          [fieldName]: 'Failed to upload files' 
+          [fieldName]: `Failed to upload files: ${err.message || 'Unknown error'}` 
         }));
       }
     }

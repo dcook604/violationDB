@@ -855,3 +855,15 @@ tail -f flask_error.log
 ls
 tail -f flask_error.log 
 exit
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git status
+git add -A && git commit -m "Fix cross-origin authentication issues and indentation errors" && git push origin redesign --force
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+java -jar bfg.jar --help
+ls -la bfg*
+git gc && git prune
+git add app/violation_routes.py && git commit -m "Fix SQLAlchemy session binding errors in violation replies" && git push origin redesign
+ls -la uploads
+ls -la uploads/violation_*
+ls -ld uploads
+ls -la

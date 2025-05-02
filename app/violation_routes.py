@@ -251,20 +251,29 @@ def api_upload_files(vid):
         return jsonify({'error': 'Forbidden'}), 403
     
     if 'files' not in request.files:
+        current_app.logger.error(f"No files part in request for violation {vid}")
         return jsonify({'error': 'No files part'}), 400
     
     files = request.files.getlist('files')
     if not files or files[0].filename == '':
+        current_app.logger.error(f"No files selected for violation {vid}")
         return jsonify({'error': 'No files selected'}), 400
     
     field_name = request.form.get('field_name')
     if not field_name:
+        current_app.logger.error(f"No field name provided for violation {vid}")
         return jsonify({'error': 'Field name is required'}), 400
+    
+    # Log received files for debugging
+    current_app.logger.info(f"Received {len(files)} files for violation {vid}, field {field_name}")
+    for file in files:
+        current_app.logger.info(f"File: {file.filename}, Content-Type: {file.content_type}")
     
     # Get the field definition to check validation rules, using cached fields
     all_fields = get_cached_fields('all')
     field_def = next((f for f in all_fields if f.name == field_name), None)
     if not field_def:
+        current_app.logger.error(f"Field '{field_name}' not found for violation {vid}")
         return jsonify({'error': 'Field not found'}), 404
     
     # Check validation rules
@@ -280,11 +289,17 @@ def api_upload_files(vid):
             current_app.logger.error(f"Error parsing validation rules: {str(e)}")
     
     if len(files) > max_files:
+        current_app.logger.error(f"Too many files: {len(files)}, max allowed: {max_files}")
         return jsonify({'error': f'Maximum of {max_files} files allowed'}), 400
     
     # Create folder for this violation if it doesn't exist
     violation_folder = os.path.join(UPLOAD_FOLDER, f'violation_{vid}')
-    os.makedirs(violation_folder, exist_ok=True)
+    try:
+        os.makedirs(violation_folder, exist_ok=True)
+        current_app.logger.info(f"Created/verified upload folder: {violation_folder}")
+    except Exception as e:
+        current_app.logger.error(f"Failed to create upload folder {violation_folder}: {str(e)}")
+        return jsonify({'error': 'Server error: Could not create upload folder'}), 500
     
     # Save files and record paths
     saved_files = []
@@ -292,47 +307,90 @@ def api_upload_files(vid):
     
     for file in files:
         if not allowed_file(file.filename):
+            current_app.logger.error(f"Invalid file type: {file.filename}")
             return jsonify({'error': 'Invalid file type. Only jpg, jpeg, png, and gif are allowed'}), 400
         
-        if file.content_length and file.content_length > max_size_bytes:
+        # Check file size (best effort since content_length might not be reliable)
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)  # Reset file pointer
+        
+        if file_size > max_size_bytes:
+            current_app.logger.error(f"File too large: {file_size} bytes, max allowed: {max_size_bytes}")
             return jsonify({'error': f'File too large. Maximum size is {max_size_mb}MB'}), 400
         
         # Generate unique filename
         original_filename = secure_filename(file.filename)
-        extension = original_filename.rsplit('.', 1)[1].lower()
+        extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else 'jpg'
         unique_filename = f"{uuid.uuid4().hex}.{extension}"
         
         file_path = os.path.join(violation_folder, unique_filename)
-        file.save(file_path)
         
-        # Store the path relative to the upload folder
-        relative_path = os.path.join(f'violation_{vid}', unique_filename)
-        saved_files.append(relative_path)
+        try:
+            file.save(file_path)
+            current_app.logger.info(f"Saved file to {file_path}")
+            
+            # Verify the file was saved and has content
+            if not os.path.exists(file_path):
+                current_app.logger.error(f"File doesn't exist after save: {file_path}")
+                return jsonify({'error': 'Server error: Failed to save file'}), 500
+            
+            if os.path.getsize(file_path) == 0:
+                current_app.logger.error(f"File is empty after save: {file_path}")
+                os.remove(file_path)  # Remove empty file
+                return jsonify({'error': 'Server error: Empty file after save'}), 500
+            
+            # Store the path relative to the upload folder
+            relative_path = os.path.join(f'violation_{vid}', unique_filename)
+            saved_files.append(relative_path)
+            current_app.logger.info(f"Added file to saved_files: {relative_path}")
+            
+        except Exception as e:
+            current_app.logger.error(f"Error saving file {file.filename}: {str(e)}")
+            return jsonify({'error': f'Failed to save file: {str(e)}'}), 500
     
     # Store the file paths in the database
-    field_value = ViolationFieldValue.query.filter_by(
-        violation_id=vid,
-        field_definition_id=field_def.id
-    ).first()
-    
-    if field_value:
-        # Append to existing files if any
-        existing_files = field_value.value.split(',') if field_value.value else []
-        field_value.value = ','.join(existing_files + saved_files)
-    else:
-        # Create new field value
-        db.session.add(ViolationFieldValue(
+    try:
+        field_value = ViolationFieldValue.query.filter_by(
             violation_id=vid,
-            field_definition_id=field_def.id,
-            value=','.join(saved_files)
-        ))
-    
-    db.session.commit()
+            field_definition_id=field_def.id
+        ).first()
+        
+        if field_value:
+            # Append to existing files if any
+            existing_files = field_value.value.split(',') if field_value.value else []
+            # Remove empty strings that might have been in the split
+            existing_files = [f for f in existing_files if f.strip()]
+            field_value.value = ','.join(existing_files + saved_files)
+            current_app.logger.info(f"Updated field value with {len(saved_files)} new files, total: {len(existing_files) + len(saved_files)}")
+        else:
+            # Create new field value
+            db.session.add(ViolationFieldValue(
+                violation_id=vid,
+                field_definition_id=field_def.id,
+                value=','.join(saved_files)
+            ))
+            current_app.logger.info(f"Created new field value with {len(saved_files)} files")
+        
+        db.session.commit()
+        current_app.logger.info(f"Committed database changes for field {field_name}")
+    except Exception as e:
+        current_app.logger.error(f"Database error storing file paths: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': f'Database error: {str(e)}'}), 500
     
     # Regenerate the HTML and PDF after adding files
     try:
+        # Refresh the violation object from the database to ensure it's bound to the current session
+        violation = Violation.query.get(vid)
         html_path, html_content = create_violation_html(violation)
         pdf_path = generate_violation_pdf(violation, html_content)
+        
+        # Store the updated HTML and PDF paths
+        violation.html_path = os.path.relpath(html_path, current_app.config['BASE_DIR'])
+        violation.pdf_path = os.path.relpath(pdf_path, current_app.config['BASE_DIR'])
+        db.session.commit()
+        current_app.logger.info(f"Updated HTML/PDF paths after file upload")
     except Exception as e:
         current_app.logger.error(f"Error updating violation files after upload: {str(e)}")
     
@@ -450,6 +508,16 @@ def api_list_violations():
             except Exception as field_err:
                 current_app.logger.warning(f"Error fetching dynamic fields for violation {row.id}: {str(field_err)}")
             
+            # Add creator email
+            try:
+                from .models import User
+                if row.created_by:
+                    creator = User.query.get(row.created_by)
+                    if creator:
+                        violation['created_by_email'] = creator.email
+            except Exception as user_err:
+                current_app.logger.warning(f"Error fetching creator for violation {row.id}: {str(user_err)}")
+            
             violations.append(violation)
             
         # For dashboard compatibility (limit parameter), return just the violations array
@@ -482,6 +550,14 @@ def api_violation_detail(vid):
         field = FieldDefinition.query.get(fv.field_definition_id)
         if field:
             dynamic_fields[field.name] = fv.value
+    
+    # Get creator email
+    from .models import User
+    creator_email = None
+    if v.created_by:
+        creator = User.query.get(v.created_by)
+        if creator:
+            creator_email = creator.email
             
     # Safely handle created_at which might be a string or datetime
     created_at = None
@@ -518,6 +594,7 @@ def api_violation_detail(vid):
         'details': v.details,
         'created_at': created_at,
         'created_by': v.created_by,
+        'created_by_email': creator_email,
         'dynamic_fields': dynamic_fields,
         'html_path': f"/violations/view/{v.id}" if hasattr(v, 'html_path') and v.html_path else None,
         'pdf_path': f"/violations/pdf/{v.id}" if hasattr(v, 'pdf_path') and v.pdf_path else None
@@ -576,6 +653,33 @@ def api_violation_field_values(vid):
         'field_definition_id': v.field_definition_id,
         'value': v.value
     } for v in values])
+
+@violation_bp.route('/api/violations/<int:vid>/replies', methods=['GET'])
+@login_required
+def api_violation_replies(vid):
+    """Get replies for a violation"""
+    from .models import ViolationReply
+    
+    # Check permission
+    violation = Violation.query.get_or_404(vid)
+    if not (current_user.is_admin or violation.created_by == current_user.id):
+        return jsonify({'error': 'Forbidden'}), 403
+        
+    # Get replies
+    replies = ViolationReply.query.filter_by(violation_id=vid).order_by(ViolationReply.created_at).all()
+    
+    # Format the replies
+    formatted_replies = []
+    for reply in replies:
+        formatted_replies.append({
+            'id': reply.id,
+            'email': reply.email,
+            'response_text': reply.response_text,
+            'created_at': reply.created_at.isoformat() if reply.created_at else None,
+            'ip_address': reply.ip_address
+        })
+    
+    return jsonify(formatted_replies)
 
 @violation_bp.route('/violations/<int:vid>/reply', methods=['POST'])
 def submit_violation_reply(vid):

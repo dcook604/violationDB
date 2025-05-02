@@ -445,6 +445,107 @@ The reply system is implemented through these components:
 - The system does not require authentication to submit replies, making it accessible to all notification recipients
 - Email addresses are displayed alongside replies for accountability
 
+## User Information Display
+
+The system provides user-friendly identity information throughout the application to improve usability and clarity, particularly in areas showing violation ownership and authorship.
+
+### User Email Integration
+
+1. **API Response Enhancement**
+   - The violation detail API (`/api/violations/<id>`) includes both the numeric user ID (`created_by`) and the user's email address (`created_by_email`)
+   - The violation list API (`/api/violations`) also includes this user information for each violation
+   - This provides human-readable identification of violation creators while maintaining database ID references
+
+2. **Frontend Display Implementation**
+   - The ViolationDetail component displays the creator's email address instead of the numeric ID
+   - This makes it immediately clear who created each violation record
+   - A fallback to "Unknown user" is provided when email information is unavailable
+
+3. **Implementation Details**
+   - When fetching a violation, the system automatically looks up the User model to retrieve email information
+   - Error handling ensures the application continues to function even if user lookup fails
+   - This approach maintains the existing database schema while enhancing the user interface
+
+### Security Considerations
+
+- User emails are only exposed to authenticated users with appropriate permissions 
+- The same permission checks that protect violation access also protect user email information
+- Only violation creators and administrators can view the detailed violation information
+
+### Implementation Pattern
+
+The user email lookup follows this pattern in API endpoints:
+
+```python
+# Get creator email
+from .models import User
+creator_email = None
+if v.created_by:
+    creator = User.query.get(v.created_by)
+    if creator:
+        creator_email = creator.email
+```
+
+This pattern ensures that even if a user record is deleted, the application continues to function with appropriate fallbacks.
+
+## Dashboard Status-Based Violation Tracking
+
+The dashboard has been enhanced to correctly categorize violations based on their dynamic Status field values.
+
+### Active Violation Definition
+
+Active violations are now defined as violations with any of the following Status values:
+- "Open"
+- "Pending Owner Response"
+- "Pending Council Response"
+
+### Implementation Details
+
+1. **Stats API Enhancement**
+   - The `/api/stats` endpoint in `dashboard_routes.py` now checks each violation's dynamic fields
+   - It looks for the "Status" field definition and gets the corresponding field value for each violation
+   - Violations are counted as active only if their Status matches one of the active status values
+   - This provides accurate counts for the dashboard cards
+
+2. **Default Behavior**
+   - Violations are treated as active by default if:
+     - The Status field definition doesn't exist in the system
+     - A violation doesn't have a Status field value
+
+3. **Dashboard Display**
+   - The dashboard shows three key metrics:
+     - Total Violations: Count of all violations
+     - Active Violations: Count of violations with active status values
+     - Resolved Violations: Count of violations without active status values
+
+4. **Implementation Pattern**
+   ```python
+   # Find the field definition for Status
+   status_field = FieldDefinition.query.filter_by(name='Status').first()
+   
+   for violation in violations:
+       # Default to active if no Status field exists
+       is_active = True
+       
+       if status_field:
+           # Try to get the Status field value for this violation
+           field_value = ViolationFieldValue.query.filter_by(
+               violation_id=violation.id,
+               field_definition_id=status_field.id
+           ).first()
+           
+           if field_value and field_value.value:
+               # Check if status is one of the active statuses
+               active_statuses = ['Open', 'Pending Owner Response', 'Pending Council Response']
+               is_active = field_value.value in active_statuses
+   ```
+
+### Error Handling
+
+- If any part of the status checking process fails, the system logs the error and returns default values
+- This ensures the dashboard continues to function even if there are database issues
+- Detailed error information is logged to help diagnose any problems
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 
