@@ -35,99 +35,53 @@ def check_session():
         return make_response()
     
     try:
-        # Debug logging
-        print(f"Session check requested from {request.remote_addr}")
-        print(f"Current user authenticated: {current_user.is_authenticated}")
-        print(f"Request cookies: {request.cookies}")
-        print(f"Request headers: {dict(request.headers)}")
-        print(f"Origin: {request.headers.get('Origin')}")
-        
-        # Check for session token specifically and log it
-        session_token = request.cookies.get('session_token')
-        print(f"Session token present: {bool(session_token)}")
-        if session_token:
-            print(f"Session token value (truncated): {session_token[:10]}...")
-        
         if current_user.is_authenticated:
-            # Check for session token in request
-            session_token = request.cookies.get('session_token')
+            # Get origin for CORS
+            origin = request.headers.get('Origin')
+            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.6:3000']
             
-            if session_token:
-                # Find the session
-                user_session = UserSession.query.filter_by(
-                    token=session_token,
-                    is_active=True
-                ).first()
-                
-                # If session exists, check if it's expired
-                if user_session:
-                    print(f"Found active session for token, user_id={user_session.user_id}")
-                    # Check for absolute timeout (24 hours)
-                    if user_session.is_expired():
-                        # Session has expired, force logout
-                        logout_user()
-                        session.clear()
-                        print(f"Session expired for user {current_user.email}")
-                        return jsonify({'error': 'Session expired', 'user': None}), 401
-                    
-                    # Check for idle timeout (30 minutes)
-                    if user_session.is_idle_timeout():
-                        # Session is idle, force logout
-                        logout_user()
-                        session.clear()
-                        user_session.terminate()
-                        print(f"Session idle timeout for user {current_user.email}")
-                        return jsonify({'error': 'Session timeout due to inactivity', 'user': None}), 401
-                    
-                    # Session is valid, update activity
-                    user_session.update_activity()
-                    print(f"Updated session activity timestamp")
-                else:
-                    # Session token not found or not active
-                    print(f"Session token not found or not active: {session_token[:10]}...")
-                    logout_user()
-                    session.clear()
-                    print(f"Invalid session token for user {current_user.email}")
-                    return jsonify({'error': 'Invalid session', 'user': None}), 401
-            
+            # Include user details in response
             user_data = {
                 'id': current_user.id,
                 'email': current_user.email,
-                'role': 'admin' if current_user.is_admin else 'user',
-                'is_admin': current_user.is_admin  # Explicitly include is_admin boolean
+                'first_name': current_user.first_name,
+                'last_name': current_user.last_name,
+                'role': current_user.role,
+                'is_admin': current_user.is_admin
             }
             
-            # Create response with user data
-            response = make_response(jsonify({'user': user_data}))
-            print(f"Creating successful session response for user {current_user.email}")
-            
-            # Get the origin from the request
-            origin = request.headers.get('Origin')
-            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+            response = make_response(jsonify({'authenticated': True, 'user': user_data}))
             
             # Only set CORS headers for allowed origins
             if origin and origin in allowed_origins:
                 response.headers['Access-Control-Allow-Origin'] = origin
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
-                print(f"Added CORS headers for origin: {origin}")
-                
+            
+            # Update session activity if the function exists
+            if hasattr(current_user, 'get_active_sessions'):
+                # Get the session ID from the request
+                session_token = request.cookies.get('session_token')
+                if session_token:
+                    # Find the session by token
+                    from .models import UserSession
+                    session = UserSession.query.filter_by(token=session_token, user_id=current_user.id, is_active=True).first()
+                    if session and not session.is_expired():
+                        session.update_activity()
+            
             return response
         else:
-            # Explicitly return a 401 with JSON when not authenticated
-            print("User not authenticated, returning 401")
+            # User is not authenticated
+            response = make_response(jsonify({'authenticated': False}))
             
-            # Create response with error message
-            response = make_response(jsonify({'error': 'Unauthorized', 'user': None}), 401)
-            
-            # Get the origin from the request
+            # Get origin for CORS
             origin = request.headers.get('Origin')
-            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.6:3000']
             
             # Only set CORS headers for allowed origins
             if origin and origin in allowed_origins:
                 response.headers['Access-Control-Allow-Origin'] = origin
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
-                
+            
             return response
     except Exception as e:
         print(f"Session check error: {str(e)}")
@@ -450,6 +404,8 @@ def session_check():
             "user": {
                 "id": current_user.id,
                 "email": current_user.email,
+                "first_name": current_user.first_name,
+                "last_name": current_user.last_name,
                 "role": 'admin' if current_user.is_admin else 'user',
                 "is_admin": current_user.is_admin
             }
@@ -466,6 +422,8 @@ def user_debug():
         user_data = {
             'id': current_user.id,
             'email': current_user.email,
+            'first_name': current_user.first_name,
+            'last_name': current_user.last_name,
             'is_admin': current_user.is_admin,
             'role': current_user.role,
             'is_active': current_user.is_active,
@@ -614,3 +572,74 @@ def terminate_specific_session(session_id):
     except Exception as e:
         logger.error(f"Error terminating session {session_id}: {str(e)}")
         return jsonify({'error': 'Failed to terminate session'}), 500
+
+@auth.route('/api/auth/register', methods=['POST', 'OPTIONS'])
+@cors_preflight
+def register_api():
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'Invalid data format'}), 400
+        
+        # Check required fields
+        required_fields = ['email', 'password', 'first_name', 'last_name']
+        missing_fields = [field for field in required_fields if field not in data or not data[field]]
+        
+        if missing_fields:
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
+        
+        # Check if user already exists
+        if User.query.filter_by(email=data['email']).first():
+            return jsonify({'error': 'Email already registered'}), 400
+        
+        # Create new user
+        user = User(
+            email=data['email'],
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            password_hash=generate_password_hash(data['password']),
+            is_active=True,  # Auto-activate users
+            role=User.ROLE_USER,  # Default to regular user role
+            is_admin=False
+        )
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        logger.info(f"New user registered: {user.email}")
+        
+        # Log the user in
+        login_user(user)
+        
+        # Create a new session
+        if hasattr(user, 'create_session'):
+            user_agent = request.headers.get('User-Agent')
+            ip_address = request.remote_addr
+            session = user.create_session(user_agent, ip_address)
+            logger.info(f"Session created for new user: {session.token[:8]}...")
+        
+        # Update last login timestamp
+        if hasattr(user, 'update_last_login'):
+            user.update_last_login()
+            logger.info(f"Last login updated for new user")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Registration successful',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': user.role,
+                'is_admin': user.is_admin
+            }
+        }), 201
+    
+    except Exception as e:
+        logger.error(f"Registration error: {str(e)}")
+        db.session.rollback()
+        return jsonify({'error': 'Registration failed'}), 500

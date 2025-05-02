@@ -29,6 +29,8 @@ def api_list_users():
         {
             'id': u.id,
             'email': u.email,
+            'first_name': u.first_name,
+            'last_name': u.last_name,
             'role': u.role,
             'is_active': u.is_active,
             'is_admin': u.is_admin
@@ -51,6 +53,8 @@ def api_create_user():
             
         user = User(
             email=data['email'],
+            first_name=data.get('first_name', ''),
+            last_name=data.get('last_name', ''),
             password_hash=generate_password_hash(password),
             role=data['role'],
             is_active=data.get('is_active', True),
@@ -77,6 +81,8 @@ def api_edit_user(uid):
     user = User.query.get_or_404(uid)
     data = request.json or {}
     user.email = data.get('email', user.email)
+    user.first_name = data.get('first_name', user.first_name)
+    user.last_name = data.get('last_name', user.last_name)
     if 'role' in data:
         user.role = data['role']
         user.is_admin = (data['role'] == 'admin')

@@ -463,6 +463,83 @@ This implementation provides several key security benefits:
 4. **Cryptographic Security**: Tokens are signed with the application's secret key
 5. **No Persistent Access**: Each access requires a valid token
 
+## Frontend URL Security Implementation
+
+To complement the backend secure URL system with UUIDs and cryptographic tokens, the frontend has been updated to use these secure identifiers in all URLs:
+
+### React Router Integration
+
+1. **Dual URL Routes**: The application supports both formats for backward compatibility:
+   - Legacy route: `/violations/:id` (numeric ID)
+   - Secure route: `/violations/public/:publicId` (UUID-based)
+
+2. **Route Component Enhancement**:
+   ```jsx
+   <Route path="/violations/public/:publicId" element={
+     <PrivateRoute>
+       <Layout>
+         <ViolationDetail usePublicId={true} />
+       </Layout>
+     </PrivateRoute>
+   } />
+   ```
+
+3. **New Violation Redirection**: When creating a new violation, the application now redirects to the UUID-based URL:
+   ```jsx
+   if (response.data && response.data.public_id) {
+     navigate(`/violations/public/${response.data.public_id}`);
+   }
+   ```
+
+### Components Adaptation
+
+1. **ViolationDetail Component**:
+   - Enhanced to support both URL types with a `usePublicId` flag
+   - Dynamically selects the appropriate API endpoint based on the URL type
+   - Maintains backward compatibility for existing bookmarked URLs
+
+2. **ViolationList Component**:
+   - Updated to generate links using public_id when available
+   - Presents consistent UI while using secure URLs in navigation
+   - Preserves table formatting and pagination with added security
+
+3. **API Integration**:
+   - Frontend requests appropriate endpoints based on URL type
+   - File links (HTML/PDF) use secure URL patterns when available
+   - All requests maintain authenticated state with proper credentials
+
+### Security Benefits for Frontend
+
+1. **No Sequential IDs in Browser History**: URLs stored in browser history and bookmarks no longer expose sequential IDs
+2. **Referrer Protection**: When navigating from violation pages, the UUID in the referrer header doesn't leak sequential IDs
+3. **Screen Sharing Safety**: During screen sharing, UUID-based URLs don't reveal the sequential structure of data
+4. **Temporal Decoupling**: UUIDs provide no indication of the creation order or total number of records
+
+This implementation ensures that the entire application uses secure, unpredictable identifiers in all user-facing URLs while maintaining full backward compatibility.
+
+## User Management System
+
+### User Model
+The system uses a comprehensive User model to store and manage user accounts:
+
+- **Core Identity**: 
+  - `id`: Primary key
+  - `email`: Unique email address (used for login)
+  - `first_name`: User's first name
+  - `last_name`: User's last name
+  - `password_hash`: Secured with Argon2id
+
+- **Access Control**:
+  - `is_admin`: Boolean flag for admin privileges
+  - `is_active`: Boolean flag for account activation
+  - `role`: String role value (user, manager, admin)
+
+- **Security Features**:
+  - Argon2id password hashing with time and memory parameters
+  - Account lockout after 10 failed attempts
+  - Temporary password functionality for resets
+  - Session tracking with idle and absolute timeouts
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 

@@ -21,13 +21,14 @@ The Strata Violation Log is designed to manage, track, and resolve violations wi
 The system prioritizes human-readable identifiers throughout the interface to enhance usability and reduce errors:
 
 1. **User Identification**: 
-   - Email addresses serve as primary user identifiers across the system
-   - Violation records display creator email addresses rather than numeric IDs
+   - Email addresses serve as primary user identifiers for authentication
+   - Full names (first name + last name) are used for display and user interface elements
+   - Violation records display creator full names and email addresses for clear attribution
    - This helps administrators and users quickly recognize the source of violations
 
 2. **Record Traceability**:
-   - Each violation is clearly associated with its creator
-   - Responses to violations include email identifiers
+   - Each violation is clearly associated with its creator's full name and email
+   - Responses to violations include name and email identifiers
    - This creates accountability and clear communication channels
 
 3. **Communication Clarity**:
@@ -155,6 +156,32 @@ Rather than using predictable, sequential URLs that could be enumerated, the sys
    - Access logs can be reviewed for suspicious activity
 
 This approach ensures that even when sharing violation information with external parties via email, the system maintains high security standards while providing a seamless user experience.
+
+### User Experience with Secure URLs
+
+The secure URL system is designed to be transparent to end users while providing enhanced security:
+
+1. **Intuitive URL Structure**:
+   - Violations are referenced with `/violations/public/{uuid}` format
+   - Links maintain consistent appearance throughout the application
+   - UUIDs are automatically generated and managed by the system
+
+2. **Seamless Navigation**:
+   - Users navigate using reference numbers and links, not raw UUIDs
+   - Table views present familiar interfaces while using secure URLs underneath
+   - PDFs and HTML exports use secure URLs for sharing
+
+3. **Backward Compatibility**:
+   - Legacy URLs with sequential IDs continue to function
+   - Bookmarks and shared links remain valid
+   - System gradually transitions to secure URLs as new content is created
+
+4. **Email Notifications**:
+   - All email notifications use secure, time-limited URLs
+   - Recipients click naturally presented links without exposure to implementation details
+   - System tracks access through these secure links for audit purposes
+
+The mental model for users remains focused on violation reference numbers (e.g., "VIO-20250502-C8A424") as the primary identifier in the UI, while the system uses secure UUIDs for all technical operations and URLs.
 
 ---
 

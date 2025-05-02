@@ -131,6 +131,56 @@ This file serves as a persistent, human-readable memory bank for the project. It
 
 ---
 
+## [2025-05-03] Secure URL System Implementation
+
+The system has been enhanced with a comprehensive secure URL implementation:
+
+### Backend Changes
+1. Added UUID-based `public_id` to Violation model
+2. Created database migration and script to generate UUIDs for existing records
+3. Added new API endpoints and routes using `public_id` instead of sequential IDs:
+   - `/api/violations/by-public-id/<public_id>`
+   - `/violations/view/by-public-id/<public_id>`
+   - `/violations/pdf/by-public-id/<public_id>`
+4. Implemented cryptographically signed, time-limited tokens for public access
+5. Added comprehensive access logging for security auditing
+
+### Frontend Changes
+1. Updated React Router with new secure routes:
+   - Added `/violations/public/:publicId` route
+   - Enhanced ViolationDetail to support both ID types
+2. Modified ViolationList to generate secure links
+3. Updated NewViolationPage to redirect to UUID-based URLs
+4. Enhanced API integration to support both legacy and secure endpoints
+
+### Security Benefits
+1. Prevention of ID enumeration attacks
+2. Non-sequential, unpredictable identifiers in URLs
+3. Temporal decoupling (UUIDs don't reveal creation order)
+4. Reduced risk during screen sharing and in browser history
+5. Comprehensive security audit trail
+
+### Key Implementation Notes
+1. Used `itsdangerous` library for secure token generation
+2. Maintained backward compatibility throughout
+3. Implemented progressive enhancement rather than breaking change
+4. Applied DRY principles by sharing validation logic between endpoints
+5. Ensured file access security with multi-layer protection
+
+### Gotchas & Solutions
+1. **Issue**: SQLite schema update for existing database
+   **Solution**: Created standalone script `update_uuids.py` to add column and generate UUIDs
+   
+2. **Issue**: Maintaining backward compatibility with existing frontend
+   **Solution**: Dual support for both URL types and progressive enhancement
+   
+3. **Issue**: API responses containing paths needed updates
+   **Solution**: Added both path formats in responses for seamless transition
+
+This update significantly enhances system security without disrupting user experience.
+
+---
+
 ## System Architecture
 
 - Backend: Flask Python application 
@@ -227,5 +277,30 @@ Key tables:
 - violation_replies: Responses to violations
 - violation_access_logs: Security logs for all access attempts
 - settings: System-wide configuration
+
+---
+
+## [2025-05-02] User Identity Enhancement
+
+### Feature Added
+- Added first_name and last_name fields to User model
+- Updated user forms to collect and display full names
+- Modified API endpoints to support first/last name fields
+- Enhanced registration process to require first and last names
+- Updated session information to include full name data
+
+### Technical Implementation
+- Added database columns to users table
+- Created migration script for backward compatibility
+- Updated all API responses to include name fields
+- Modified React components to display full names
+- Enhanced API schema to include new identity fields
+
+### Benefits
+- Improved user experience with personalized interface
+- Enhanced audit trails with clear user attribution 
+- More professional communication in violation reports
+- Human-readable identification throughout the system
+- Better organizational visibility for administration
 
 ---

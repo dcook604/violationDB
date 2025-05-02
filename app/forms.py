@@ -11,6 +11,8 @@ class LoginForm(FlaskForm):
 
 class RegisterForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
+    first_name = StringField('First Name', validators=[DataRequired()])
+    last_name = StringField('Last Name', validators=[DataRequired()])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=6)])
     password2 = PasswordField('Repeat Password', validators=[DataRequired(), EqualTo('password')])
     submit = SubmitField('Register')
@@ -43,6 +45,8 @@ class ViolationForm(FlaskForm):
 
 class UserCreateForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
+    first_name = StringField('First Name', validators=[DataRequired()])
+    last_name = StringField('Last Name', validators=[DataRequired()])
     role = SelectField('Role', choices=[('user', 'User'), ('manager', 'Manager'), ('admin', 'Admin')], validators=[DataRequired()])
     is_active = BooleanField('Active')
     submit = SubmitField('Create User')
@@ -53,6 +57,8 @@ class UserCreateForm(FlaskForm):
 
 class UserEditForm(FlaskForm):
     email = StringField('Email', validators=[DataRequired(), Email()])
+    first_name = StringField('First Name', validators=[DataRequired()])
+    last_name = StringField('Last Name', validators=[DataRequired()])
     role = SelectField('Role', choices=[('user', 'User'), ('manager', 'Manager'), ('admin', 'Admin')], validators=[DataRequired()])
     is_active = BooleanField('Active')
     set_temporary_password = BooleanField('Set Temporary Password')
