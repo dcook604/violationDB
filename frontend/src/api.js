@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://localhost:5004',  // Direct to backend server instead of using proxy
+  baseURL: 'http://172.16.16.6:5004',  // Updated to use IP address instead of localhost
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

@@ -79,26 +79,26 @@ const RecentViolationsTable = ({ violations }) => (
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
                 <div className="flex space-x-3">
-                  {violation.html_path && (
-                    <a 
-                      href={violation.html_path} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
+                {violation.html_path && (
+                  <a 
+                    href={violation.html_path} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
                       className="inline-block px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-medium hover:bg-green-200"
-                    >
-                      HTML
-                    </a>
-                  )}
-                  {violation.pdf_path && (
-                    <a 
-                      href={violation.pdf_path} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
+                  >
+                    HTML
+                  </a>
+                )}
+                {violation.pdf_path && (
+                  <a 
+                    href={violation.pdf_path} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
                       className="inline-block px-2 py-1 bg-red-100 text-red-800 rounded text-xs font-medium hover:bg-red-200"
-                    >
-                      PDF
-                    </a>
-                  )}
+                  >
+                    PDF
+                  </a>
+                )}
                   {!violation.html_path && !violation.pdf_path && (
                     <span className="text-gray-400">None</span>
                   )}

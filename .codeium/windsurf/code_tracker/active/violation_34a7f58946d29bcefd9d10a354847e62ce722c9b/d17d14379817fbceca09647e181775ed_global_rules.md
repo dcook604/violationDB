@@ -1,0 +1,1 @@
+"(34a7f58946d29bcefd9d10a354847e62ce722c9b2Afile:///home/violation/.codeium/windsurf/memories/global_rules.md:file:///home/violation

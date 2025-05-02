@@ -458,3 +458,400 @@ source .venv/bin/activate && python -c "from app import create_app; app=create_a
 source .venv/bin/activate && python -c "from flask.sessions import SecureCookieSessionInterface; print(dir(SecureCookieSessionInterface))"
 curl -I http://localhost:3001
 cd frontend && npm install --save-dev http-proxy-middleware
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+lsof -i -P -n | grep LISTEN | grep python
+ps aux | grep run.py
+lsof -i -P -n | grep LISTEN | grep python
+chmod +x reset_servers.sh
+git add reset_servers.sh frontend/src/api.js gotchas.md implementation_details.md README.md
+git status
+git add app/auth_routes.py frontend/package.json frontend/src/setupProxy.js run.py start_all.sh
+git commit -m "Fix authentication issues and improve server management"
+git push origin redesign
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && tail -n 100 flask_error.log
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && python test_smtp_connection.py
+cd /home/violation && python3 test_smtp_connection.py
+cd /home/violation && source venv/bin/activate && python test_smtp_connection.py
+python3 -c "import socket; print('Can connect to Google DNS:', socket.create_connection(('8.8.8.8', 53), timeout=5) and 'Yes' or 'No')"
+chmod +x test_email_directly.py && python3 test_email_directly.py
+cd /home/violation && source venv/bin/activate && python3 -c "from app import create_app; from app.models import Settings; app = create_app(); app.app_context().push(); settings = Settings.get_settings(); print(f'SMTP Server: {settings.smtp_server}\\nSMTP Port: {settings.smtp_port}\\nSMTP Username: {settings.smtp_username}\\nSMTP Password: {len(settings.smtp_password or \"\") > 0 and \"[SET]\" or \"[NOT SET]\"}\\nSMTP TLS: {settings.smtp_use_tls}')"
+cd /home/violation && source venv/bin/activate && python3 update_smtp_password.py
+cd /home/violation && source venv/bin/activate && python3 check_network.py
+cd /home/violation && source venv/bin/activate && python3 test_flask_email.py
+cd /home/violation && source venv/bin/activate && python3 fix_mail_config.py
+cd /home/violation && source venv/bin/activate && python3 fix_smtp_password.py
+d /home/violation && source venv/bin/activate && python3 fix_smtp_password.pyq
+cd /home/violation && source venv/bin/activate && python test_network_firewall.py
+cd /home/violation && source venv/bin/activate && python check_mail_config.py
+cd /home/violation && chmod +x restart_app.sh && ./restart_app.sh
+cd /home/violation && cat flask.log
+ls -la /home/violation/reset_servers.sh
+git status
+sqlite3 app.db "SELECT sql FROM sqlite_master WHERE type='table' AND name='settings'"
+sqlite3 app.db "SELECT id, smtp_server, smtp_port, smtp_use_tls FROM settings"
+chmod +x check_tls_setting.py
+git add app/admin_routes.py frontend/src/components/Settings.js gotchas.md check_tls_setting.py
+git commit -m "Fix SMTP TLS checkbox saving issue and add diagnostics script"
+git push
+git push --set-upstream origin redesign
+python3 check_tls_setting.py --direct
+source .venv/bin/activate && python check_tls_setting.py --direct
+.venv/bin/pip install requests
+python check_tls_setting.py --direct
+chmod +x fix_tls_setting.py
+python fix_tls_setting.py
+python test_tls_api.py
+python list_users.py
+python test_tls_api.py
+./reset_servers.sh
+python test_tls_api.py
+git add app/admin_routes.py gotchas.md fix_tls_setting.py test_tls_api.py
+git add app/admin_routes.py gotchas.md fix_tls_setting.py
+git commit -m "Fix TLS checkbox not saving disabled state issue"
+git push
+python add_grid_column.py
+./reset_servers.sh
+git add app/models.py app/admin_routes.py app/violation_routes.py frontend/src/components/AdminFieldManager.js frontend/src/components/DynamicViolationForm.js add_grid_column.py
+git commit -m "Add multi-column layout support for dynamic field forms"
+git push
+mkdir -p frontend/src/assets/images
+cd frontend/src/assets/images && echo "This command will be manually approved, and you'll upload the Spectrum 4 logo image."
+cd /home/violation && node save_logo.js
+ls -la frontend/src/assets/images/
+ps aux | grep npm
+cp frontend/src/assets/images/spectrum4-logo.png frontend/public/
+ls -la frontend/public/spectrum4-logo.png
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+ls -la frontend/public/ | grep logo
+file frontend/public/spectrum4-logo.png
+identify frontend/public/spectrum4-logo.png || echo "identify not available" && ls -lh frontend/public/spectrum4-logo.png
+node save_logo.js
+ls -lh frontend/public/spectrum4-logo.png
+pip freeze | grep -i weasyprint
+cd /home/violation && grep -i "pdf generation error" *.log app/*.log 2>/dev/null
+cd /home/violation && cd app && grep -A 1 -B 1 "from weasyprint import HTML" *.py
+cd /home/violation && ls -l pdf_violations
+cd /home/violation && python3 -c "from app import create_app; from app.models import Violation; from app.utils import create_violation_html, generate_violation_pdf; app = create_app(); app.app_context().push(); violation = Violation.query.get(4); if violation: html_path, html_content = create_violation_html(violation); pdf_path = generate_violation_pdf(violation, html_content); print(f'Generated PDF: {pdf_path}')"
+cd /home/violation && touch app/utils.py && python3 -c "from app import create_app; app = create_app(); print('Application successfully initialized')"
+cd /home/violation && pip install flask-cors flask-mail weasyprint
+cd /home/violation && pkill -9 -f flask && bash reset_servers.sh
+curl -s http://localhost:5004/api/fields/active | head -20
+cd /home/violation && cd frontend && npm run build
+cd /home/violation && python3 -c "from app import create_app; from app.models import Violation; app = create_app(); app.app_context().push(); print(f'Total violations: {Violation.query.count()}'); for v in Violation.query.all()[:5]: print(f'ID: {v.id}, Reference: {v.reference}, Created by: {v.created_by}')"
+cd /home/violation && sqlite3 instance/app.db "SELECT COUNT(*) FROM violations;"
+cd /home/violation && sqlite3 instance/app.db ".tables"
+cd /home/violation && find . -name "*.db" | xargs ls -la
+cd /home/violation && sqlite3 app.db ".tables"
+cd /home/violation && sqlite3 app.db "SELECT COUNT(*), MAX(id) FROM violations;"
+cd /home/violation && sqlite3 app.db "SELECT id, reference, created_by FROM violations;"
+cd /home/violation && sqlite3 app.db "SELECT id, email, is_admin FROM users;"
+cd /home/violation && cat flask_error.log | grep -i "error fetching violations" | tail -10
+cd /home/violation && flask db upgrade
+cd /home/violation && sqlite3 app.db 'CREATE TABLE violation_replies (id INTEGER PRIMARY KEY, violation_id INTEGER NOT NULL, email VARCHAR(255) NOT NULL, response_text TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, ip_address VARCHAR(50), FOREIGN KEY (violation_id) REFERENCES violations(id));' && sqlite3 app.db 'CREATE INDEX ix_violation_replies_violation_id ON violation_replies (violation_id);'
+cd /home/violation && pkill -f flask && pkill -f npm && (cd frontend && nohup npm start > ../frontend/react.log 2>&1 &) && (FLASK_APP=app flask run --host=0.0.0.0 --port=5004 > flask.log 2>&1 &) && echo "Servers restarted"
+grep -A 5 "^    \"\"\"" /home/violation/app/violation_routes.py
+tail -n 20 /home/violation/app/violation_routes.py
+source .venv/bin/activate && python run.py
+git status
+git add app/violation_routes.py implementation_details.md gotchas.md
+git commit -m "Fix f-string syntax error and update documentation"
+git push
+git add app/violation_routes.py gotchas.md
+git commit -m "Fix SQLite date handling for incident_date field and update documentation"
+git push
+tail -n 50 flask_error.log
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pip list | grep weasyprint
+ls -la pdf_violations/ | head -5
+file pdf_violations/violation_4.pdf
+cat pdf_violations/violation_4.pdf | head -5
+ls -la logs/
+ls -la app/ | grep log
+ls -la app/flask_error.log
+pip show weasyprint
+python3 -c "from weasyprint import HTML; print('WeasyPrint imports successfully'); import os; print('CWD:', os.getcwd())"
+python3 test_pdf.py
+pip show pydyf
+sudo apt-get update && sudo apt-get install -y wkhtmltopdf
+cd ~
+dir
+ls -a
+nano .gitconfig 
+nano .gitignore 
+cd .cache
+ls
+cd ..
+dir
+ls -a
+dir
+ls -a
+cd ..
+dir
+cd back
+ls -a
+cd frontend/
+dir
+ls -a
+nano .gitignore 
+cd ..
+dir
+ls -a
+git rm --cached -r .codeium/
+git rm --cached -r .cursor-server/
+git rm --cached -r frontend/cypress/screenshots/
+git rm --cached -r frontend/cypress/videos/
+git rm --cached .gitconfig
+git rm --cached .windsurfrules
+dir
+git commit -m "Remove large and unnecessary files from tracking per updated .gitignore"
+git push origin redesign
+curl -L https://github.com/rtyley/bfg-repo-cleaner/releases/download/v1.14.0/bfg.jar -o bfg.jar
+java -jar bfg.jar --delete-folders .codeium,.cursor-server --no-blob-protection
+sudo apt-get install git-filter-repo
+git filter-repo --path .codeium --path .cursor-server --invert-paths
+dir
+cd app
+dir
+cd ..
+nano run.py
+ps aux | grep run.py
+chmod +x start_all.sh
+./start_all.sh
+ls
+ps aux
+ls
+nano nohup.out
+ls
+tail -f nohup.out 
+tail -f flask_error.log 
+./fix_smtp_password.py
+python3 fix_smtp_password.py
+tail -f flask_error.log 
+ls
+nano rerequirements.txt
+nano requirements.txt
+nano README.md 
+nano ARCHITECTURE.md 
+nano Procfile 
+nano implementation_details.md 
+ls
+tail -f flask_error.log 
+dir
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+ls
+nano reset_servers.sh 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+nano reset_servers.sh 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask.log
+ls
+tail -f flask_error.log 
+ls
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+l
+ls
+tail -f flask_error.log 
+ls
+cd frontend/
+dir
+tail -f flask_error.log 
+dir
+cd ..
+cd app
+dir
+tail f flask_error.log 
+tail -f flask_error.log 
+cd ..
+dir
+nano start_all.sh 
+./start_all.sh 
+ls
+su -
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+sudo apt-get install -y wkhtmltopdf
+python3 test_pdf.py
+ls -la test_output.pdf
+curl -s "http://localhost:5004/api/violations?limit=2" | head -20
+git status
+git add docs/gotchas.md docs/implementation_details.md docs/mental_model.md docs/quick_reference.md requirements.txt
+git commit -m "Update documentation and requirements for PDF generation, pagination, and dynamic fields implementation"
+git push origin redesign
+mgit status
+git status
+git add app frontend/src/components/ViolationDetail.js frontend/src/components/ViolationList.js frontend/src/views/Dashboard.js
+git commit -m "Fix PDF generation, implement pagination, and update dynamic fields implementation"
+git push origin redesign
+git status
+git add frontend/src/App.js frontend/src/components/AdminFieldManager.js frontend/src/components/DynamicViolationForm.js frontend/src/components/UserManagement.js frontend/src/components/common/Layout.js frontend/src/views/auth/Login.js quick_reference.md
+git commit -m "Update frontend components for improved UI and functionality"
+git push origin redesign
+git status
+ls -la migrations/
+FLASK_APP=app flask db migrate -m "Add account lockout and Argon2 password hashing support"
+pip install argon2-cffi
+git add app/models.py app/auth_routes.py apply_account_lockout.py add_account_lockout.sql migrations/versions/add_account_lockout.py docs/implementation_details.md requirements.txt requirements.security.txt
+git commit -m "Implement Argon2id password hashing and account lockout after 10 failed login attempts"
+git push origin redesign
+python apply_account_lockout.py
+python3 apply_account_lockout.py
+ls -la | grep venv
+source .venv/bin/activate && python apply_account_lockout.py
+source .venv/bin/activate && pip install argon2-cffi && python apply_migration.py
+source .venv/bin/activate && python -c "from app import create_app, db; app = create_app(); with app.app_context(): print('Database URI:', db.engine.url)"
+source .venv/bin/activate && python check_db_type.py
+source .venv/bin/activate && python apply_migration.py
+ps aux | grep flask
+ps aux | grep python
+git add app/models.py app/auth_routes.py app/config.py migrations/versions/add_user_sessions.py add_user_sessions_sqlite.sql add_user_sessions.sql apply_user_sessions.py docs/implementation_details.md
+git commit -m "Implement enhanced session management with absolute and idle timeouts and single session enforcement"
+git push origin redesign
+find . -name "*.db" -o -name "*.sqlite" -o -name "*.sqlite3" | grep -v "venv" | grep -v "__pycache__" | grep -v ".git"
+ls -la app.db violation.db instance/app.db instance/violation.db
+sqlite3 app.db .tables
+sqlite3 app.db "SELECT name, sql FROM sqlite_master WHERE type='table'"
+cat .env 2>/dev/null || echo ".env file not found"
+python apply_user_sessions.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+find /home/violation -type d -name templates | grep -v node_modules
+mkdir -p /home/violation/app/templates/violations
+mkdir -p /home/violation/pdf_violations /home/violation/html_violations
+cd /home/violation && flask db migrate -m "add html and pdf paths to violation model"
+chmod +x /home/violation/add_html_pdf_columns.py
+pip install weasyprint flask-mail python-dotenv flask-cors
+cd /home/violation && python3 -m venv venv && source venv/bin/activate && pip install weasyprint flask-mail python-dotenv flask-cors
+cd /home/violation && source .venv/bin/activate && python add_html_pdf_columns.py
+cd /home/violation && chmod +x test_violation_creation.py
+cd /home/violation && source .venv/bin/activate && export TEST_EMAIL=test@example.com && python test_violation_creation.py
+cd /home/violation && python test_violation_creation.py
+cd /home/violation && python add_settings_table.py
+cd /home/violation && python test_violation_creation.py
+git status
+git add app/utils.py app/violation_routes.py app/admin_routes.py frontend/src/components/DynamicViolationForm.js frontend/src/components/AdminFieldManager.js frontend/src/components/ViolationDetail.js implementation_details.md
+git commit -m "Performance optimization: Implement field definition caching system"
+git log -1 --stat
+git show --stat
+git branch
+ls -la .git
+git status
+git push origin redesign
+cd /home/violation && python -c "from app import create_app, db; from app.models import User; app = create_app(); with app.app_context(): users = User.query.all(); print('\nAvailable users:'); [print(f'Email: {u.email}, Role: {u.role}, Is Admin: {u.is_admin}') for u in users]"
+cd /home/violation && python -c "from app import create_app, db; from app.models import User; app = create_app(); with app.app_context(): users = User.query.all(); print('Available users:'); [print(f'Email: {u.email}, Admin: {u.is_admin}') for u in users]"
+cd /home/violation && python list_users.py
+cd /home/violation && python -c "from app import create_app; from app.models import User; app = create_app(); with app.app_context(): print(list(User.query.all()))"
+find /home/violation -name "*.db" | sort
+cd /home/violation && sqlite3 violation.db "SELECT email, role, is_admin FROM user;" 2>/dev/null || sqlite3 instance/violation.db "SELECT email, role, is_admin FROM user;" 2>/dev/null || sqlite3 app.db "SELECT email, role, is_admin FROM user;" 2>/dev/null
+cd /home/violation && python create_test_user.py
+cd /home/violation && python check_user_status.py
+cd /home/violation && python activate_user.py
+cd /home/violation && python reset_admin_password.py
+cd /home/violation && python verify_admin_login.py
+cd /home/violation && python check_admin_role.py
+cd /home/violation && python check_settings_table.py
+cd /home/violation && python debug_session_response.py
+cd /home/violation && python test_smtp_connection.py
+cd /home/violation && tail -n 50 flask.log
+python3 fix_smtp_password.py
+cd frontend && npm run build
+pip install flask-cors flask-mail weasyprint
+pip install Flask-Migrate
+cd..
+cd ..
+source .venv/bin/activate && python run.py
+pip install argon2-cffi
+source /home/violation/.venv/bin/activate
+source /home/violation/.venv/bin/activate
+cd frontend && npm start
+npm start
+source /home/violation/.venv/bin/activate
+git rm --cached -r .codeium/
+git rm --cached -r .cursor-server/
+cd .codeium/
+dir
+cd windsurf/
+dir
+cd ..
+git rm --cached -r .codeium/
+git rm --cached -r .cursor-server/
+git rm --cached -r frontend/cypress/screenshots/
+git rm --cached -r frontend/cypress/videos/
+git rm --cached .gitconfig
+git rm --cached .windsurfrules
+git push origin redesign
+git filter-repo --path .codeium --path .cursor-server --invert-paths
+git push --force origin redesign
+git remote -v
+git remote add origin https://github.com/dcook604/violation.git
+git push --force origin redesign
+source .venv/bin/activate && python run.py
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+pip install weasyprint flask-mail python-dotenv flask-cors
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+git rm --cached -r .codeium/
+git rm --cached -r .cursor-server/
+git rm --cached -r .cursor-server -f 
+git commit -m "Remove large files and directories from git tracking"
+source .venv/bin/activate
+source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+source .venv/bin/activate && python run.py
+sed -i '235,244s/^    try:\n    return/    try:\n        return/g' app/violation_routes.py
+sed -i '456,457s/^        if limit is not None:\n        return/        if limit is not None:\n            return/g' app/violation_routes.py
+source .venv/bin/activate && python run.py
+grep -A 20 "Configure session and cookie settings" app/__init__.py
+python debug_session.py
+python reset_admin_password.py
+python debug_session.py
+cd ~
+dir
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+ls
+tail -f flask_error.log 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask.log
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask.log 
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask_error.log 
+./reset_servers.sh
+ls
+tail -f flask_error.log 
+exit

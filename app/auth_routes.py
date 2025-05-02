@@ -39,6 +39,14 @@ def check_session():
         print(f"Session check requested from {request.remote_addr}")
         print(f"Current user authenticated: {current_user.is_authenticated}")
         print(f"Request cookies: {request.cookies}")
+        print(f"Request headers: {dict(request.headers)}")
+        print(f"Origin: {request.headers.get('Origin')}")
+        
+        # Check for session token specifically and log it
+        session_token = request.cookies.get('session_token')
+        print(f"Session token present: {bool(session_token)}")
+        if session_token:
+            print(f"Session token value (truncated): {session_token[:10]}...")
         
         if current_user.is_authenticated:
             # Check for session token in request
@@ -53,6 +61,7 @@ def check_session():
                 
                 # If session exists, check if it's expired
                 if user_session:
+                    print(f"Found active session for token, user_id={user_session.user_id}")
                     # Check for absolute timeout (24 hours)
                     if user_session.is_expired():
                         # Session has expired, force logout
@@ -72,8 +81,10 @@ def check_session():
                     
                     # Session is valid, update activity
                     user_session.update_activity()
+                    print(f"Updated session activity timestamp")
                 else:
                     # Session token not found or not active
+                    print(f"Session token not found or not active: {session_token[:10]}...")
                     logout_user()
                     session.clear()
                     print(f"Invalid session token for user {current_user.email}")
@@ -88,15 +99,17 @@ def check_session():
             
             # Create response with user data
             response = make_response(jsonify({'user': user_data}))
+            print(f"Creating successful session response for user {current_user.email}")
             
             # Get the origin from the request
             origin = request.headers.get('Origin')
-            allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
+            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
             
             # Only set CORS headers for allowed origins
             if origin and origin in allowed_origins:
                 response.headers['Access-Control-Allow-Origin'] = origin
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
+                print(f"Added CORS headers for origin: {origin}")
                 
             return response
         else:
@@ -108,7 +121,7 @@ def check_session():
             
             # Get the origin from the request
             origin = request.headers.get('Origin')
-            allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
+            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
             
             # Only set CORS headers for allowed origins
             if origin and origin in allowed_origins:
@@ -124,7 +137,7 @@ def check_session():
         
         # Get the origin from the request
         origin = request.headers.get('Origin')
-        allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
+        allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
         
         # Only set CORS headers for allowed origins
         if origin and origin in allowed_origins:
@@ -162,7 +175,7 @@ def login():
         if not user.password_hash:
             logger.warning(f"Login attempt failed: User {email} has no password hash set.")
             return jsonify({'error': 'Account not properly configured'}), 401
-        
+
         # Check if account is locked
         if user.is_account_locked():
             lockout_time = user.account_locked_until
@@ -175,34 +188,27 @@ def login():
                 if not user.is_active:
                     logger.warning(f"Login attempt failed: User {email} is inactive.")
                     return jsonify({'error': 'Account pending approval'}), 403
-                    
                 # Check if we need to migrate password to Argon2id
                 if user.password_algorithm != 'argon2' or not user.password_hash.startswith('$argon2'):
                     user.migrate_to_argon2(password)
                     logger.info(f"Migrated password hash for user {email} to Argon2id")
-                
                 # Set session as permanent
                 session.permanent = True
-                
                 # If configured to enforce single session, terminate other sessions
                 if current_app.config.get('ENFORCE_SINGLE_SESSION', True):
                     user.terminate_all_sessions()
                     logger.info(f"Terminated existing sessions for user {email}")
-                
                 # Create a new session for this login
                 user_session = user.create_session(
                     user_agent=request.headers.get('User-Agent'),
                     ip_address=request.remote_addr
                 )
                 logger.info(f"Created new session {user_session.id} for user {email}")
-                
                 # Explicitly login user
                 login_user(user, remember=True)
                 logger.info(f"User {email} logged in successfully.")
-                
                 # Update last login and reset failed attempts
                 user.update_last_login()
-                
                 # Create response with user data
                 user_data = {
                     'id': user.id,
@@ -210,30 +216,26 @@ def login():
                     'role': 'admin' if current_user.is_admin else 'user',
                     'is_admin': current_user.is_admin  # Explicitly include is_admin boolean
                 }
-                
                 # Create a response object with proper CORS headers for specific origin
                 response = make_response(jsonify({'user': user_data}))
-                
                 # Get the origin from the request
                 origin = request.headers.get('Origin')
-                allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
-                
+                allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
                 # Only set CORS headers for allowed origins
                 if origin and origin in allowed_origins:
                     response.headers['Access-Control-Allow-Origin'] = origin
                     response.headers['Access-Control-Allow-Credentials'] = 'true'
-                
-                # Set session token cookie 
-                response.set_cookie(
-                    'session_token',
-                    user_session.token,
-                    httponly=True,  # Not accessible by JavaScript
-                    secure=current_app.config.get('SESSION_COOKIE_SECURE', False),
-                    samesite=current_app.config.get('SESSION_COOKIE_SAMESITE', 'Lax'),
-                    path='/',
-                    max_age=86400  # 24 hours in seconds
-                )
-                
+                    # Set session token cookie 
+                    response.set_cookie(
+                        'session_token',
+                        user_session.token,
+                        httponly=True,  # Not accessible by JavaScript
+                        secure=False,   # HTTP is ok for development
+                        samesite='Lax', # Changed from config to direct value to ensure it works
+                        domain=None,    # Allow the browser to determine the domain
+                        path='/',
+                        max_age=86400  # 24 hours in seconds
+                    )
                 # Manually set a test cookie for troubleshooting
                 response.set_cookie(
                     'test_auth', 
@@ -241,21 +243,22 @@ def login():
                     httponly=False,
                     secure=False,
                     samesite='Lax',
+                    domain=None,  # Allow the browser to determine the domain
                     path='/',
                     max_age=86400
                 )
-                
+                # Print debug info about cookies being set
+                logger.info(f"Setting session_token cookie: {user_session.token[:10]}... (truncated)")
+                logger.info(f"Cookie parameters: domain=None, path=/, secure=False, samesite=Lax, httponly=True")
+                logger.info(f"Response headers: {dict(response.headers)}")
                 # Print debug info
                 logger.debug("Response headers: %s", dict(response.headers))
-                
                 return response
             else:
                 # Record the failed login attempt
                 user.record_failed_login()
-                
                 # Get remaining attempts before lockout
                 remaining_attempts = User.MAX_FAILED_ATTEMPTS - user.failed_login_attempts
-                
                 if remaining_attempts <= 0:
                     logger.warning(f"Account locked: User {email} exceeded maximum failed login attempts.")
                     return jsonify({'error': 'Account locked due to too many failed attempts. Please try again later.'}), 423
@@ -267,12 +270,12 @@ def login():
                     }), 401
                 else:
                     logger.warning(f"Login attempt failed: Invalid password for user {email}.")
-                    return jsonify({'error': 'Invalid credentials'}), 401
+                return jsonify({'error': 'Invalid credentials'}), 401
                     
         except AccountLockedError as e:
             logger.warning(f"Login attempt on locked account: {email}. {str(e)}")
             return jsonify({'error': 'Account temporarily locked due to too many failed attempts. Please try again later.'}), 423
-                
+            
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         import traceback
@@ -385,7 +388,7 @@ def debug_session():
     
     # Get the origin from the request
     origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
     
     # Only set CORS headers for allowed origins
     if origin and origin in allowed_origins:
@@ -408,7 +411,7 @@ def set_test_cookie():
     
     # Get the origin from the request
     origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost:3001', 'http://localhost:3002']
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
     
     # Only set CORS headers for allowed origins
     if origin and origin in allowed_origins:

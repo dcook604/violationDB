@@ -375,7 +375,8 @@ def generate_violation_pdf(violation, html_content=None):
         with open(pdf_path, 'wb') as pdf_file:
             try:
                 document.write_pdf(pdf_file)
-                current_app.logger.info(f"PDF successfully generated at {pdf_path}")
+                current_app.logger.info(f"Successfully generated PDF ({os.path.getsize(pdf_path)} bytes)")
+                return pdf_path
             except TypeError as err:
                 if "PDF.__init__() takes 1 positional argument but 3 were given" in str(err):
                     current_app.logger.warning(f"pydyf compatibility issue detected: {err}")

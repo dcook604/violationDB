@@ -93,7 +93,7 @@ user.set_role('manager')
 | 403        | Insufficient permissions     | Verify user role            |
 | 404        | User not found              | Verify user ID              |
 | 409        | Email already exists        | Use different email         |
-| 500        | Database operation failed   | Check logs for details      |
+| 500        | Database operation failed   | Check logs for details      | 
 
 ## PDF Generation
 

@@ -1,0 +1,113 @@
+­&<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Log New Violation | Strata Violation Log</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      body { background: #f8fafc; }
+      .violation-box { max-width: 700px; margin: 40px auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 20px #0001; padding: 2rem; }
+      .logo { display: block; margin: 0 auto 2rem; max-width: 180px; }
+    </style>
+  </head>
+  <body>
+    <div class="violation-box">
+      <img src="/static/logo.png" alt="Logo" class="logo">
+      <h3 class="mb-4 text-center">Log New Violation</h3>
+      <form method="post" enctype="multipart/form-data">
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Entry Date*</label>
+            <input type="date" name="entry_date" class="form-control" value="{{ today_date }}" required>
+          </div>
+          <div class="col">
+            <label class="form-label">Category*</label>
+            <select name="category" class="form-select" required>
+              <option value="">Select a Category</option>
+              {% for cat in categories %}<option>{{ cat }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Building*</label>
+            <input type="text" name="building" class="form-control" value="BCS2611 Spectrum 4 Apartments" readonly>
+          </div>
+          <div class="col">
+            <label class="form-label">Incident Units</label>
+            <select name="incident_units" class="form-select" multiple>
+              {% for unit in units %}<option>{{ unit }}</option>{% endfor %}
+            </select>
+            <small class="text-muted">(Hold Ctrl/Cmd to select multiple)</small>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Incident Area</label>
+          <input type="text" name="incident_area" class="form-control">
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Report To*</label>
+            <select name="report_to" class="form-select" required>
+              <option value="">Select a Manager</option>
+              {% for mgr in managers %}<option>{{ mgr }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col">
+            <label class="form-label">Concierge Shift</label>
+            <input type="text" name="concierge_shift" class="form-control">
+          </div>
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Time*</label>
+            <input type="time" name="incident_time" class="form-control" required>
+          </div>
+          <div class="col">
+            <label class="form-label">People Involved</label>
+            <input type="text" name="people_involved" class="form-control">
+          </div>
+        </div>
+        <div class="row mb-3">
+          <div class="col">
+            <label class="form-label">Noticed By</label>
+            <input type="text" name="noticed_by" class="form-control">
+          </div>
+          <div class="col">
+            <label class="form-label">People Called</label>
+            <input type="text" name="people_called" class="form-control">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Re: (Subject)</label>
+          <input type="text" name="subject" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Details*</label>
+          <textarea name="details" class="form-control" rows="3" required></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Initial Action Taken</label>
+          <textarea name="initial_action" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Resolution</label>
+          <textarea name="resolution" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Upload Photos</label>
+          <input type="file" name="photos" class="form-control" accept="image/jpeg,image/gif" multiple>
+          <small class="text-muted">(jpg or gif only)</small>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Upload PDFs</label>
+          <input type="file" name="pdfs" class="form-control" accept="application/pdf" multiple>
+        </div>
+        <button type="submit" class="btn btn-primary w-100">Submit Violation</button>
+        <a href="/" class="btn btn-link mt-2">Cancel</a>
+      </form>
+    </div>
+  </body>
+</html>
+­&27file:///home/violation/app/templates/new_violation.html

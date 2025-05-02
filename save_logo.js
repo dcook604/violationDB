@@ -1,0 +1,29 @@
+const fs = require('fs');
+const path = require('path');
+
+// Target directory and file
+const targetDir = path.join(__dirname, 'frontend', 'public');
+const targetFile = path.join(targetDir, 'spectrum4-logo.png');
+
+// Ensure the target directory exists
+if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
+}
+
+try {
+    // A larger, more visible logo with standard web dimensions
+    console.log(`Saving the Spectrum 4 logo to ${targetFile}`);
+    
+    // Base64 encoded PNG logo (the same one we use as fallback in Login.js)
+    const logoBase64 = "iVBORw0KGgoAAAANSUhEUgAAASwAAABkCAYAAAA8AQ3AAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMy1jMDExIDY2LjE0NTY2MSwgMjAxMi8wMi8wNi0xNDo1NjoyNyAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNiAoV2luZG93cykiIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OEI5RDc5RDY3NjAxMTFFOUI0QTk4RjYwQUMzQUQwMEIiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OEI5RDc5RDc3NjAxMTFFOUI0QTk4RjYwQUMzQUQwMEIiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo4QjlENzlENDc2MDExMUU5QjRBOThGNjBBQzNBRDAwQiIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo4QjlENzlENTc2MDExMUU5QjRBOThGNjBBQzNBRDAwQiIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PnRj7mUAAAWqSURBVHja7J1NbBVFFMd3oRRCi6XWmgDSQiXxg9iqiTGRhYkhwYUkLkzcGs0x0YUmaowmJroySjRuCCYmujFqTEjcIG5caAyfoiYqihgNUgvFQmuhlOdjTji2j/fee2/evHlz5v+TJqXtvM6d85/fnDNnZm7LwsKCcZxms+kOJz3aR8+rbY2eU0HLKVBC/bRN9PwhPe+eH/5fE/w4jtlmHTJmC1Kwwqh+jGbTdTH3SQpMMqfL+AvG26/CQPvpnEpqT6etK1UhZ/RsZ8qqgPbPdlNfxXWCTuVMVSG6PUdVYcpx36oCaFNWEZqE/UwC10/l1DH1pqByOJVT2VTC2/M6t3OPqDRDlNVRYbxu9xEfZv02GRxBOVFWPcmcQs4JKavxoG3ylmC/G5KoWCZf9kFZEX+UrfWZ9kRZbShZPyirTlnjhLJKeXlOuFhCMjAMK42sMHe0WVsLskrRJ4OjlNc9IRmYMJemjYj5JaUkZYUk7TFmdGVb56yj2GIuLVsb3cQmI3YeacvH5J9bWxtnNijAx1JpBnLQbxQgfxmXtp4ktFvfVQXnAEEZbSE1H8aJVbXEhh0m9YWdCpKB7Kb0j57vSSirhikrGH/+NRhDwkXnTNxgIqx+YX5yzuDshAx2BXWjNiGdbMPCGFDFWIeJMY38jQZl6WSVovWrxUxNHvh16xyULHRuLCclJwPz/E1jVrAYm8fZRlRp7Wlgr1NKXjd53IblaU4lH/QpzMZnKGX1xI+k16/OGe05LlPLbZSe92VqeYmvzhkVJgP1UzCfYlNWEcmAyqsavOxOAh0NlcK5I+XN0CcsnTP97SXNbEwu0Nj7qcl3u0n97Cj3CUBZgUxZpA3CSplqtX0QVpyzYdOxWTBuPmiFglB5u/AeLeaOJpk7Gma7GiTh2VFUfepXlXPvV2f6LNnDsj41sGD/ijYZ+A4FazXZpxTWo67n4Nz39H+Fj2dZM5I8wzIlZ1QrCWeVFGzwVnZzSRCsWemcUQ6FScKzI+e+8rBo3xphJd1vXjnTDr+HhQoFOqcKrTPpnJ2tLXTuPO5QgJpXVkUXxCbdF+ic0TnsZu5ozLQtK6v19yAsnQz2JNwvvGdkMsDWBW1SHR4WqhhZoXPG2mSgglX5Zk0q0H2Bzpmzc36GBcyMqsZ7ZdXrZ1jgbHBW0zFe/P5a8YPRHsIG0D7RjMrJnGqBLlEw8Y63a2wqhJVnzqjEvbIaYE610bmjs6a5zrCZVuW0l+RuDTJ35N2P3vewgLaO1uicgc4ZpSUL546Q87xmWBVGZuZYc0eQgb+UJAMlKCuQYt6nrKUU9snV1Jz7KsiqXmxMYa0hh1Pxc+5Bz7mdYSEZGLfOIZdTaTI4rtfYkJuz+i0IitZFE78Hp9fJgOqJFD9ntBxZLZUMLJjyJINF+21kMlCHsLz+MU5qVeqcqXM/fLfYDKvI3JGvOdXKJs+2GvgFIIuCUU60VaHYvZBZJr3LyB213Q93LvVLp1lYCo4/V1bJY6ltbW2VOrfP+GVBvJ2NXaGsUg49VeFxBGV1xKTbC1jU8FMm/xZT9NxR17nDwNPG81lYg0YFUS8VxmtVvE+nraJ2YLwB2BxcEAj2sKp2nrhKBkrcX0c8C9ZphBWtvIYCWa0YSjRYLKcS4mVa58pqxVmXjWGFZTXI2F/KZGCS7RFuoqw5kDFHIwPOCB9lGUm5XVIGsuA9rLxwLbAiE1oKMlhvp7rXk4ElZA+rSDKQdeQtU1aFzmVd6z1hMrACtGm/YYtJBtSu/xQ1h1g6GWgy3sMq6OQq2GVJQGfZBpVREXWTgdzDSjh0Vrif50KyVFnNuJYMyHiPnAxkDyvO0CuVlTqXUjdldTrgpaxMCckAHBcQFgCEBQAQLPj/Afa0YeJ+kS7RAAAAAElFTkSuQmCC";
+    
+    // Remove the data:image/png;base64, prefix to get just the base64 data
+    const base64Data = logoBase64.replace(/^data:image\/png;base64,/, "");
+    
+    // Write the decoded base64 data to the file
+    fs.writeFileSync(targetFile, base64Data, 'base64');
+    
+    console.log('Spectrum 4 logo has been saved successfully!');
+} catch (error) {
+    console.error('Error saving the logo:', error);
+} 

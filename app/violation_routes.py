@@ -451,11 +451,11 @@ def api_list_violations():
                 current_app.logger.warning(f"Error fetching dynamic fields for violation {row.id}: {str(field_err)}")
             
             violations.append(violation)
-        
+            
         # For dashboard compatibility (limit parameter), return just the violations array
         if limit is not None:
             return jsonify(violations)
-            
+        
         # Return data with pagination info for regular violations list
         return jsonify({
             'violations': violations,

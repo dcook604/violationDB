@@ -55,7 +55,7 @@
 ### Role Management
 - Role changes automatically update admin status
 - Admin role always includes active status
-- Role changes preserve existing user data
+- Role changes preserve existing user data 
 
 ### Dynamic Fields Workflow
 1. Admin configures fields for violation forms
