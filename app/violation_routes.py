@@ -605,6 +605,8 @@ def submit_violation_reply(vid):
     
     # Regenerate HTML after adding reply
     try:
+        # Refresh the violation object from the database to ensure it's bound to the current session
+        violation = Violation.query.get(vid)
         html_path, html_content = create_violation_html(violation)
         pdf_path = generate_violation_pdf(violation, html_content)
         
@@ -629,7 +631,8 @@ def notify_about_reply(reply):
     """Send notification about a new violation reply"""
     from .models import User, Settings
     
-    # Get the violation
+    # Get the violation (refresh from database to ensure session binding)
+    reply = ViolationReply.query.get(reply.id)  # Refresh reply object
     violation = Violation.query.get(reply.violation_id)
     if not violation:
         current_app.logger.error(f"Violation {reply.violation_id} not found for reply notification")
