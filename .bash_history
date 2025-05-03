@@ -867,3 +867,335 @@ ls -la uploads
 ls -la uploads/violation_*
 ls -ld uploads
 ls -la
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+systemctl status clamav-daemon || echo "ClamAV daemon not running"
+sudo apt-get update && sudo apt-get install -y clamav clamav-daemon
+sudo freshclam
+sudo systemctl status clamav-freshclam
+sudo systemctl start clamav-daemon && sudo systemctl status clamav-daemon
+cd /home/violation && source .venv/bin/activate && pip install pyclamd
+ps aux | grep app.py
+ps aux | grep python
+sudo pkill -f run.py
+mkdir -p /home/violation/saved_files/uploads/fields && chmod -R 755 /home/violation/saved_files
+chmod -R 777 /home/violation/uploads
+sudo pkill -f run.py
+find /home/violation -name "Elevator-Before-300x203-1.jpg" -type f
+find /home/violation/saved_files -type f -mmin -30 | grep -v "\.html$\|\.pdf$"
+find /home/violation/saved_files/uploads -type f
+find /home/violation/uploads -type f
+tail -n 100 /home/violation/flask_error.log | grep -B 5 -A 5 "upload"
+cd /home/violation && grep -i "error.*upload" flask_error.log | tail -n 20
+cd /home/violation/frontend && npm run build
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && source .venv/bin/activate && flask db migrate -m "Add public_id to Violation model and ViolationAccess model"
+cd /home/violation && git status
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && source .venv/bin/activate && pip install flask-migrate
+cd /home/violation && ls -la migrations
+cd /home/violation && python -c "from app import db; db.create_all()"
+cd /home/violation && source .venv/bin/activate && FLASK_APP=run.py python -m flask db migrate -m "Add public_id to violations table"
+cd /home/violation && source .venv/bin/activate && FLASK_APP=app flask db init
+cd /home/violation && source .venv/bin/activate && FLASK_APP=app flask db migrate -m "Add public_id to violations table"
+cd /home/violation && python -c "import sqlite3; conn = sqlite3.connect('app.db'); cursor = conn.cursor(); cursor.execute('ALTER TABLE violations ADD COLUMN public_id TEXT'); conn.commit(); conn.close()"
+cd /home/violation && python -c "import sqlite3; import uuid; conn = sqlite3.connect('app.db'); cursor = conn.cursor(); cursor.execute('SELECT id FROM violations'); rows = cursor.fetchall(); for row in rows: vid = row[0]; cursor.execute('UPDATE violations SET public_id = ? WHERE id = ?', (str(uuid.uuid4()), vid)); conn.commit(); conn.close(); print('Updated all existing violations with UUID')"
+cd /home/violation && python -c "import sqlite3, uuid; conn = sqlite3.connect('app.db'); cursor = conn.cursor(); cursor.execute('SELECT id FROM violations'); rows = cursor.fetchall(); for row in rows: vid = row[0]; cursor.execute('UPDATE violations SET public_id = ? WHERE id = ?', (str(uuid.uuid4()), vid)); conn.commit(); conn.close(); print('Updated all existing violations with UUID')"
+cd /home/violation && python update_uuids.py
+cd /home/violation && python -c "import sqlite3; conn = sqlite3.connect('app.db'); cursor = conn.cursor(); cursor.execute('PRAGMA table_info(violations)'); cols = cursor.fetchall(); for col in cols: print(col); conn.close()"
+cd /home/violation && python check_schema.py
+cd /home/violation && git add implementation_details.md mental_model.md MEMORY_BANK.md requirements.txt app/models.py app/utils.py app/violation_routes.py app/__init__.py update_uuids.py check_schema.py
+cd /home/violation && git commit -m "Implement secure URL system with token-based access and UUID identifiers"
+cd /home/violation && git push origin redesign
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+source /home/violation/.venv/bin/activate
+source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && git status -- app/models.py app/forms.py app/user_routes.py app/auth_routes.py implementation_details.md mental_model.md MEMORY_BANK.md update_admin.py
+cd /home/violation && git add app/models.py app/forms.py app/user_routes.py app/auth_routes.py implementation_details.md mental_model.md MEMORY_BANK.md
+cd /home/violation && git add add_user_fields.py
+cd /home/violation && git commit -m "Added first_name and last_name fields to User model and related components" -m "- Added first_name and last_name fields to User model\n- Updated user forms to include first/last name fields\n- Modified API endpoints to support name fields\n- Enhanced registration and user management\n- Updated documentation with user identity features"
+cd /home/violation && git push origin redesign
+find /home/violation -name "login*" -type f | grep -v node_modules
+find /home/violation/frontend/src -name "*Login*" -type f
+ls -la saved_files/html/ saved_files/pdf/ | head -10
+ls -la saved_files/pdf/ | head -10
+grep -A 10 "Error generating PDF" flask.log | tail -20
+grep -i "pdf" flask.log | tail -20
+pip list | grep -i weasy
+tail -50 flask_error.log | grep -i -A 5 -B 5 "pdf\\|html\\|weasy"
+tail -100 flask_error.log
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+ls -la /home/violation/saved_files/html/ | head -5
+ls -la /home/violation/saved_files/pdf/ | head -5
+stat -c "%a %U:%G %s %n" /home/violation/saved_files/html/522c2b2e-90c2-4d85-be81-8ecd5593f27a_12.html
+cat /var/log/uwsgi/app/violation.log | grep "Error" | tail -10
+ls -l /var/log/
+cat /home/violation/app.log | grep "pdf\|html\|Error\|document\|WeasyPrint" | tail -10 || echo "File not found"
+find /home/violation/ -name "*.log" -type f
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation/frontend && npm run build
+dir
+ls
+cd ~
+ls
+tail -f flask_error.log 
+ls
+tail -f flask_error.log 
+bfg --strip-blobs-bigger-than 80M
+sudo apt install bfg
+java -jar bfg.jar
+sudo apt install default-jre -y
+java
+java bfg.jar --strip-blobs-bigger-than 80M
+java -jar bfg.jar --strip-blobs-bigger-than 80M
+wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar -O bfg.jar
+java -jar bfg.jar --strip-blobs-bigger-than 80M
+ls
+tail -f flask_error.log 
+ls
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+dir
+git add -A
+git commit -m "Overwrite with new codebase"
+git push origin refresh --force
+git push origin redesign --force
+git remote add origin https://github.com/dcook604/violation.git
+git remote set-url origin https://github.com/dcook604/violation.git
+git push origin redesign --force
+java -jar ../bfg.jar --delete-files '*.sqlite'
+dir
+ls -a
+rm -rf bfg.jar 
+ls
+wget https://repo1.maven.org/maven2/com/madgag/bfg/1.14.0/bfg-1.14.0.jar -O bfg.jar
+java -jar ../bfg.jar --delete-files '*.sqlite'
+nano bfg.jar 
+ls
+su -
+java -jar bfg.jar --delete-files '*.sqlite'
+su
+git reflog expire --expire=now --all && git gc --prune=now --aggressive
+git gc --prune=now --aggressive
+sudo chown -R violation:violation ~/violation.git
+cd .git
+ls
+cd objects/
+dir
+sudo chown -R violation:violation .git/*
+sudo chown -R violation:violation .git
+cd ..
+sudo chown -R violation:violation .git
+git gc --prune=now --aggressive
+git push --force origin redesign
+git rm --cached .codeium/windsurf/database/9c0694567290725d9dcba14ade58e297/3/MODEL_EMBED_6591/embedding_database.sqlite
+echo ".codeium/windsurf/database/" >> .gitignore
+git commit -m "Remove large SQLite database file and update .gitignore"
+git push --force origin redesign
+java -jar bfg.jar --strip-blobs-bigger-than 100M .
+git reflog expire --expire=now --all
+git gc --prune=now --aggressive
+git push --force origin redesign
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+la
+ls
+tail -f flask_error.log 
+;s
+ls
+cd app
+dir
+cd static
+ls
+pwd
+cd ..
+ls
+ls -a
+rm -rf .windsurf-server
+rm -rf .windsurfrules
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git status
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+ls -la
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+ls -la | grep -i docker
+git add .dockerignore DOCKER_README.md Dockerfile.backend Dockerfile.frontend docker-compose.yml docker-entrypoint.sh
+git status
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git commit -m "Add comprehensive Docker setup script with hostname, email, and database configuration"
+git push origin docker
+git checkout redesign
+cd ~
+dir
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail flask_error.log 
+ls
+tail -f flask.log
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+find . -name "docker-compose.yml" -type f
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git add run.py init_db.py
+mkdir -p saved_files/html saved_files/pdf saved_files/uploads/fields && touch saved_files/.gitkeep && git add saved_files/
+git commit -m "Add Docker configuration with required application files for deployment"
+git remote -v
+git push -u origin docker
+chmod +x docker-setup.sh && git add docker-setup.sh && git status
+source .venv/bin/activate
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+ls -la app frontend
+ls -la *.py requirements.txt
+find app -type f -name "*.py" | head -5
+git add app/ frontend/ run.py requirements.txt
+git add add_admin.py create_tables.py
+ls -la requirements-dev.txt 2>/dev/null && git add requirements-dev.txt
+ls -la requirements.security.txt 2>/dev/null && git add requirements.security.txt
+git status
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git checkout -b docker
+git status
+source /home/violation/.venv/bin/activate
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && python3 -c "from app import db; from app.models import ViolationAccess; db.create_all()"
+source /home/violation/.venv/bin/activate && pip install flask-cors
+source /home/violation/.venv/bin/activate && cd /home/violation && python -c "from app import db; from app.models import ViolationAccess; db.create_all()"
+source /home/violation/.venv/bin/activate && cd /home/violation && python create_tables.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+ps aux | grep "npm run build"
+cd /home/violation/frontend && npm run build
+ls -la /home/violation/frontend/build/
+ps aux | grep python
+cd /home/violation/ && kill -HUP 228477
+ls -la /home/violation/saved_files/uploads/fields/
+ls -la /home/violation/saved_files/uploads/fields/violation_14/
+id clamav
+chmod -R 755 /home/violation/saved_files/uploads/
+find /home/violation/saved_files/uploads/ -type f -exec chmod 644 {} \;
+ps aux | grep python
+cat /home/violation/flask.log | grep "incident\|detail" | tail -20
+cat /home/violation/flask_error.log | grep "incident\|detail" | tail -20
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+grep -A 20 "Direct HTML string PDF generation failed" /home/violation/flask.log | tail -30
+ls -la /home/violation/instance/
+which wkhtmltopdf
+wkhtmltopdf --version
+ls -la /usr/bin/wkhtmltopdf
+cat /home/violation/test_pdf.py
+python3 /home/violation/test_pdf.py
+sudo systemctl restart uwsgi.service
+sudo systemctl list-units --type=service | grep -i "flask\|viol\|uwsgi\|web"
+cat /etc/systemd/system/*.service | grep -i "flask\|viol\|app\|wsgi" || find /etc/systemd/system/ -type f -name "*.service" | xargs grep -l "flask\|viol\|app\|wsgi" 2>/dev/null
+ps aux | grep -i "python\|flask\|gunicorn\|wsgi"
+ls -la /home/violation/frontend/public/
+cp /home/violation/app/static/spectrum4icon.svg /home/violation/frontend/public/favicon.svg
+cd /home/violation/frontend && npm run build
+cd /home/violation && flask db migrate -m "Add first_name and last_name to User model"
+cd /home/violation && source .venv/bin/activate && flask db migrate -m "Add first_name and last_name to User model"
+cd /home/violation && python -c "from app import db; from app.models import User; db.engine.execute('ALTER TABLE users ADD COLUMN first_name VARCHAR(50), ADD COLUMN last_name VARCHAR(50);'); print('Migration completed successfully.')"
+cd /home/violation && python add_user_fields.py
+find /home/violation/frontend/src -name "*Register*.js" -o -name "*register*.js"
+find /home/violation/frontend/src -name "*auth*.js" -o -name "*Auth*.js"
+find /home/violation/frontend/src/views -type f | xargs grep -l "Register\|register\|Login\|login" 2>/dev/null
+cd /home/violation && source .venv/bin/activate && python -c "from app import create_app, db; from app.models import User; app = create_app(); with app.app_context(): user = User.query.filter_by(email='admin@example.com').first(); if user: user.first_name = 'Daniel'; user.last_name = 'Cook'; db.session.commit(); print(f'User {user.email} updated with first_name={user.first_name}, last_name={user.last_name}'); else: print('User admin@example.com not found')"
+cd /home/violation && source .venv/bin/activate && python update_admin.py
+cd /home/violation && cat requirements.txt
+cd /home/violation && git status
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && pkill -f "python app.py" && python app.py &
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pkill -f "python app.py" && cd /home/violation && python app.py &
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pkill -f "python app.py" && cd /home/violation && python app.py &
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+ls -la /home/violation/saved_files/uploads/fields
+ps aux | grep clam
+sudo usermod -a -G violation clamav
+sudo chmod g+rx /home/violation/saved_files/uploads/fields
+sudo chmod g+rx /home/violation/saved_files/uploads/fields/violation_*
+sudo systemctl restart clamav-daemon
+hostname -I
+cat .env
+cd /home/violation/frontend && npm run build
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation/frontend && npm run build && npx serve -s build -l 3001
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && pkill -f "python run.py" && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && pkill -f "python run.py" && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && pkill -f "python run.py" && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pkill -f "python run.py" && cd /home/violation && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pkill -f "python run.py" && cd /home/violation && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pkill -f "python run.py" && cd /home/violation && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation/frontend && npx serve -s build -l 3001
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation/frontend && npm run build && npx serve -s build -l 3001
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && source .venv/bin/activate && cd app && flask run --host=0.0.0.0 --port=5004
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pip install pyclamd==0.4.0
+source .venv/bin/activate && pip install pyclamd==0.4.0
+pkill -f "flask run" || true
+ls -la /home/violation/saved_files
+ls -la /home/violation/saved_files/uploads
+ps aux | grep flask
+ls -la /home/violation/flask_*.log
+tail -n 50 /home/violation/flask_error.log
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && sudo systemctl restart violation
+pkill -f "python -m flask run" || true
+source .venv/bin/activate && python run.py
+find . -type f -size +10M | grep -v "node_modules\|\.git\|\.venv"
+ls -la .git/objects/pack/
+git status
+git rm --cached bfg.jar
+mkdir -p saved_files/html saved_files/pdf saved_files/uploads/fields
+sudo apt-get update && sudo apt-get install -y clamav clamav-daemon libclamav-dev
+nmp start build
+npm start build
+source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd frontend && npm run build && npx serve -s build -l 3001
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+pkill -f run.py && source .venv/bin/activate && python run.py
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+source .venv/bin/activate && python debug_session.py
+ls
+cd frontend/
+npm build
+npm run build
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+chmod +x debug_session.py && python debug_session.py
+source .venv/bin/activate && python debug_session.py
+source /home/violation/.venv/bin/activate

@@ -151,3 +151,76 @@ GET /api/violations?page=1&per_page=10&date_filter=7days
     "pages": 5
 }
 ``` 
+
+## Loading Components
+
+### Spinner Component
+```jsx
+// Basic spinner usage
+<Spinner />
+
+// Size options
+<Spinner size="sm" />  // Small
+<Spinner size="md" />  // Medium (default)
+<Spinner size="lg" />  // Large
+<Spinner size="xl" />  // Extra large
+
+// Color options
+<Spinner color="blue" />   // Blue (default)
+<Spinner color="gray" />   // Gray
+<Spinner color="white" />  // White (for dark backgrounds)
+
+// With additional classes
+<Spinner className="mt-4" />
+```
+
+### LoadingOverlay Component
+```jsx
+// Basic usage - controlled by isLoading prop
+<LoadingOverlay isLoading={isSubmitting} />
+
+// Custom loading message
+<LoadingOverlay 
+  isLoading={isSubmitting} 
+  message="Saving changes..." 
+/>
+
+// Custom background opacity (0-100)
+<LoadingOverlay 
+  isLoading={isSubmitting} 
+  opacity={50} 
+/>
+
+// Context-sensitive message
+<LoadingOverlay 
+  isLoading={isSubmitting} 
+  message={isUploadingFiles ? "Uploading files..." : "Processing..."} 
+/>
+```
+
+### Spinner in Forms
+```jsx
+// Basic spinner in form submit button
+<button type="submit" disabled={isSubmitting}>
+  {isSubmitting ? <Spinner size="sm" className="mr-2" /> : null}
+  Submit
+</button>
+
+// Spinner with context-sensitive text
+<button type="submit" disabled={isSubmitting}>
+  {isSubmitting ? (
+    <>
+      <Spinner size="sm" className="mr-2" />
+      Saving...
+    </>
+  ) : "Save Changes"}
+</button>
+```
+
+### Common Loading States
+| Component | Loading State | Description |
+|-----------|--------------|-------------|
+| Form Loading | `const [loading, setLoading] = useState(true)` | Initial data fetch |
+| Form Submission | `const [isSubmitting, setIsSubmitting] = useState(false)` | Form submission |
+| File Upload | `window.isUploadingFiles = true` | File upload tracking |
+| Data Table | `const [isLoading, setIsLoading] = useState(false)` | Data fetching | 

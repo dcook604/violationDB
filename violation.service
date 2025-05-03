@@ -1,0 +1,47 @@
+# /etc/systemd/system/violation.service
+
+[Unit]
+Description=Violation Application Gunicorn Service
+# Start after network and database are ready
+After=network.target mysql.service # Add postgresql.service if using PostgreSQL
+
+[Service]
+# User and Group that will run the process
+# Create a dedicated user or use your deployment user
+# Ensure this user has permissions to the project directory, venv, and socket path
+User=violation # CHANGE THIS to your deployment user/group
+Group=violation # CHANGE THIS to your deployment user/group
+
+# Working Directory
+WorkingDirectory=/home/violation # CHANGE THIS to your project root directory
+
+# Environment Variables
+# Load variables from a .env file (Recommended for secrets)
+EnvironmentFile=/home/violation/.env # CHANGE THIS path if needed
+# Set FLASK_ENV to production
+Environment="FLASK_ENV=production"
+# Gunicorn socket path (should match gunicorn.conf.py if overridden)
+# Environment="GUNICORN_SOCKET_PATH=/path/to/your/sock/gunicorn.sock"
+
+# Create the runtime directory for the socket if it doesn't exist
+RuntimeDirectory=violation # Creates /run/violation owned by User/Group
+
+# Command to execute
+# Assumes virtual environment is at /home/violation/.venv
+ExecStart=/home/violation/.venv/bin/gunicorn --config /home/violation/gunicorn.conf.py run:app # Adjust paths as needed
+# Make sure run:app matches your application entry point (see gunicorn.conf.py comments)
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+
+# Standard output and error logging
+# Redirects stdout/stderr to journald, view with `journalctl -u violation.service`
+StandardOutput=journal
+StandardError=journal
+
+# Other settings
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target 

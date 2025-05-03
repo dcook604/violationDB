@@ -2,9 +2,9 @@
 
 ## CORS Settings
 
-During development, CORS is configured to be completely open to facilitate frontend-backend communication. This includes:
+During development, CORS is configured with specific allowed origins to facilitate frontend-backend communication. This includes:
 
-- All origins allowed (`*`)
+- Specific allowed origins (localhost, development servers, etc.)
 - All common HTTP methods enabled (GET, POST, PUT, DELETE, OPTIONS)
 - Credentials supported
 - All necessary headers allowed
@@ -12,8 +12,8 @@ During development, CORS is configured to be completely open to facilitate front
 ```python
 CORS(app, 
      resources={r"/*": {
-         "origins": "*",
-         "methods": ["GET", "POST", "PUT", DELETE, "OPTIONS"],
+         "origins": ["http://localhost:3001", "http://localhost:3002", "http://172.16.16.6:3001", "http://172.16.16.6:5004", "http://100.75.244.2", "http://100.75.244.2:3001", "http://100.75.244.2:5004"],
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
          "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
          "supports_credentials": True,
          "expose_headers": ["Content-Type", "Authorization"]
@@ -29,7 +29,7 @@ CORS(app,
 ## Session Configuration
 
 For development convenience, session cookies are configured with:
-- `SameSite=None` to allow cross-site requests
+- `SameSite=Lax` to allow cross-site requests
 - `Secure=False` to work without HTTPS
 - `HttpOnly=True` for security
 
@@ -38,11 +38,23 @@ For development convenience, session cookies are configured with:
 The backend runs on `http://172.16.16.6:5004` and accepts requests from:
 - `http://localhost:3001`
 - `http://localhost:3002`
-- Any other origin during development
+- `http://172.16.16.6:3001`
+- `http://172.16.16.6:5004`
+- `http://100.75.244.2`
+- `http://100.75.244.2:3001`
+- `http://100.75.244.2:5004`
 
 ## API Endpoints
 
 All API endpoints (`/api/*`) are CORS-enabled with the above settings.
+
+## Environment Configuration
+
+The application uses different configurations based on the `FLASK_ENV` environment variable:
+- `development` (or unset): Uses `DevelopmentConfig` (Debug mode ON, SQLite default, relaxed CORS/cookies).
+- `production`: Uses `ProductionConfig` (Debug mode OFF, expects `DATABASE_URL`, `SECRET_KEY` etc. from environment, restrictive CORS, secure cookies).
+
+Set `FLASK_ENV=development` for local development.
 
 ## Known Development Configurations
 

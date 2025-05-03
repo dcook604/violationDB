@@ -96,3 +96,38 @@
    - Very large or complex violations may cause PDF generation to slow down
    - Extremely large violations may exceed memory limits during PDF generation
    - Consider implementing timeout handling for PDF generation 
+
+## Loading State Management
+
+### Global Window Properties
+1. **Window Property Persistence**
+   - `window.isUploadingFiles` and `window.latestViolationId` are global variables
+   - These values persist between page navigations within the same browser session
+   - Always reset these values after use or they may affect subsequent violation submissions
+
+2. **Navigation During Loading**
+   - Navigating away during file uploads may interrupt the process
+   - Loading overlay blocks interaction but doesn't prevent manual navigation
+   - Consider implementing a warning message for navigation attempts during uploads
+
+### Loading Overlay Styling
+1. **Opacity Issues**
+   - `bg-opacity-${opacity}` requires Tailwind class purging considerations
+   - Values outside the default Tailwind opacity scale may not be included in production builds
+   - Stick to standard Tailwind opacity values (0, 25, 50, 75, 100) or use inline styles
+
+2. **Z-Index Conflicts**
+   - LoadingOverlay uses `z-50` which may conflict with other high z-index elements
+   - Modal dialogs or dropdowns may appear above the overlay if they use higher z-index
+   - Ensure consistent z-index management across the application
+
+### Form Submission States
+1. **Error Handling**
+   - Always reset loading state in error catch blocks
+   - Failure to reset `isSubmitting` will leave the overlay visible indefinitely
+   - Use try/finally blocks to ensure loading state is always reset
+
+2. **File Upload Tracking**
+   - Large file uploads may appear to freeze if no progress indicator is provided
+   - Consider implementing more granular file upload progress tracking
+   - Upload progress requires proper API endpoint support 

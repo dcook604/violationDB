@@ -70,3 +70,33 @@
 3. If primary method fails, system tries fallback methods
 4. Successful PDF is delivered to user
 5. All generation attempts are logged for monitoring 
+
+## Loading State Management
+
+### Component-Based Loading States
+- **Spinner Component**: Atomic loading indicator with configurable properties
+- **LoadingOverlay Component**: Full-screen overlay that blocks interaction during processing
+- **Context-Sensitive Messages**: Dynamic loading messages based on current operation
+
+### Multi-Phase Operations
+- **Two-Phase Form Submission**: Form data submission followed by file uploads
+- **Global State Tracking**: Window properties track operation progress across components
+- **Operation Completion**: Callbacks notify parent components when operations complete
+
+### User Experience Principles
+- **Immediate Feedback**: Loading indicators appear instantly when operations start
+- **Clear Progress Communication**: Different messages for different operation phases
+- **Error Recovery**: Loading states are always reset after errors to prevent UI lockup
+
+### Loading State Workflow
+1. User initiates form submission
+2. System shows "Creating violation" loading overlay
+3. Form data is submitted to backend
+4. If file uploads exist:
+   - System updates to "Uploading files" message
+   - Files are uploaded sequentially
+   - Global tracking flags monitor upload progress
+5. On completion or error:
+   - Loading state is reset
+   - Success: User is navigated to new violation
+   - Error: Error message is displayed with form preserved 

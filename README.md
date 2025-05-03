@@ -190,3 +190,40 @@ If you encounter issues with the servers:
 - Check `frontend/react.log` for frontend errors
 - Run `lsof -i -P -n | grep LISTEN` to see what's running on which ports
 - Use the reset script to stop and restart everything
+
+## Production Deployment
+
+This application is designed to be deployed using a production-grade WSGI server (like Gunicorn) behind a reverse proxy (like Nginx).
+
+**Key Components:**
+
+*   **Configuration:** Production settings are managed via the `ProductionConfig` class in `app/config.py`, primarily loaded using environment variables (set in `.env` on the server or via systemd). Set `FLASK_ENV=production`.
+*   **WSGI Server:** Use Gunicorn to run the application. A configuration file `gunicorn.conf.py` is provided.
+*   **Reverse Proxy:** Use Nginx as a reverse proxy. A sample configuration template `nginx_violation.spectrum4.ca.conf` is provided. Adapt it for your domain and SSL setup (Cloudpanel/Let's Encrypt).
+*   **Process Management:** Use systemd to manage the Gunicorn process. A service file template `violation.service` is provided.
+
+**General Steps (Ubuntu 22.04 Example):**
+
+1.  **Clone Repository:** Clone the code onto your production server.
+2.  **Install Dependencies:** Set up Python venv, install OS packages (`python3-venv`, `nginx`, `libmysqlclient-dev`, etc.), and install Python requirements (`pip install -r requirements.txt`).
+3.  **Configure Environment:** Create a `.env` file in the project root with production secrets (`SECRET_KEY`, `DATABASE_URL`, `MAIL_*`). **Do not commit this file.**
+4.  **Database Setup:** Ensure your production database (e.g., MySQL) is running and accessible. Create the necessary database and user.
+5.  **Run Migrations:** Apply database migrations: `export FLASK_APP=run.py && export FLASK_ENV=production && flask db upgrade`.
+6.  **Configure Gunicorn:** Ensure `gunicorn.conf.py` points to the correct application object (e.g., `run:app`).
+7.  **Configure systemd:**
+    *   Copy `violation.service` to `/etc/systemd/system/`.
+    *   Modify the `User`, `Group`, `WorkingDirectory`, `EnvironmentFile`, and `ExecStart` paths in the service file to match your server setup.
+    *   Reload systemd: `sudo systemctl daemon-reload`
+    *   Enable the service: `sudo systemctl enable violation.service`
+    *   Start the service: `sudo systemctl start violation.service`
+    *   Check status: `sudo systemctl status violation.service` and logs `sudo journalctl -u violation.service`.
+8.  **Configure Nginx:**
+    *   Copy `nginx_violation.spectrum4.ca.conf` to `/etc/nginx/sites-available/`. Rename if needed.
+    *   Adapt the `server_name`, SSL paths (if not handled by Cloudpanel), and `alias` paths for static/uploads.
+    *   Ensure the socket path in `proxy_pass` matches the `bind` directive in `gunicorn.conf.py` and the `RuntimeDirectory` in the systemd file.
+    *   Create a symlink: `sudo ln -s /etc/nginx/sites-available/your-config-file /etc/nginx/sites-enabled/`
+    *   Test Nginx config: `sudo nginx -t`
+    *   Reload Nginx: `sudo systemctl reload nginx`
+9.  **DNS & Firewall:** Ensure your DNS points to the server IP and firewall rules allow traffic on ports 80 and 443.
+
+Refer to the specific configuration files (`gunicorn.conf.py`, `nginx_violation.spectrum4.ca.conf`, `violation.service`, `app/config.py`) for detailed settings.

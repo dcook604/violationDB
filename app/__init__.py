@@ -6,7 +6,7 @@ from flask_login import LoginManager
 from flask_mail import Mail
 from flask_cors import CORS
 from flask_migrate import Migrate
-from .config import Config
+from .config import config_by_name
 from datetime import timedelta
 from flask.sessions import SecureCookieSessionInterface
 import os.path
@@ -14,8 +14,8 @@ import os.path
 # Custom session interface to fix SameSite issue
 class CustomSessionInterface(SecureCookieSessionInterface):
     def get_cookie_samesite(self, app):
-        # Use SameSite=Lax for development (works with HTTP)
-        return 'Lax'
+        # Use SameSite=Strict in production if possible, else Lax
+        return 'Strict' if app.config.get('SESSION_COOKIE_SECURE') else 'Lax'
 
 # Configure logging to save errors to flask_error.log
 logging.basicConfig(
@@ -46,9 +46,10 @@ def load_user(user_id):
 def unauthorized():
     # Log that the handler was triggered
     path = request.path if request and hasattr(request, 'path') else 'unknown'
-    print(f"--- UNAUTHORIZED HANDLER TRIGGERED for {path} ---")
-    print(f"Request method: {request.method}, Headers: {dict(request.headers)}")
-    print(f"Cookies present: {bool(request.cookies)}")
+    if os.environ.get('FLASK_ENV') == 'development':
+        print(f"--- UNAUTHORIZED HANDLER TRIGGERED for {path} ---")
+        print(f"Request method: {request.method}, Headers: {dict(request.headers)}")
+        print(f"Cookies present: {bool(request.cookies)}")
     
     # Always return JSON
     return jsonify({
@@ -66,27 +67,21 @@ def nl2br_filter(text):
         return ""
     return text.replace('\n', '<br>')
 
-def create_app(config_class=Config):
+def create_app(config_name=None):
+    if config_name is None:
+        config_name = os.getenv('FLASK_ENV', 'default')
+        
     app = Flask(__name__)
-    app.config.from_object(config_class)
+    app.config.from_object(config_by_name[config_name])
     
     # Ensure secret key is set
     if not app.config.get('SECRET_KEY'):
-        app.config['SECRET_KEY'] = 'dev-key-please-change-in-production'
+        if config_name == 'production':
+            raise ValueError("SECRET_KEY must be set via environment variable in production!")
+        else:
+            app.logger.warning("Using default development SECRET_KEY. Set a proper SECRET_KEY environment variable.")
+            app.config['SECRET_KEY'] = 'dev-key-please-change-in-production'
 
-    # Configure session and cookie settings for development
-    app.config.update(
-        SESSION_COOKIE_SAMESITE='Lax',  # Changed from None to Lax
-        SESSION_COOKIE_SECURE=False,
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_DOMAIN=None,
-        PERMANENT_SESSION_LIFETIME=timedelta(days=31),
-        REMEMBER_COOKIE_SAMESITE='Lax',  # Changed from None to Lax
-        REMEMBER_COOKIE_SECURE=False,
-        REMEMBER_COOKIE_HTTPONLY=True,
-        REMEMBER_COOKIE_DURATION=timedelta(days=31)
-    )
-    
     # Register custom Jinja2 filters
     app.jinja_env.filters['basename'] = basename_filter
     app.jinja_env.filters['nl2br'] = nl2br_filter
@@ -100,32 +95,35 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
     mail.init_app(app)
 
-    # Enable CORS for development with specific origins (not wildcards)
-    CORS(app, 
-         resources={r"/*": {
-             "origins": ["http://localhost:3001", "http://localhost:3002", "http://172.16.16.6:3001", "http://172.16.16.6:5004"],
-             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-             "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-             "supports_credentials": True,
-             "expose_headers": ["Content-Type", "Authorization"]
-         }},
-         supports_credentials=True)
-
-    # Force CORS for every response
-    @app.after_request
-    def add_cors_headers(response):
-        origin = request.headers.get('Origin')
-        if origin and origin in ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']:
-            response.headers['Access-Control-Allow-Origin'] = origin
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-            response.headers['Access-Control-Allow-Headers'] = 'Origin, Content-Type, Accept, Authorization, X-Requested-With'
-            if request.method == 'OPTIONS':
-                response.headers['Access-Control-Max-Age'] = '1728000'
-        
-        # Log response
-        print(f"CORS Response for {request.path}: origin={origin}, status={response.status_code}, headers={dict(response.headers)}")
-        return response
+    # Conditional CORS Setup
+    if app.config['DEBUG']:
+        # Development CORS (more permissive)
+        allowed_origins = ["http://localhost:3001", "http://localhost:3002", "http://172.16.16.6:3001", "http://172.16.16.6:5004", "http://100.75.244.2", "http://100.75.244.2:3001", "http://100.75.244.2:5004"]
+        CORS(app, 
+             resources={r"/*": {
+                 "origins": allowed_origins,
+                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+                 "supports_credentials": True,
+                 "expose_headers": ["Content-Type", "Authorization"]
+             }},
+             supports_credentials=True)
+        app.logger.info(f"Development CORS enabled for: {', '.join(allowed_origins)}")
+    else:
+        # Production CORS (restrictive)
+        allowed_origins = [app.config.get('BASE_URL')] # Use BASE_URL from config
+        if not allowed_origins[0]:
+             raise ValueError("BASE_URL must be configured for production CORS.")
+        CORS(app,
+             resources={r"/api/*": { # Often only needed for /api/* routes
+                 "origins": allowed_origins,
+                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+                 "supports_credentials": True,
+                 "expose_headers": ["Content-Type", "Authorization"]
+             }},
+             supports_credentials=True)
+        app.logger.info(f"Production CORS enabled for: {allowed_origins[0]}")
 
     from .auth_routes import auth as auth_blueprint
     from .routes import bp as main_blueprint

@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import API from '../api';
 import Button from './common/Button';
 import Input from './common/Input';
+import Spinner from './common/Spinner';
 
-function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Submit' }) {
+function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Submit', onFileUploadsComplete }) {
   const [fields, setFields] = useState([]);
   const [values, setValues] = useState(initialValues);
   const [errors, setErrors] = useState({});
@@ -148,10 +149,11 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
         }
       });
       
-      // Combine them for the API request
+      // Add fileUploads to the submission data
       const formData = {
         ...standardFields,
-        dynamic_fields
+        dynamic_fields,
+        files: fileUploads // Pass files to the parent component
       };
       
       console.log('Submitting violation data:', formData);
@@ -160,10 +162,27 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
       // If we have file uploads and the form submission returned a violation ID, upload the files
       const violationId = response?.id;
       if (violationId && Object.keys(fileUploads).length > 0) {
+        // Store this ID globally to support navigation after uploads
+        window.latestViolationId = violationId;
+        // Set a flag to indicate we're uploading files
+        window.isUploadingFiles = true;
         await uploadFiles(violationId);
+        // Reset the flag after uploads
+        window.isUploadingFiles = false;
+      }
+      
+      // Call the callback if provided to notify that uploads are complete
+      if (onFileUploadsComplete) {
+        onFileUploadsComplete();
       }
     } catch (err) {
+      // Reset the uploading flag in case of an error
+      window.isUploadingFiles = false;
       setErrors({ global: 'Form submission failed' });
+      // Also notify the parent component
+      if (onFileUploadsComplete) {
+        onFileUploadsComplete();
+      }
     }
   };
   
@@ -218,7 +237,14 @@ function DynamicViolationForm({ onSubmit, initialValues = {}, submitLabel = 'Sub
     }
   };
 
-  if (loading) return <div>Loading fields...</div>;
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center p-8">
+        <Spinner size="lg" />
+        <span className="ml-3 text-gray-600">Loading form fields...</span>
+      </div>
+    );
+  }
 
   // Group fields by their grid layout properties
   const renderFields = () => {

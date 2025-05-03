@@ -86,3 +86,4 @@ tests/
 **/tests/
 **/test_*
 **/*_test.py
+.codeium/windsurf/database/

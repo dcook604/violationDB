@@ -308,3 +308,169 @@ class UserSession(db.Model):
 - Tokens are validated against stored sessions on every request
 - Tokens are invalidated upon logout
 - Cookies cleared on both client and server during logout 
+
+# Loading State Management Implementation
+
+## Loading Components
+
+### Spinner Component
+```jsx
+// Reusable spinner component with configurable properties
+function Spinner({ size = 'md', color = 'blue', className = '' }) {
+  // Size classes for different spinner sizes
+  const sizeClasses = {
+    sm: 'w-5 h-5',
+    md: 'w-8 h-8',
+    lg: 'w-12 h-12',
+    xl: 'w-16 h-16'
+  };
+
+  // Color classes for different spinner colors
+  const colorClasses = {
+    blue: 'text-blue-600',
+    gray: 'text-gray-600',
+    white: 'text-white'
+  };
+
+  // SVG-based spinner with animation
+  return (
+    <div className={`inline-block ${className}`} role="status" aria-label="Loading">
+      <svg 
+        className={`animate-spin ${sizeClasses[size] || sizeClasses.md} ${colorClasses[color] || colorClasses.blue}`}
+        xmlns="http://www.w3.org/2000/svg" 
+        fill="none" 
+        viewBox="0 0 24 24"
+      >
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>
+  );
+}
+```
+
+### LoadingOverlay Component
+```jsx
+// Full-screen loading overlay with message
+function LoadingOverlay({ isLoading, message = 'Processing...', opacity = 80 }) {
+  return isLoading ? (
+    <div 
+      className={`fixed inset-0 flex flex-col items-center justify-center z-50 bg-black bg-opacity-${opacity}`}
+      style={{ backdropFilter: 'blur(2px)' }}
+    >
+      <Spinner size="xl" color="white" className="mb-4" />
+      <div className="text-white text-lg font-semibold">{message}</div>
+    </div>
+  ) : null;
+}
+```
+
+## Violation Submission Process
+
+### Loading State Management
+- Two-phase loading state for form submission:
+  1. Initial violation data submission
+  2. File uploads (if any)
+- Uses global window properties to track upload status:
+  - `window.isUploadingFiles`: Flag to indicate active file uploads
+  - `window.latestViolationId`: Stores ID of newly created violation
+
+### Loading State in NewViolationPage
+```jsx
+function NewViolationPage() {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Form submission handler with loading state management
+  const handleSubmit = async (values) => {
+    setIsSubmitting(true);
+    try {
+      const response = await API.post('/api/violations', values);
+      // Keep loading state active during file uploads
+      if (Object.keys(values.files || {}).length === 0) {
+        setIsSubmitting(false);
+        navigate(`/violations/${response.data.id}`);
+      }
+      return response.data;
+    } catch (error) {
+      setIsSubmitting(false);
+      console.error('Error creating violation:', error);
+      alert('Failed to create violation: ' + (error.message || 'Unknown error'));
+    }
+  };
+  
+  return (
+    <Layout>
+      {/* Context-sensitive loading message */}
+      <LoadingOverlay 
+        isLoading={isSubmitting} 
+        message={
+          window.isUploadingFiles 
+            ? "Uploading files... Please wait" 
+            : "Creating violation... Please wait"
+        } 
+      />
+      
+      <DynamicViolationForm 
+        onSubmit={handleSubmit} 
+        onFileUploadsComplete={() => {
+          setIsSubmitting(false);
+          navigate(`/violations/${window.latestViolationId}`);
+        }}
+      />
+    </Layout>
+  );
+}
+```
+
+### File Upload Implementation
+```jsx
+const uploadFiles = async (violationId) => {
+  // Set global flags for tracking upload state
+  window.latestViolationId = violationId;
+  window.isUploadingFiles = true;
+  
+  for (const [fieldName, files] of Object.entries(fileUploads)) {
+    if (!files || files.length === 0) continue;
+    
+    const formData = new FormData();
+    formData.append('field_name', fieldName);
+    
+    files.forEach((file) => {
+      formData.append('files', file, file.name);
+    });
+    
+    try {
+      await API.post(`/api/violations/${violationId}/upload`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+    } catch (err) {
+      console.error(`Failed to upload files for ${fieldName}:`, err);
+      setErrors(prev => ({
+        ...prev,
+        [fieldName]: `Failed to upload files: ${err.message || 'Unknown error'}`
+      }));
+    }
+  }
+  
+  // Reset global upload flag when complete
+  window.isUploadingFiles = false;
+  
+  // Notify parent component that uploads are complete
+  if (onFileUploadsComplete) {
+    onFileUploadsComplete();
+  }
+};
+```
+
+## UI Feedback During Load
+- Loading spinner during initial form field fetching
+- Full-screen loading overlay during form submission and file uploads
+- Context-sensitive loading messages based on current operation
+- Proper error handling with UI feedback for failed operations
+
+## Accessibility Considerations
+- Loading spinners have appropriate ARIA attributes (`role="status"`, `aria-label="Loading"`)
+- Visual feedback through animation and color
+- Text descriptions in loading overlays to indicate process status 
