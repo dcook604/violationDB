@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import API from "../api";
+import { Link } from "react-router-dom";
 
 // Components
 const StatCard = ({ title, value, icon, color }) => (
@@ -30,9 +31,7 @@ const RecentViolationsTable = ({ violations }) => (
     <div className="rounded-t mb-0 px-4 py-3 border-0">
       <div className="flex flex-wrap items-center">
         <div className="relative w-full px-4 max-w-full flex-grow flex-1">
-          <h3 className="font-semibold text-lg text-blueGray-700">
-            Recent Violations
-          </h3>
+          <h3 className="font-semibold text-base text-blueGray-700">Recent Violations</h3>
         </div>
       </div>
     </div>
@@ -40,33 +39,27 @@ const RecentViolationsTable = ({ violations }) => (
       <table className="items-center w-full bg-transparent border-collapse">
         <thead>
           <tr>
-            <th className="px-6 align-middle border border-solid py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left bg-blueGray-50 text-blueGray-500 border-blueGray-100">
-              Reference
-            </th>
-            <th className="px-6 align-middle border border-solid py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left bg-blueGray-50 text-blueGray-500 border-blueGray-100">
-              Category
-            </th>
-            <th className="px-6 align-middle border border-solid py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left bg-blueGray-50 text-blueGray-500 border-blueGray-100">
-              Date
-            </th>
-            <th className="px-6 align-middle border border-solid py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left bg-blueGray-50 text-blueGray-500 border-blueGray-100">
-              Status
-            </th>
-            <th className="px-6 align-middle border border-solid py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left bg-blueGray-50 text-blueGray-500 border-blueGray-100">
-              Documents
-            </th>
+            <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">Reference</th>
+            <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">Unit No.</th>
+            <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">Category</th>
+            <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">Date</th>
+            <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">Status</th>
+            <th className="px-6 bg-blueGray-50 text-blueGray-500 align-middle border border-solid border-blueGray-100 py-3 text-xs uppercase border-l-0 border-r-0 whitespace-nowrap font-semibold text-left">Documents</th>
           </tr>
         </thead>
         <tbody>
           {violations.map((violation) => (
             <tr key={violation.id}>
-              <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
-                <a href={`/violations/${violation.id}`} className="text-blue-600 hover:underline">
+              <th className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4 text-left">
+                <Link to={`/violations/public/${violation.public_id}`} className="text-blue-600 hover:underline">
                   {violation.reference}
-                </a>
+                </Link>
+              </th>
+              <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
+                {violation.unit_number}
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
-                {violation.category || violation.dynamic_fields?.Category || "Not specified"}
+                {violation.category}
               </td>
               <td className="border-t-0 px-6 align-middle border-l-0 border-r-0 text-xs whitespace-nowrap p-4">
                 {violation.created_at ? new Date(violation.created_at).toLocaleDateString() : 'Unknown date'}

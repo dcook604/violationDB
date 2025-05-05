@@ -27,7 +27,7 @@ export default function Layout({ children }) {
               to="/"
               className="text-blueGray-700 text-sm font-bold leading-relaxed inline-block mr-4 py-2 whitespace-nowrap uppercase"
             >
-              Violation Log
+              Spectrum 4 Violation System
             </Link>
           </div>
           {user && (
@@ -71,7 +71,8 @@ export default function Layout({ children }) {
                         Users
                       </Link>
                     </li>
-                    <li className="flex items-center">
+                    {/* Field Manager Link Removed as functionality is deprecated */}
+                    {/* <li className="flex items-center">
                       <Link
                         to="/admin"
                         className="hover:text-blueGray-500 text-blueGray-700 px-3 py-4 lg:py-2 flex items-center text-xs uppercase font-bold"
@@ -79,7 +80,7 @@ export default function Layout({ children }) {
                         <i className="fas fa-list text-blueGray-400 mr-2 text-lg"></i>
                         Field Manager
                       </Link>
-                    </li>
+                    </li> */}
                     <li className="flex items-center">
                       <Link
                         to="/admin/settings"
