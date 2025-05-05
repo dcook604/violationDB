@@ -164,6 +164,21 @@ The login page is now implemented as a React SPA component in `frontend/src/view
 - Handles error display and form validation (email and password required).
 - All authentication is handled via API calls to the backend; the Flask/Jinja2 login template is no longer used for user login.
 
+### File Upload Security (2024-06)
+All uploaded files are now subject to strict filename sanitization and content type validation:
+
+- Filenames are sanitized using `werkzeug.utils.secure_filename` and prefixed with a UUID to prevent path traversal and collisions.
+- Only the following MIME types are allowed for uploads:
+  - image/jpeg (.jpg, .jpeg)
+  - image/png (.png)
+  - application/pdf (.pdf)
+  - application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx)
+  - application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (.xlsx)
+  - text/plain (.txt)
+- MIME type is detected using `python-magic` if available, otherwise falls back to the browser-provided `file.mimetype`.
+- Files with disallowed or undetectable types are rejected and deleted.
+- All files are scanned for viruses using ClamAV before being accepted.
+
 ## API Error Handling Patterns
 
 ### Database Schema Protection

@@ -420,3 +420,14 @@ Note: The system now uses only static fields and the status field is editable af
 
 - **Login page logo:** `frontend/public/logospectrum.png`
 - **To change:** Replace the file and rebuild the frontend. 
+
+## Allowed File Types for Uploads (2024-06)
+Uploads are restricted to the following MIME types:
+- image/jpeg (.jpg, .jpeg)
+- image/png (.png)
+- application/pdf (.pdf)
+- application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx)
+- application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (.xlsx)
+- text/plain (.txt)
+
+Filenames are sanitized and prefixed with a UUID. Files with unsupported or undetectable types are rejected. See implementation_details.md for details. 

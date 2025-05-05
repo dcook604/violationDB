@@ -16,6 +16,9 @@ This document lists known edge cases, caveats, workarounds, and potential issues
 - Deleting field definitions: Deleting a field definition should either cascade to field values or mark the field as inactive to preserve data integrity.
 - Field order: Reordering fields must be reflected consistently in both admin and user forms.
 - Validation: Ensure both backend and frontend enforce field validation rules to prevent inconsistent data.
+- File upload: If a user attempts to upload a file with an unsupported or undetectable type, the upload will be rejected and an error message will be shown. Only specific document/image types are allowed (see implementation_details.md).
+- File upload: If the server does not have python-magic installed, MIME type detection falls back to the browser-provided mimetype, which may be less reliable. This could result in some valid files being rejected or some invalid files being accepted (rare).
+- File upload: If a file is rejected for type or virus, it is deleted immediately and not stored.
 
 ## Warnings
 - Ensure that all static assets are correctly referenced using `url_for('static', ...)` to avoid broken links.

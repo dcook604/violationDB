@@ -278,7 +278,10 @@ def create_violation_html(violation, field_defs=None):
         tuple: (html_path, html_content)
     """
     from .models import ViolationFieldValue, FieldDefinition, ViolationReply, User
-    
+    from flask import current_app, render_template, url_for
+    import os
+    import uuid
+
     # Use cached field definitions if not provided
     if field_defs is None:
         field_defs = get_cached_fields('all')
@@ -311,6 +314,21 @@ def create_violation_html(violation, field_defs=None):
     if violation.created_by:
         creator = User.query.get(violation.created_by)
     
+    # Parse attached evidence if it exists and is valid JSON
+    evidence_list = []
+    if violation.attach_evidence:
+        try:
+            parsed_evidence = json.loads(violation.attach_evidence)
+            # Ensure it's a list (or adapt if structure differs)
+            if isinstance(parsed_evidence, list):
+                evidence_list = parsed_evidence
+            else:
+                 current_app.logger.warning(f"Parsed attach_evidence for violation {violation.id} is not a list: {type(parsed_evidence)}")
+        except json.JSONDecodeError as e:
+            current_app.logger.error(f"Error decoding attach_evidence JSON for violation {violation.id}: {e}")
+            # Optionally handle non-JSON data if needed, e.g., if it's a simple string path
+            # evidence_list = [{'filename': violation.attach_evidence, 'originalname': 'Attached File'}] 
+
     # Generate UUID-based filename
     unique_id = str(uuid.uuid4())
     filename = f"{unique_id}_{violation.id}.html"
@@ -322,13 +340,14 @@ def create_violation_html(violation, field_defs=None):
     # Generate full file path
     file_path = os.path.join(secure_dir, filename)
     
-    # Render the HTML template
+    # Render the HTML template, passing the parsed evidence list
     html_content = render_template(
         'violations/detail.html',
         violation=violation,
         dynamic_fields=dynamic_fields,
         field_images=field_images,
         has_images=bool(field_images),
+        evidence_list=evidence_list,
         field_defs=field_defs,
         replies=replies,
         creator=creator
@@ -604,7 +623,7 @@ def scan_file(file_path):
 
 def secure_handle_uploaded_file(file, violation_id, field_name, subdir='fields'):
     """
-    Securely handle an uploaded file with virus scanning
+    Securely handle an uploaded file with virus scanning and content type validation
     
     Args:
         file: The uploaded file object
@@ -615,9 +634,17 @@ def secure_handle_uploaded_file(file, violation_id, field_name, subdir='fields')
     Returns:
         tuple: (success, file_path or error_message)
     """
-    # Import inside function to avoid circular imports
     from werkzeug.utils import secure_filename
     
+    # Allowed MIME types
+    ALLOWED_MIME_TYPES = {
+        'image/jpeg',
+        'image/png',
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/plain',
+    }
     try:
         # Check if file exists
         if not file or not file.filename:
@@ -641,7 +668,7 @@ def secure_handle_uploaded_file(file, violation_id, field_name, subdir='fields')
         # Generate full file path
         file_path = os.path.join(secure_dir, unique_filename)
         
-        # Save the file temporarily for scanning
+        # Save the file temporarily for scanning and validation
         file.save(file_path)
         
         # Verify the file was saved successfully
@@ -651,6 +678,19 @@ def secure_handle_uploaded_file(file, violation_id, field_name, subdir='fields')
         if os.path.getsize(file_path) == 0:
             os.remove(file_path)
             return False, "Empty file"
+        
+        # Content type validation
+        detected_type = None
+        try:
+            import magic
+            mime = magic.Magic(mime=True)
+            detected_type = mime.from_file(file_path)
+        except ImportError:
+            detected_type = file.mimetype
+        
+        if detected_type not in ALLOWED_MIME_TYPES:
+            os.remove(file_path)
+            return False, f"File type {detected_type} is not allowed."
         
         # Scan the file for viruses
         is_clean, scan_result = scan_file(file_path)
