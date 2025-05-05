@@ -753,6 +753,20 @@ All generated HTML (and thus PDFs) now include a restrictive Content Security Po
 
 This policy blocks all scripts, restricts images to self and data URIs, and only allows inline styles and self-hosted fonts. This helps prevent XSS in violation detail views and exported PDFs.
 
+## Session Security Improvements (2024-06)
+#### Session Timeout and Idle Timeout
+- User sessions now expire after 24 hours (absolute timeout) or 30 minutes of inactivity (idle timeout).
+- Enforced via a before_app_request handler in auth_routes.py.
+- Users are logged out and redirected to login if their session expires.
+
+#### Secure Cookie Settings
+- SESSION_COOKIE_SECURE, SESSION_COOKIE_HTTPONLY, and SESSION_COOKIE_SAMESITE are set for all environments (production must use HTTPS).
+
+#### Re-authentication for Sensitive Actions
+- A @require_recent_password decorator is available for sensitive endpoints (e.g., change password, admin actions).
+- Requires password re-entry within the last 5 minutes.
+- Usage: see auth_routes.py for example.
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 

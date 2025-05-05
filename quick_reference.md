@@ -443,3 +443,9 @@ All paginated API endpoints (e.g., /api/violations, /api/users) enforce strict v
 All generated HTML and PDFs include a restrictive CSP meta tag to prevent XSS:
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'none';">
 If you need to allow external images or fonts, update the policy in the template. 
+
+## Session Security (2024-06)
+- **Session Timeout:** 24 hours (PERMANENT_SESSION_LIFETIME in config.py)
+- **Idle Timeout:** 30 minutes (IDLE_TIMEOUT_MINUTES in config.py)
+- **Secure Cookies:** SESSION_COOKIE_SECURE, SESSION_COOKIE_HTTPONLY, SESSION_COOKIE_SAMESITE
+- **Re-authentication:** Sensitive actions require password re-entry within 5 minutes (@require_recent_password in auth_routes.py) 

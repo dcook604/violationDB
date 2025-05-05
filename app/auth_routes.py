@@ -207,6 +207,9 @@ def login():
                 logger.info(f"Response headers: {dict(response.headers)}")
                 # Print debug info
                 logger.debug("Response headers: %s", dict(response.headers))
+                # Update login time and last activity
+                session['login_time'] = datetime.utcnow().isoformat()
+                session['last_activity'] = datetime.utcnow().isoformat()
                 return response
             else:
                 # Record the failed login attempt
@@ -643,3 +646,70 @@ def register_api():
         logger.error(f"Registration error: {str(e)}")
         db.session.rollback()
         return jsonify({'error': 'Registration failed'}), 500
+
+# --- SESSION TIMEOUT HANDLING ---
+@auth.before_app_request
+def enforce_session_timeouts():
+    # Only enforce for authenticated users
+    if not current_user.is_authenticated:
+        return
+    now = datetime.utcnow()
+    idle_timeout = current_app.config.get('IDLE_TIMEOUT_MINUTES', 30)
+    absolute_timeout = current_app.config.get('PERMANENT_SESSION_LIFETIME', timedelta(hours=24))
+    # Track login time and last activity in session
+    login_time = session.get('login_time')
+    last_activity = session.get('last_activity')
+    # Set on first login
+    if not login_time:
+        session['login_time'] = now.isoformat()
+        login_time = session['login_time']
+    if not last_activity:
+        session['last_activity'] = now.isoformat()
+        last_activity = session['last_activity']
+    # Parse times
+    try:
+        login_time_dt = datetime.fromisoformat(login_time)
+        last_activity_dt = datetime.fromisoformat(last_activity)
+    except Exception:
+        # If parsing fails, force logout
+        logout_user()
+        session.clear()
+        return redirect(url_for('auth.login_page'))
+    # Check absolute timeout
+    if now - login_time_dt > absolute_timeout:
+        logout_user()
+        session.clear()
+        return redirect(url_for('auth.login_page'))
+    # Check idle timeout
+    if now - last_activity_dt > timedelta(minutes=idle_timeout):
+        logout_user()
+        session.clear()
+        return redirect(url_for('auth.login_page'))
+    # Update last activity
+    session['last_activity'] = now.isoformat()
+
+# --- RE-AUTHENTICATION FOR SENSITIVE ACTIONS ---
+def require_recent_password(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        # Require password re-entry within the last 5 minutes
+        from flask import session, request, jsonify
+        from datetime import datetime, timedelta
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        pw_time = session.get('recent_password_time')
+        now = datetime.utcnow()
+        if not pw_time or (now - datetime.fromisoformat(pw_time)) > timedelta(minutes=5):
+            return jsonify({'error': 'Re-authentication required', 'reauth': True}), 401
+        return func(*args, **kwargs)
+    return wrapper
+
+# Example usage: apply to sensitive routes
+# @auth.route('/api/auth/change-password', methods=['POST'])
+# @login_required
+# @require_recent_password
+# def change_password():
+#     ...
+
+# In the password re-auth endpoint, after verifying password:
+# session['recent_password_time'] = datetime.utcnow().isoformat()

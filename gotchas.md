@@ -249,6 +249,13 @@ The system has fallback mechanisms for PDF generation failures:
 
 - All generated HTML and PDFs include a restrictive CSP meta tag to prevent XSS. If you need to embed external images or fonts, you must adjust the policy in the template.
 
+## Session Timeout, Idle Timeout, and Re-authentication
+
+- Session Timeout: Users will be logged out after 24 hours or 30 minutes of inactivity. If users report unexpected logouts, check server time and browser cookie settings.
+- Idle Timeout: If a user leaves a tab open and returns after 30+ minutes, they must log in again.
+- Secure Cookies: SESSION_COOKIE_SECURE requires HTTPS in production. If users cannot stay logged in, check for mixed content or HTTP usage.
+- Re-authentication: Sensitive actions require password re-entry within 5 minutes. If users are prompted too often, adjust the timeout in the decorator.
+
 ---
 
 *Update this file immediately when new issues, bugs, or edge cases are discovered.* 

@@ -11,9 +11,20 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'development-key-change-me' # MUST be set via env var in production
     BASE_DIR = os.path.dirname(basedir)
     
-    # Default Database (SQLite for development)
+    # Default Database configuration
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(BASE_DIR, 'app.db')
+        'mysql+pymysql://violation:n2hm13i@localhost:3309/violationdb'
+    
+    # Connection pooling settings
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 10,          # Default number of database connections in the pool
+        'max_overflow': 20,       # Maximum number of connections to create above pool_size
+        'pool_timeout': 30,       # Seconds to wait before giving up on getting a connection
+        'pool_recycle': 1800,     # Recycle connections after 30 minutes to avoid stale connections
+        'pool_pre_ping': True,    # Issue a test query on the connection to check if it's still valid
+    }
+    
+    # General SQLAlchemy settings
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Default Email settings (use environment variables for production)
@@ -31,13 +42,13 @@ class Config:
     # Default SSL redirect (False for development)
     SSL_REDIRECT = False
     
-    # Default Session and Cookie Settings (less secure for development)
-    SESSION_COOKIE_SECURE = False 
-    SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SAMESITE = 'Lax'  
-    REMEMBER_COOKIE_SAMESITE = 'Lax' 
-    SESSION_COOKIE_DOMAIN = None  
-    REMEMBER_COOKIE_DOMAIN = None 
+    # Default Session and Cookie Settings (secure for production)
+    SESSION_COOKIE_SECURE = True  # Only sent over HTTPS
+    SESSION_COOKIE_HTTPONLY = True  # Not accessible via JavaScript
+    SESSION_COOKIE_SAMESITE = 'Lax'  # Prevent CSRF
+    REMEMBER_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_DOMAIN = None
+    REMEMBER_COOKIE_DOMAIN = None
     SESSION_PROTECTION = 'strong'
     
     # Session timeout settings
@@ -58,7 +69,7 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True # Ensure HTTPS is used
     REMEMBER_COOKIE_SECURE = True # Ensure HTTPS is used
     
-    # Production Database (MySQL) - Read from environment or use provided details
+    # Production Database (MySQL/MariaDB) configuration
     # --- WARNING: Hardcoding credentials here is NOT recommended for production! ---
     # --- It's better to set DATABASE_URL as an environment variable on your server. ---
     MYSQL_ROOT_PASSWORD = "n2hm13i" # Hardcoded as requested, but strongly discouraged
@@ -80,6 +91,15 @@ class ProductionConfig(Config):
         prod_db_url = f"mysql+mysqlclient://{MYSQL_USER}:{MYSQL_PASSWORD}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}"
         
     SQLALCHEMY_DATABASE_URI = prod_db_url
+    
+    # Production-specific connection pooling - more conservative for production
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': 5,           # Start with fewer connections for better server resource management
+        'max_overflow': 10,       # Allow fewer overflow connections
+        'pool_timeout': 60,       # Wait longer in production before giving up
+        'pool_recycle': 1800,     # Recycle connections after 30 minutes (match MariaDB wait_timeout)
+        'pool_pre_ping': True,    # Always verify connection is valid before using it
+    }
 
     # Base URL for production
     BASE_URL = os.environ.get('BASE_URL') or 'https://violation.spectrum4.ca'
