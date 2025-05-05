@@ -5,6 +5,7 @@ Flask-WTF==1.1.1
 Flask-Migrate==4.0.4
 Flask-Mail==0.9.1
 Flask-Limiter==3.3.0
+limits==3.5.0
 Flask-CORS==4.0.0
 python-dotenv==1.0.0
 WeasyPrint==59.0
@@ -16,7 +17,6 @@ Werkzeug==2.3.7
 gunicorn==20.1.0
 pydyf==0.8.0
 pdfkit==1.0.0
-tempfile2==0.2.0
 python-magic==0.4.27
 argon2-cffi==23.1.0
 pyclamd==0.4.0

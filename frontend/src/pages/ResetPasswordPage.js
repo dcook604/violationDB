@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import API from '../utils/api';
-import InputField from '../components/common/InputField';
+import API from '../api';
+import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import LoadingOverlay from '../components/common/LoadingOverlay'; // Assuming you have this
 
@@ -52,7 +52,7 @@ function ResetPasswordPage() {
 
                 {!message && ( // Hide form after success
                     <form onSubmit={handleSubmit}>
-                        <InputField
+                        <Input
                             label="New Password"
                             id="password"
                             type="password"
@@ -61,7 +61,7 @@ function ResetPasswordPage() {
                             required
                             placeholder="Enter new password (min. 8 characters)"
                         />
-                        <InputField
+                        <Input
                             label="Confirm New Password"
                             id="confirmPassword"
                             type="password"

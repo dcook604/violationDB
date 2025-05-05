@@ -22,10 +22,16 @@ if lsof -i:5004 > /dev/null || lsof -i:3001 > /dev/null; then
   exit 1
 fi
 
+echo "===== CHECKING DEPENDENCIES ====="
+# Activate virtual environment and install dependencies
+source .venv/bin/activate
+echo "Installing/updating Python dependencies..."
+pip install -r requirements.txt
+echo "Python dependencies installed!"
+
 echo "===== STARTING SERVERS ====="
 # Start backend server
 echo "Starting backend on port 5004..."
-source .venv/bin/activate
 python run.py > flask.log 2>&1 &
 BACKEND_PID=$!
 echo "Backend started with PID: $BACKEND_PID"

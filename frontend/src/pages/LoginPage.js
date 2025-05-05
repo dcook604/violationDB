@@ -1,8 +1,8 @@
 import React, { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import API from '../utils/api';
-import InputField from '../components/common/InputField';
+import API from '../api';
+import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import LoadingOverlay from '../components/common/LoadingOverlay';
 
@@ -42,7 +42,7 @@ function LoginPage() {
                 <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">Login</h2>
                 {error && <p className="text-red-500 text-center mb-4">{error}</p>}
                 <form onSubmit={handleLogin}>
-                     <InputField
+                     <Input
                          label="Email Address"
                          id="email"
                          type="email"
@@ -51,7 +51,7 @@ function LoginPage() {
                          required
                          placeholder="you@example.com"
                      />
-                     <InputField
+                     <Input
                          label="Password"
                          id="password"
                          type="password"

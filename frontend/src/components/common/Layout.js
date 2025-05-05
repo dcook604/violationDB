@@ -1,8 +1,9 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import API from '../../api';
 import "@fortawesome/fontawesome-free/css/all.min.css";
+import logo from '../../assets/images/spectrum4-logo.png';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
@@ -40,6 +41,15 @@ export default function Layout({ children }) {
                   >
                     <i className="fas fa-tv text-blueGray-400 mr-2 text-lg"></i>
                     Dashboard
+                  </Link>
+                </li>
+                <li className="flex items-center">
+                  <Link
+                    to="/units"
+                    className="hover:text-blueGray-500 text-blueGray-700 px-3 py-4 lg:py-2 flex items-center text-xs uppercase font-bold"
+                  >
+                    <i className="fas fa-building text-blueGray-400 mr-2 text-lg"></i>
+                    Unit Profiles
                   </Link>
                 </li>
                 <li className="flex items-center">

@@ -139,7 +139,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-          <Route path="/violations/public/:public_id" element={<PublicViolationDetail />} />
+          <Route path="/violations/public/:public_id" element={<ViolationDetail usePublicId={true} />} />
 
           {/* Protected Routes */}
           <Route path="/" element={<ProtectedRoute><Layout><Navigate to="/dashboard" replace /></Layout></ProtectedRoute>} />

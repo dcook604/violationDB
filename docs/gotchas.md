@@ -174,4 +174,53 @@ The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user 
 
 ### Rate Limiting
 - **Storage Backend:** The current implementation uses `memory://` storage for `Flask-Limiter`. This works for single-process development but **will not work correctly** if the application is deployed with multiple worker processes (e.g., using Gunicorn). For production, switch to a shared storage backend like Redis (`storage_uri="redis://localhost:6379"`).
-- **Limit Tuning:** The current limits (IP: 10/5min, 50/hr; Email: 3/hr) are starting points. Monitor logs and user feedback to potentially adjust these based on observed traffic patterns and any abuse attempts. 
+- **Limit Tuning:** The current limits (IP: 10/5min, 50/hr; Email: 3/hr) are starting points. Monitor logs and user feedback to potentially adjust these based on observed traffic patterns and any abuse attempts.
+
+## Frontend Build & Component Issues
+
+### Import Path Resolution
+1. **API Utility Import**
+   - The API utility is located in `frontend/src/api.js`
+   - Import using `import API from '../api'` (relative path from component location)
+   - Incorrect import paths (e.g., `../utils/api`) will cause build failures
+   - The error `Can't resolve '../utils/api'` indicates an incorrect import path
+
+2. **Component Directory Structure**
+   - Common UI components are in `frontend/src/components/common/`
+   - The `Input` component should be used instead of `InputField`
+   - `UnitList` is in the `units` subdirectory (`frontend/src/components/units/UnitList.js`) 
+   - Always check component locations before importing them
+
+3. **Asset Paths**
+   - Logo and images are stored in `frontend/src/assets/images/`
+   - Import images using relative paths (e.g., `import logo from '../../assets/images/spectrum4-logo.png'`)
+   - Missing asset files will cause build failures
+
+### Route Handling
+1. **Component Consistency**
+   - Public routes for viewing violations need to use the same component with `usePublicId` prop
+   - Ensure all routes in `App.js` reference valid, imported components
+   - The error `'X' is not defined` in `App.js` indicates a missing component import
+
+### Restarting Development Servers
+1. **Port Conflicts**
+   - React development server uses port 3001
+   - Flask backend uses port 5004
+   - If either port is in use, the `reset_servers.sh` script will fail
+   - Use `fuser -k PORT/tcp` to forcibly free a port if needed
+
+2. **Processing Dependencies**
+   - Frontend build failures may occur due to missing dependencies
+   - Run `npm install` in the frontend directory to ensure all dependencies are installed
+   - Check the React build logs in `frontend/react.log` for detailed error information
+   
+### Debugging Build Issues
+1. **Build Logs**
+   - React build errors are logged in `frontend/react.log`
+   - Look for "Failed to compile" messages and specific error details
+   - Most common build errors are related to import paths, missing files, or undefined variables
+
+2. **Component Testing**
+   - For component-level issues, consider adding tests in `setupTests.js`
+   - Test imports explicitly: `test('API module can be imported', () => { expect(() => require('../src/api')).not.toThrow(); });`
+   - Run tests with `npm run test -- --testPathPattern=setupTests.js` 

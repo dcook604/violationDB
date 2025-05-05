@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import API from '../utils/api';
-import InputField from '../components/common/InputField';
+import API from '../api';
+import Input from '../components/common/Input';
 import Button from '../components/common/Button';
 import LoadingOverlay from '../components/common/LoadingOverlay'; // Assuming you have this
 
@@ -39,7 +39,7 @@ function ForgotPasswordPage() {
                 {error && <p className="text-red-600 bg-red-100 border border-red-300 p-3 rounded text-center mb-4">{error}</p>}
                 {!message && ( // Hide form after success message is shown
                     <form onSubmit={handleSubmit}>
-                        <InputField
+                        <Input
                             label="Email Address"
                             id="email"
                             type="email"
