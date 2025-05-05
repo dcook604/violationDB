@@ -224,3 +224,49 @@ GET /api/violations?page=1&per_page=10&date_filter=7days
 | Form Submission | `const [isSubmitting, setIsSubmitting] = useState(false)` | Form submission |
 | File Upload | `window.isUploadingFiles = true` | File upload tracking |
 | Data Table | `const [isLoading, setIsLoading] = useState(false)` | Data fetching | 
+
+## Unit Profiles
+
+### Database
+
+```sql
+CREATE TABLE unit_profiles (
+    id INTEGER NOT NULL AUTO_INCREMENT, 
+    unit_number VARCHAR(50) NOT NULL, 
+    strata_lot_number VARCHAR(50), 
+    owner_first_name VARCHAR(100) NOT NULL, 
+    owner_last_name VARCHAR(100) NOT NULL, 
+    owner_email VARCHAR(255) NOT NULL, 
+    owner_telephone VARCHAR(50) NOT NULL, 
+    owner_mailing_address TEXT, 
+    parking_stall_numbers VARCHAR(255), 
+    bike_storage_numbers VARCHAR(255), 
+    has_dog BOOL, 
+    has_cat BOOL, 
+    is_rented BOOL, 
+    tenant_first_name VARCHAR(100), 
+    tenant_last_name VARCHAR(100), 
+    tenant_email VARCHAR(255), 
+    tenant_telephone VARCHAR(50), 
+    created_at DATETIME, 
+    updated_at DATETIME, 
+    updated_by INTEGER, 
+    PRIMARY KEY (id), 
+    FOREIGN KEY(updated_by) REFERENCES users (id) ON DELETE SET NULL, 
+    UNIQUE (unit_number)
+)
+```
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/units` | GET | List all unit profiles |
+| `/api/units` | POST | Create new unit profile |
+| `/api/units/<unit_number>` | GET | Get specific unit profile |
+| `/api/units/<unit_number>` | PUT | Update unit profile |
+| `/api/units/<unit_number>` | DELETE | Delete unit profile |
+
+### Required Packages
+
+- PyMySQL: `pip install PyMySQL` (for MariaDB connectivity) 

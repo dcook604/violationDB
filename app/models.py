@@ -5,6 +5,8 @@ import secrets
 from werkzeug.security import generate_password_hash, check_password_hash
 import argon2
 import uuid
+from sqlalchemy.dialects.mysql import JSON # If using MySQL for JSON storage
+from sqlalchemy.ext.mutable import MutableDict # For JSON mutation tracking
 
 # Create Argon2 password hasher
 ph = argon2.PasswordHasher(
@@ -356,12 +358,6 @@ class User(UserMixin, db.Model):
 class Violation(db.Model):
     __tablename__ = 'violations'
     
-    # Status constants
-    STATUS_ACTIVE = 'active'
-    STATUS_RESOLVED = 'resolved'
-    STATUS_PENDING = 'pending'
-    VALID_STATUSES = [STATUS_ACTIVE, STATUS_RESOLVED, STATUS_PENDING]
-    
     id = db.Column(db.Integer, primary_key=True)
     public_id = db.Column(db.String(36), default=lambda: str(uuid.uuid4()), nullable=True)
     reference = db.Column(db.String(50), unique=True)
@@ -376,14 +372,35 @@ class Violation(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
     html_path = db.Column(db.String(255))
     pdf_path = db.Column(db.String(255))
-    status = db.Column(db.String(20), default=STATUS_ACTIVE)
+    status = db.Column(db.String(64), default='Open', nullable=False)
     resolved_at = db.Column(db.DateTime)
     resolved_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    # --- Static Violation Fields (2024) ---
+    owner_property_manager_first_name = db.Column(db.String(100))
+    owner_property_manager_last_name = db.Column(db.String(100))
+    owner_property_manager_email = db.Column(db.String(255))
+    owner_property_manager_telephone = db.Column(db.String(50))
+    where_did = db.Column(db.String(100))
+    was_security_or_police_called = db.Column(db.String(100))
+    fine_levied = db.Column(db.String(100))
+    action_taken = db.Column(db.Text)
+    tenant_first_name = db.Column(db.String(100))
+    tenant_last_name = db.Column(db.String(100))
+    tenant_email = db.Column(db.String(255))
+    tenant_phone = db.Column(db.String(50))
+    concierge_shift = db.Column(db.String(100))
+    noticed_by = db.Column(db.String(100))
+    people_called = db.Column(db.String(255))
+    actioned_by = db.Column(db.String(100))
+    people_involved = db.Column(db.String(255))
+    incident_details = db.Column(db.Text)
+    attach_evidence = db.Column(db.Text)  # JSON-encoded list or metadata
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not self.status:
-            self.status = self.STATUS_ACTIVE
+            self.status = 'Open'
 
     def resolve(self, user_id):
         """Mark violation as resolved
@@ -391,14 +408,14 @@ class Violation(db.Model):
         Args:
             user_id (int): ID of user resolving the violation
         """
-        self.status = self.STATUS_RESOLVED
+        self.status = 'Resolved'
         self.resolved_at = datetime.utcnow()
         self.resolved_by = user_id
         db.session.commit()
 
     def reopen(self):
         """Reopen a resolved violation"""
-        self.status = self.STATUS_ACTIVE
+        self.status = 'Open'
         self.resolved_at = None
         self.resolved_by = None
         db.session.commit()
@@ -410,7 +427,48 @@ class Violation(db.Model):
         Returns:
             bool: True if resolved
         """
-        return self.status == self.STATUS_RESOLVED
+        return self.status == 'Resolved'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'public_id': self.public_id,
+            'reference': self.reference,
+            'category': self.category,
+            'building': self.building,
+            'unit_number': self.unit_number,
+            'incident_date': self.incident_date.isoformat() if self.incident_date else None,
+            'incident_time': self.incident_time,
+            'subject': self.subject,
+            'details': self.details,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'created_by': self.created_by,
+            'html_path': self.html_path,
+            'pdf_path': self.pdf_path,
+            'status': self.status,
+            'resolved_at': self.resolved_at.isoformat() if self.resolved_at else None,
+            'resolved_by': self.resolved_by,
+            # --- Static Violation Fields (2024) ---
+            'owner_property_manager_first_name': self.owner_property_manager_first_name,
+            'owner_property_manager_last_name': self.owner_property_manager_last_name,
+            'owner_property_manager_email': self.owner_property_manager_email,
+            'owner_property_manager_telephone': self.owner_property_manager_telephone,
+            'where_did': self.where_did,
+            'was_security_or_police_called': self.was_security_or_police_called,
+            'fine_levied': self.fine_levied,
+            'action_taken': self.action_taken,
+            'tenant_first_name': self.tenant_first_name,
+            'tenant_last_name': self.tenant_last_name,
+            'tenant_email': self.tenant_email,
+            'tenant_phone': self.tenant_phone,
+            'concierge_shift': self.concierge_shift,
+            'noticed_by': self.noticed_by,
+            'people_called': self.people_called,
+            'actioned_by': self.actioned_by,
+            'people_involved': self.people_involved,
+            'incident_details': self.incident_details,
+            'attach_evidence': self.attach_evidence,
+        }
 
 class FieldDefinition(db.Model):
     __tablename__ = 'field_definitions'
@@ -577,3 +635,83 @@ class ViolationAccess(db.Model):
     
     # Relationship
     violation = db.relationship('Violation', backref=db.backref('access_logs', lazy='dynamic'))
+
+class ViolationStatusLog(db.Model):
+    __tablename__ = 'violation_status_log'
+    id = db.Column(db.Integer, primary_key=True)
+    violation_id = db.Column(db.Integer, db.ForeignKey('violations.id'), nullable=False)
+    old_status = db.Column(db.String(64), nullable=False)
+    new_status = db.Column(db.String(64), nullable=False)
+    changed_by = db.Column(db.String(128), nullable=False)
+    timestamp = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+class UnitProfile(db.Model):
+    __tablename__ = 'unit_profiles'
+    id = db.Column(db.Integer, primary_key=True)
+    unit_number = db.Column(db.String(50), nullable=False, unique=True)
+    strata_lot_number = db.Column(db.String(50), nullable=True)
+    # Owner Information
+    owner_first_name = db.Column(db.String(100), nullable=False)
+    owner_last_name = db.Column(db.String(100), nullable=False)
+    owner_email = db.Column(db.String(255), nullable=False)
+    owner_telephone = db.Column(db.String(50), nullable=False)
+    owner_mailing_address = db.Column(db.Text, nullable=True)
+    # Storage Information
+    parking_stall_numbers = db.Column(db.String(255), nullable=True) # Store as comma-separated string initially
+    bike_storage_numbers = db.Column(db.String(255), nullable=True) # Store as comma-separated string initially
+    # Consider using JSON type if DB supports it and needs structure:
+    # parking_stall_numbers = db.Column(MutableDict.as_mutable(JSON), nullable=True) 
+    # Pet Information
+    has_dog = db.Column(db.Boolean, default=False)
+    has_cat = db.Column(db.Boolean, default=False)
+    # Rental Status & Tenant Info
+    is_rented = db.Column(db.Boolean, default=False)
+    tenant_first_name = db.Column(db.String(100), nullable=True)
+    tenant_last_name = db.Column(db.String(100), nullable=True)
+    tenant_email = db.Column(db.String(255), nullable=True)
+    tenant_telephone = db.Column(db.String(50), nullable=True)
+    # Audit Information
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_by = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+
+    # Relationship to updater (optional)
+    updater = db.relationship('User', backref='updated_unit_profiles')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'unit_number': self.unit_number,
+            'strata_lot_number': self.strata_lot_number,
+            'owner_first_name': self.owner_first_name,
+            'owner_last_name': self.owner_last_name,
+            'owner_email': self.owner_email,
+            'owner_telephone': self.owner_telephone,
+            'owner_mailing_address': self.owner_mailing_address,
+            'parking_stall_numbers': self.parking_stall_numbers,
+            'bike_storage_numbers': self.bike_storage_numbers,
+            'has_dog': self.has_dog,
+            'has_cat': self.has_cat,
+            'is_rented': self.is_rented,
+            'tenant_first_name': self.tenant_first_name,
+            'tenant_last_name': self.tenant_last_name,
+            'tenant_email': self.tenant_email,
+            'tenant_telephone': self.tenant_telephone,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'updated_by': self.updated_by,
+            'updater_email': self.updater.email if self.updater else None
+        }
+
+# If implementing the generic audit log:
+# class AuditLog(db.Model):
+#     __tablename__ = 'audit_log'
+#     id = db.Column(db.Integer, primary_key=True)
+#     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+#     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+#     action = db.Column(db.String(50), nullable=False)
+#     target_table = db.Column(db.String(100), nullable=False)
+#     target_id = db.Column(db.Integer, nullable=False)
+#     details = db.Column(db.Text, nullable=True) # Store changes as JSON string?
+#     # Relationship to user (optional)
+#     user = db.relationship('User', backref='audit_logs')

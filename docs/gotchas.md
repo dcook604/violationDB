@@ -131,3 +131,26 @@
    - Large file uploads may appear to freeze if no progress indicator is provided
    - Consider implementing more granular file upload progress tracking
    - Upload progress requires proper API endpoint support 
+
+## Unit Profiles Gotchas
+
+### Migration Issues
+
+When implementing the `unit_profiles` table, we encountered several migration challenges:
+
+1. **Index Dependencies**: Several indices in the database are required by foreign key constraints. When Alembic detects a schema difference between the model definition and database (for indexes), attempting to drop these indices causes errors. Always use `if_not_exists=True` when creating tables and comment out index operations that conflict with foreign key constraints.
+
+2. **Database Name Discrepancy**: When working with MariaDB/MySQL, ensure that the connection string in `alembic.ini` matches the actual database name. Migration failures can occur if there's a mismatch between the expected database name and the actual one.
+
+3. **Database Permissions**: The migration user needs appropriate permissions from all possible connection sources. For Docker environments, this might mean granting permissions to both `localhost` and the internal Docker network IPs (e.g., `172.17.0.1`).
+
+4. **PyMySQL Required**: The Flask-SQLAlchemy to MariaDB connection requires the PyMySQL package when using the `mysql+pymysql://` connection string. Ensure this is installed in the virtual environment with `pip install PyMySQL`.
+
+### Data Validation
+
+- The `unit_number` field is a unique identifier and should be validated both on the backend and frontend to ensure consistency.
+- When displaying or storing parking/bike storage information that uses comma-separated values, be careful with validation to avoid injection risks.
+
+### Foreign Key Behavior
+
+The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user is deleted, the unit profile history isn't lost. This means applications should handle potential NULL values in this field. 

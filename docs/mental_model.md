@@ -100,3 +100,17 @@
    - Loading state is reset
    - Success: User is navigated to new violation
    - Error: Error message is displayed with form preserved 
+
+## Unit Profiles
+
+The Unit Profile feature provides a centralized repository for unit-specific information within the building. Each unit has a single profile that stores:
+
+1. **Basic Information** - Unit number and strata lot number
+2. **Owner Information** - Name, contact details, and mailing address
+3. **Storage Details** - Parking stall numbers and bike storage numbers
+4. **Pet Information** - Whether dogs or cats are present in the unit
+5. **Tenant Information** - For rented units, contact details for the current tenants
+
+Unit Profiles connect to the Violation system by providing a consistent reference for unit numbers. This allows the system to maintain proper records even when tenant information changes over time.
+
+The Unit Profile system maintains audit trails for all changes, tracking who made updates and when they occurred. This helps with governance and compliance requirements for the property management team. 

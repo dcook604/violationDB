@@ -474,3 +474,54 @@ const uploadFiles = async (violationId) => {
 - Loading spinners have appropriate ARIA attributes (`role="status"`, `aria-label="Loading"`)
 - Visual feedback through animation and color
 - Text descriptions in loading overlays to indicate process status 
+
+## Unit Profiles Implementation
+
+### Database Schema
+
+The `unit_profiles` table stores all information related to a unit:
+
+- `id`: Primary key (auto-increment)
+- `unit_number`: Unique identifier for the unit (VARCHAR(50))
+- `strata_lot_number`: Optional strata lot identifier (VARCHAR(50))
+- `owner_first_name`: First name of the owner (VARCHAR(100))
+- `owner_last_name`: Last name of the owner (VARCHAR(100))
+- `owner_email`: Email contact for the owner (VARCHAR(255))
+- `owner_telephone`: Phone contact for the owner (VARCHAR(50))
+- `owner_mailing_address`: Optional mailing address (TEXT)
+- `parking_stall_numbers`: Comma-separated list of parking stalls (VARCHAR(255))
+- `bike_storage_numbers`: Comma-separated list of bike storage locations (VARCHAR(255))
+- `has_dog`: Boolean flag indicating presence of dogs
+- `has_cat`: Boolean flag indicating presence of cats
+- `is_rented`: Boolean flag indicating rental status
+- `tenant_first_name`: First name of tenant if applicable (VARCHAR(100))
+- `tenant_last_name`: Last name of tenant if applicable (VARCHAR(100))
+- `tenant_email`: Email contact for tenant if applicable (VARCHAR(255))
+- `tenant_telephone`: Phone contact for tenant if applicable (VARCHAR(50))
+- `created_at`: Timestamp of creation
+- `updated_at`: Timestamp of last update
+- `updated_by`: Foreign key to users table (soft reference, can be NULL if user deleted)
+
+The schema includes a unique constraint on `unit_number` to enforce data integrity, and a foreign key constraint for `updated_by` with `ON DELETE SET NULL` to maintain referential integrity even if a user is deleted.
+
+### Model Implementation
+
+The `UnitProfile` model is defined in `app/models.py` with all the necessary fields and a `to_dict()` method for serialization. The model uses SQLAlchemy relationships to connect to the `User` model for tracking updates.
+
+### API Endpoints
+
+Unit Profile data is exposed through several API endpoints:
+
+- `GET /api/units` - List all unit profiles
+- `GET /api/units/<unit_number>` - Get details for a specific unit
+- `POST /api/units` - Create a new unit profile
+- `PUT /api/units/<unit_number>` - Update an existing unit profile
+- `DELETE /api/units/<unit_number>` - Delete a unit profile
+
+### Frontend Components
+
+The Unit Profile UI is implemented using React components:
+
+- `UnitListPage` - Displays all units with filtering and sorting options
+- `UnitProfileDetailPage` - Shows detailed information for a specific unit
+- `UnitProfileForm` - Form for creating or editing unit profiles 
