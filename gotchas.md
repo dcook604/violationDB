@@ -245,6 +245,10 @@ The system has fallback mechanisms for PDF generation failures:
 - **Data Consistency:** Ensure that all new fields are included in API responses and are properly mapped in the model's `to_dict()` method.
 - **Testing:** Test both creation and retrieval of violations with and without the new fields to ensure robust handling of all cases.
 
+## Content Security Policy
+
+- All generated HTML and PDFs include a restrictive CSP meta tag to prevent XSS. If you need to embed external images or fonts, you must adjust the policy in the template.
+
 ---
 
 *Update this file immediately when new issues, bugs, or edge cases are discovered.* 

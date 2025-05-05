@@ -3,225 +3,333 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'none';">
     <title>Violation {{ violation.reference }}</title>
+    <!-- Include Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Optional: Configure Tailwind (can customize colors, etc.)
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Add Notus-specific colors if needed, e.g., lightBlue
+                        lightBlue: {
+                            500: '#0ea5e9', // Example color
+                            600: '#0284c7'  // Example hover/active color
+                        },
+                        blueGray: { // Example palette
+                           50: '#f8fafc',
+                           100: '#f1f5f9',
+                           200: '#e2e8f0',
+                           300: '#cbd5e1',
+                           400: '#94a3b8',
+                           500: '#64748b',
+                           600: '#475569',
+                           700: '#334155',
+                           800: '#1e293b',
+                           900: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <style>
+        /* Minimal extra styles if needed */
         body {
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            max-width: 1000px;
-            margin: 0 auto;
-            padding: 20px;
+             background-color: #f1f5f9; /* bg-blueGray-100 equivalent */
+             padding: 1rem; /* Add some padding */
         }
-        h1 {
-            color: #1a56db;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #1a56db;
-        }
-        .section {
-            margin-bottom: 20px;
-            padding: 15px;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-        }
-        .field {
-            margin-bottom: 10px;
-        }
-        .field-label {
-            font-weight: bold;
-        }
-        .attachment-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 15px;
-        }
-        .attachment {
-            border: 1px solid #ddd;
-            padding: 10px;
-            text-align: center;
-            border-radius: 5px;
-        }
-        .attachment img {
-            max-width: 100%;
-            max-height: 200px;
-            object-fit: contain;
-        }
-        .footer {
-            margin-top: 30px;
-            padding-top: 15px;
-            border-top: 1px solid #ddd;
-            font-size: 0.9em;
-            color: #666;
-        }
-        .reply-form {
-            margin-top: 30px;
-            border: 1px solid #ddd;
-            padding: 20px;
-            border-radius: 5px;
-            background-color: #f0f7ff;
-        }
-        .form-field {
-            margin-bottom: 15px;
-        }
-        .form-field label {
+        /* Style nl2br output */
+        .nl2br br {
+            margin-bottom: 0.5rem;
+            content: "";
             display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-        }
-        .form-field input,
-        .form-field textarea {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .form-field textarea {
-            height: 150px;
-        }
-        .button {
-            background-color: #1a56db;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        .button:hover {
-            background-color: #0f3d8d;
-        }
-        .replies-section {
-            margin-top: 30px;
-        }
-        .reply {
-            border-left: 3px solid #1a56db;
-            padding-left: 15px;
-            margin-bottom: 20px;
-        }
-        .reply-meta {
-            color: #666;
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-        .important-field {
-            background-color: #e9ecef;
-            padding: 10px;
-            border-radius: 4px;
-            margin-bottom: 15px;
         }
     </style>
 </head>
-<body>
-    <h1>Violation {{ violation.reference }}</h1>
-    
-    <div class="section">
-        <div class="field">
-            <span class="field-label">Reference:</span> {{ violation.reference }}
-        </div>
-        <div class="field">
-            <span class="field-label">Created At:</span> {{ violation.created_at }}
-        </div>
-        <div class="field">
-            <span class="field-label">Created By:</span> {{ creator.email if creator else 'Unknown' }}
-        </div>
-        
-        {% if dynamic_fields %}
-            <div class="important-field">
-                <div class="field">
-                    <span class="field-label">Category:</span> {{ dynamic_fields.get('Category', violation.category) or 'Not specified' }}
+<body class="bg-blueGray-100">
+    <div class="max-w-4xl mx-auto">
+        <!-- Card Wrapper -->
+        <div class="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded-lg bg-white border-0">
+            <div class="rounded-t bg-white mb-0 px-6 py-6">
+                <div class="text-center flex justify-between">
+                    <h6 class="text-blueGray-700 text-xl font-bold">
+                        Violation Details: {{ violation.reference }}
+                    </h6>
+                    {# Optional: Add PDF/HTML download buttons if needed #}
                 </div>
             </div>
-            
-            {% if dynamic_fields.get('Incident Details') %}
-            <div class="important-field">
-                <div class="field">
-                    <span class="field-label">Details:</span> {{ dynamic_fields.get('Incident Details') }}
-                </div>
-            </div>
-            {% endif %}
-        {% else %}
-            <div class="important-field">
-                <div class="field">
-                    <span class="field-label">Category:</span> {{ violation.category or 'Not specified' }}
-                </div>
-                <div class="field">
-                    <span class="field-label">Details:</span> {{ violation.subject or 'Not provided' }}
-                </div>
-            </div>
-        {% endif %}
-    </div>
-    
-    {% if dynamic_fields %}
-    <div class="section">
-        <h2>Additional Information</h2>
-        {% for field_name, field_value in dynamic_fields.items() %}
-            {% if field_value and field_name != 'Category' and field_name != 'Incident Details' and not field_images[field_name] %}
-            <div class="field">
-                <span class="field-label">{{ field_name }}:</span> {{ field_value }}
-            </div>
-            {% endif %}
-        {% endfor %}
-    </div>
-    {% endif %}
-    
-    {% if has_images %}
-    <div class="section">
-        <h2>Attachments</h2>
-        {% for field_name, images in field_images.items() %}
-            {% if images %}
-            <div class="field">
-                <span class="field-label">{{ field_name }}:</span>
-                <div class="attachment-grid">
-                    {% for image_url in images %}
-                    <div class="attachment">
-                        <img src="{{ image_url }}" alt="{{ field_name }} attachment">
-                        <div>{{ image_url|basename }}</div>
+            <div class="flex-auto px-4 lg:px-10 py-10 pt-0">
+                <form> {# Use form tag for semantic structure, even if not submitting from here #}
+
+                    <!-- Section: Core Violation Info -->
+                    <h6 class="text-blueGray-400 text-sm mt-3 mb-6 font-bold uppercase">
+                        Violation Information
+                    </h6>
+                    <div class="flex flex-wrap">
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Reference</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.reference }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Date</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.incident_date.strftime('%Y-%m-%d') if violation.incident_date else 'N/A' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Time</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.incident_time or 'N/A' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Status</label>
+                            <span class="text-sm font-medium px-2.5 py-0.5 rounded {{ 'bg-green-100 text-green-800' if violation.status == 'Open' else 'bg-blueGray-100 text-blueGray-800' }}">{{ violation.status }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Unit Number</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.unit_number or 'N/A' }}</span>
+                        </div>
+                         <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Building</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.building or 'N/A' }}</span>
+                        </div>
+                         <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Category</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.category or 'Not specified' }}</span>
+                        </div>
+                         <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Created By</label>
+                            <span class="text-sm text-blueGray-700">{{ creator.email if creator else 'System/Unknown' }}</span>
+                        </div>
+                         <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Created At</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.created_at.strftime('%Y-%m-%d %H:%M:%S') if violation.created_at else 'N/A' }}</span>
+                        </div>
+                         {# Add other static fields here using the same pattern #}
+                         <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Location (Where Did)</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.where_did or 'N/A' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Security/Police Called?</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.was_security_or_police_called or 'N/A' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Fine Levied</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.fine_levied or 'N/A' }}</span>
+                        </div>
                     </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-        {% endfor %}
-    </div>
-    {% endif %}
-    
-    {% if replies %}
-    <div class="section replies-section">
-        <h2>Responses</h2>
-        {% for reply in replies %}
-        <div class="reply">
-            <div class="reply-meta">
-                <strong>{{ reply.email }}</strong> on {{ reply.created_at.strftime('%B %d, %Y at %I:%M %p') }}
-            </div>
-            <div class="reply-content">
-                {{ reply.response_text|nl2br }}
-            </div>
+
+                    <!-- Section: Incident Narrative -->
+                    <hr class="mt-6 border-b-1 border-blueGray-300">
+                    <h6 class="text-blueGray-400 text-sm mt-3 mb-6 font-bold uppercase">
+                        Incident Narrative & Action
+                    </h6>
+                    <div class="flex flex-wrap">
+                        <div class="w-full px-4 mb-3">
+                             <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Incident Details</label>
+                             <p class="text-sm text-blueGray-700 nl2br">{{ violation.incident_details or 'Not provided.' }}</p>
+                        </div>
+                         <div class="w-full px-4 mb-3">
+                             <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Action Taken</label>
+                             <p class="text-sm text-blueGray-700 nl2br">{{ violation.action_taken or 'Not specified.' }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Section: Owner/Property Manager -->
+                    <hr class="mt-6 border-b-1 border-blueGray-300">
+                    <h6 class="text-blueGray-400 text-sm mt-3 mb-6 font-bold uppercase">
+                        Owner / Property Manager
+                    </h6>
+                     <div class="flex flex-wrap">
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Name</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.owner_property_manager_first_name or '' }} {{ violation.owner_property_manager_last_name or '' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Email</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.owner_property_manager_email or 'N/A' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Telephone</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.owner_property_manager_telephone or 'N/A' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Section: Tenant Info (Optional) -->
+                    {% if violation.tenant_first_name or violation.tenant_last_name or violation.tenant_email or violation.tenant_phone %}
+                    <hr class="mt-6 border-b-1 border-blueGray-300">
+                    <h6 class="text-blueGray-400 text-sm mt-3 mb-6 font-bold uppercase">
+                        Tenant Information
+                    </h6>
+                    <div class="flex flex-wrap">
+                         <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Name</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.tenant_first_name or '' }} {{ violation.tenant_last_name or '' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Email</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.tenant_email or 'N/A' }}</span>
+                        </div>
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Phone</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.tenant_phone or 'N/A' }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Section: Other Details (Optional) -->
+                     {% if violation.concierge_shift or violation.noticed_by or violation.people_called or violation.actioned_by or violation.people_involved %}
+                    <hr class="mt-6 border-b-1 border-blueGray-300">
+                    <h6 class="text-blueGray-400 text-sm mt-3 mb-6 font-bold uppercase">
+                        Other Details
+                    </h6>
+                    <div class="flex flex-wrap">
+                        {% if violation.concierge_shift %}
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Concierge Shift</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.concierge_shift }}</span>
+                        </div>
+                        {% endif %}
+                         {% if violation.noticed_by %}
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Noticed By</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.noticed_by }}</span>
+                        </div>
+                        {% endif %}
+                         {% if violation.people_called %}
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">People Called</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.people_called }}</span>
+                        </div>
+                         {% endif %}
+                        {% if violation.actioned_by %}
+                        <div class="w-full lg:w-6/12 px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Actioned By</label>
+                            <span class="text-sm text-blueGray-700">{{ violation.actioned_by }}</span>
+                        </div>
+                        {% endif %}
+                        {% if violation.people_involved %}
+                        <div class="w-full px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">People Involved</label>
+                            <p class="text-sm text-blueGray-700 nl2br">{{ violation.people_involved }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                     {% endif %}
+
+                    {# Add Attachments Section #}
+                    {% if evidence_list %}
+                    <hr class="mt-6 border-b-1 border-blueGray-300">
+                    <h6 class="text-blueGray-400 text-sm mt-3 mb-6 font-bold uppercase">
+                        Attachments
+                    </h6>
+                     <div class="flex flex-wrap">
+                        <div class="w-full px-4">
+                            <ul class="list-disc pl-5">
+                            {# Iterate over the evidence_list passed from the view #}
+                            {% for file_info in evidence_list %}
+                                {% if file_info.filename and file_info.originalname %}
+                                    <li class="mb-1">
+                                        {# IMPORTANT: Replace 'get_evidence_file' with the actual name of your file serving route #}
+                                        {# Pass violation_id along with filename #}
+                                        <a href="{{ url_for('get_evidence_file', violation_id=violation.id, filename=file_info.filename) }}" 
+                                           target="_blank" 
+                                           class="text-lightBlue-500 hover:text-lightBlue-600 hover:underline">
+                                            {{ file_info.originalname }}
+                                        </a>
+                                        {% if file_info.size %} {# Optionally display size #}
+                                            <span class="text-xs text-blueGray-500 ml-2">({{ (file_info.size / 1024) | round(1) }} KB)</span>
+                                        {% endif %}
+                                    </li>
+                                {% else %}
+                                    <li class="mb-1 text-red-500 text-sm">Invalid file metadata entry</li>
+                                {% endif %}
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                     <!-- Section: Responses -->
+                    {% if replies %}
+                    <hr class="mt-6 border-b-1 border-blueGray-300">
+                    <h6 class="text-blueGray-400 text-sm mt-3 mb-6 font-bold uppercase">
+                        Responses
+                    </h6>
+                    <div class="flex flex-wrap">
+                        <div class="w-full px-4">
+                            {% for reply in replies %}
+                            <div class="mb-4 border-l-4 border-blueGray-300 pl-4 py-2">
+                                <p class="text-sm font-semibold text-blueGray-700">{{ reply.email }}</p>
+                                <p class="text-xs text-blueGray-500 mb-2">
+                                    {{ reply.created_at.strftime('%B %d, %Y at %I:%M %p') }}
+                                </p>
+                                <p class="text-sm text-blueGray-600 nl2br">{{ reply.response_text }}</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </form> {# End semantic form tag #}
+            </div> {# End Card Body #}
+        </div> {# End Card Wrapper #}
+
+        <!-- Reply Form Card -->
+        <div class="relative flex flex-col min-w-0 break-words w-full mb-6 shadow-lg rounded-lg bg-white border-0">
+             <div class="rounded-t bg-white mb-0 px-6 py-6">
+                 <h6 class="text-blueGray-700 text-xl font-bold">
+                    Reply to this Violation
+                </h6>
+             </div>
+             <div class="flex-auto px-4 lg:px-10 py-10 pt-0">
+                <form action="{{ url_for('violations.submit_violation_reply', vid=violation.id) }}" method="post">
+                     <div class="flex flex-wrap">
+                         <div class="w-full px-4 mb-3">
+                             <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2" htmlFor="email">
+                                 Your Email:
+                             </label>
+                             <input type="email" id="email" name="email" required
+                                    class="border-0 px-3 py-3 placeholder-blueGray-300 text-blueGray-600 bg-white rounded text-sm shadow focus:outline-none focus:ring w-full ease-linear transition-all duration-150">
+                         </div>
+                         <div class="w-full px-4 mb-3">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2" htmlFor="response">
+                                Your Response:
+                            </label>
+                            <textarea id="response" name="response_text" required rows="4"
+                                      class="border-0 px-3 py-3 placeholder-blueGray-300 text-blueGray-600 bg-white rounded text-sm shadow focus:outline-none focus:ring w-full ease-linear transition-all duration-150"></textarea>
+                            <p class="text-xs text-blueGray-500 mt-1">Please provide your response.</p>
+                        </div>
+                        <div class="w-full px-4 text-right mt-4">
+                            <button type="submit"
+                                    class="bg-lightBlue-500 text-white active:bg-lightBlue-600 text-sm font-bold uppercase px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">
+                                Submit Response
+                            </button>
+                        </div>
+                     </div>
+                </form>
+             </div>
         </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-    
-    <div class="reply-form">
-        <h2>Reply to this Violation</h2>
-        <form action="{{ url_for('violations.submit_violation_reply', vid=violation.id) }}" method="post">
-            <div class="form-field">
-                <label for="email">Your Email:</label>
-                <input type="email" id="email" name="email" required>
-            </div>
-            <div class="form-field">
-                <label for="response">Your Response:</label>
-                <textarea id="response" name="response_text" required></textarea>
-                <div class="hint">You can include up to 2 paragraphs in your response.</div>
-            </div>
-            <button type="submit" class="button">Submit Response</button>
-        </form>
-    </div>
-    
-    <div class="footer">
-        <p>For more information, please contact the property management office.</p>
-        <p>Reference ID: {{ violation.reference }}</p>
-    </div>
+
+        <!-- Footer Info -->
+         <div class="text-center mt-6 text-blueGray-500 text-xs">
+             <p>For more information, please contact the property management office.</p>
+             <p>Reference ID: {{ violation.reference }}</p>
+         </div>
+
+    </div> {# End Max Width Wrapper #}
+
+    {# Add Jinja filter for nl2br if not globally available #}
+    {% macro nl2br(value) -%}
+        {{ value | replace('\n', '<br>\n') | safe }}
+    {%- endmacro %}
+
+    <script>
+        // Add nl2br functionality to paragraphs with the class
+        document.querySelectorAll('.nl2br').forEach(el => {
+           el.innerHTML = el.innerHTML.replace(/\n/g, '<br>\n');
+        });
+    </script>
+
 </body>
 </html> 

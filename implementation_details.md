@@ -746,6 +746,13 @@ All API endpoints that support pagination or filtering parameters (e.g., page, p
 - This prevents abuse and denial-of-service by requesting excessively large result sets.
 - Endpoints affected: /api/violations, /api/users (and any future paginated endpoints).
 
+## Content Security Policy for Generated HTML/PDFs (2024-06)
+All generated HTML (and thus PDFs) now include a restrictive Content Security Policy (CSP) meta tag in the <head>:
+
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'none';">
+
+This policy blocks all scripts, restricts images to self and data URIs, and only allows inline styles and self-hosted fonts. This helps prevent XSS in violation detail views and exported PDFs.
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 

@@ -438,3 +438,8 @@ All paginated API endpoints (e.g., /api/violations, /api/users) enforce strict v
 - Maximum per_page/limit: 100 (MAX_PAGE_SIZE=100)
 - Requests above this return an error. Invalid or missing values default to safe values.
 - Error messages are returned for invalid or excessive values. 
+
+## Content Security Policy (CSP) for Generated HTML/PDFs
+All generated HTML and PDFs include a restrictive CSP meta tag to prevent XSS:
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'none';">
+If you need to allow external images or fonts, update the policy in the template. 
