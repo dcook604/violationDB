@@ -132,8 +132,8 @@ function ProtectedRoute({ children }) {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<Login />} />
@@ -145,21 +145,21 @@ function App() {
           <Route path="/" element={<ProtectedRoute><Layout><Navigate to="/dashboard" replace /></Layout></ProtectedRoute>} />
           <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
           
-           {/* Unit Profile Routes */}
-           <Route path="/units" element={
-             <ProtectedRoute>
-               <Layout>
-                 <UnitListPage />
-               </Layout>
-             </ProtectedRoute>
-           } />
-           <Route path="/units/:unitNumber" element={
-             <ProtectedRoute>
-               <Layout>
-                 <UnitProfileDetailPage />
-               </Layout>
-             </ProtectedRoute>
-           } />
+          {/* Unit Profile Routes */}
+          <Route path="/units" element={
+            <ProtectedRoute>
+              <Layout>
+                <UnitListPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/units/:unitNumber" element={
+            <ProtectedRoute>
+              <Layout>
+                <UnitProfileDetailPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
 
           {/* Admin Routes */}
           <Route path="/admin/users" element={<AdminRoute><Layout><UserManagement /></Layout></AdminRoute>} />
@@ -197,8 +197,8 @@ function App() {
           <Route path="*" element={<ProtectedRoute><div>404 Not Found</div></ProtectedRoute>} />
           
         </Routes>
-      </Router>
-    </AuthProvider>
+      </AuthProvider>
+    </Router>
   );
 }
 

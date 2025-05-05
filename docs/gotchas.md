@@ -224,3 +224,36 @@ The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user 
    - For component-level issues, consider adding tests in `setupTests.js`
    - Test imports explicitly: `test('API module can be imported', () => { expect(() => require('../src/api')).not.toThrow(); });`
    - Run tests with `npm run test -- --testPathPattern=setupTests.js` 
+
+## React Router Issues
+
+### Component Hierarchy and Hooks
+1. **Router Component Order**
+   - React Router hooks (like `useNavigate`, `useLocation`, `useParams`) must be used inside a `Router` component
+   - The error `useNavigate() may be used only in the context of a <Router> component` indicates this issue
+   - The correct component order is: `<Router>` → `<AuthProvider>` → `<Routes>` → `<Route>`
+   - Example of correct implementation:
+     ```jsx
+     function App() {
+       return (
+         <Router>
+           <AuthProvider>
+             <Routes>
+               <Route path="/" element={<Home />} />
+               {/* more routes */}
+             </Routes>
+           </AuthProvider>
+         </Router>
+       );
+     }
+     ```
+
+2. **Provider Nesting**
+   - Context providers that use router hooks must be placed inside the Router component
+   - Don't wrap Router inside AuthProvider or other contexts that use router hooks
+   - If a provider needs to be outside the Router, avoid using router hooks in that provider
+
+3. **Protected Route Implementation**
+   - When creating custom route protection components, they should utilize router hooks
+   - These components must be rendered inside Routes/Route components
+   - They cannot be implemented at the same level as the Router component 
