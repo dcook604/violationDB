@@ -314,3 +314,55 @@ The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user 
 - When adding new features, check all Link components and navigation calls to ensure they use obfuscated paths
 - Test direct URL access to all routes to verify they work correctly
 - If new routes are added, remember to update both App.js and routeMapper.js 
+
+## JWT Authentication Implementation
+
+### Dual Authentication Systems
+
+**Issue:** The application now supports both session-based and JWT-based authentication, which could lead to confusion.
+
+**Solution:** 
+- During the migration period, both authentication systems exist in parallel with separate endpoints
+- Session-based endpoints use `/api/auth/login`, `/api/auth/logout`, etc.
+- JWT-based endpoints use `/api/auth/login-jwt`, `/api/auth/logout-jwt`, etc.
+- JWT-protected routes use `@jwt_required_api` decorator instead of `@login_required`
+
+### Token Storage
+
+**Issue:** JWT tokens stored in localStorage are vulnerable to XSS attacks.
+
+**Solution:** All tokens are stored in HttpOnly cookies that cannot be accessed by JavaScript. Additional security is provided by:
+- CSRF protection for state-changing operations
+- Short expiration time (30 minutes) for access tokens
+- Refresh token mechanism to get new access tokens
+
+### Cookie Settings
+
+**Issue:** Improper cookie settings can lead to security vulnerabilities.
+
+**Solution:** 
+- `HttpOnly`: Set to true to prevent JavaScript access
+- `Secure`: Set to true in production to restrict to HTTPS
+- `SameSite`: Set to 'Lax' to prevent CSRF attacks
+- `Path`: Set to '/' to make cookies available throughout the application
+- `Domain`: Set automatically by the browser
+
+### CSRF Protection
+
+**Issue:** CSRF attacks can still affect cookie-based authentication.
+
+**Solution:**
+- CSRF protection is enabled for all state-changing operations (POST, PUT, DELETE)
+- `/api/csrf-token` endpoint provides tokens for protected requests
+- Tokens are included in request headers via `X-CSRF-TOKEN`
+- Frontend automatically fetches and includes CSRF tokens
+
+### Token Refresh
+
+**Issue:** Short-lived access tokens require frequent re-authentication.
+
+**Solution:**
+- Refresh tokens have longer expiration (7 days) and can be used to get new access tokens
+- Token refresh happens automatically when a request receives a 401 response
+- Queuing system ensures multiple simultaneous requests are handled properly
+- Failed refreshes redirect to login page 

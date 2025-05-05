@@ -12,6 +12,7 @@ from .config import config_by_name
 from datetime import timedelta
 from flask.sessions import SecureCookieSessionInterface
 import os.path
+from flask_wtf.csrf import CSRFProtect
 
 # Custom session interface to fix SameSite issue
 class CustomSessionInterface(SecureCookieSessionInterface):
@@ -37,6 +38,7 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 mail = Mail()
 migrate = Migrate()
+csrf = CSRFProtect()
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"],
@@ -103,6 +105,11 @@ def create_app(config_name=None):
     login_manager.init_app(app)
     mail.init_app(app)
     limiter.init_app(app)
+    csrf.init_app(app)
+    
+    # Initialize JWT
+    from .jwt_config import init_jwt
+    jwt = init_jwt(app)
 
     # Database connection error handler
     @app.errorhandler(Exception)
@@ -139,9 +146,9 @@ def create_app(config_name=None):
              resources={r"/*": {
                  "origins": allowed_origins,
                  "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-CSRF-TOKEN"],
                  "supports_credentials": True,
-                 "expose_headers": ["Content-Type", "Authorization"]
+                 "expose_headers": ["Content-Type", "Authorization", "X-CSRF-TOKEN"]
              }},
              supports_credentials=True)
         app.logger.info(f"Development CORS enabled for: {', '.join(allowed_origins)}")
@@ -154,9 +161,9 @@ def create_app(config_name=None):
              resources={r"/api/*": { # Often only needed for /api/* routes
                  "origins": allowed_origins,
                  "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-CSRF-TOKEN"],
                  "supports_credentials": True,
-                 "expose_headers": ["Content-Type", "Authorization"]
+                 "expose_headers": ["Content-Type", "Authorization", "X-CSRF-TOKEN"]
              }},
              supports_credentials=True)
         app.logger.info(f"Production CORS enabled for: {allowed_origins[0]}")
@@ -168,6 +175,8 @@ def create_app(config_name=None):
     from .user_routes import user_api as users_blueprint
     from .dashboard_routes import dashboard as dashboard_blueprint
     from .unit_routes import unit_bp as unit_blueprint
+    from .csrf_routes import csrf_bp as csrf_blueprint
+    from .test_jwt_routes import test_jwt_bp as test_jwt_blueprint
 
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(main_blueprint)
@@ -176,6 +185,8 @@ def create_app(config_name=None):
     app.register_blueprint(users_blueprint)
     app.register_blueprint(dashboard_blueprint)
     app.register_blueprint(unit_blueprint)
+    app.register_blueprint(csrf_blueprint)
+    app.register_blueprint(test_jwt_blueprint)
     
     # Load SMTP settings from database when the app is fully initialized
     with app.app_context():

@@ -12,6 +12,18 @@ from flask import url_for
 from .mail_utils import send_password_reset_email
 # ------------------------------
 from . import limiter # Import the limiter instance
+from flask_jwt_extended import (
+    create_access_token, 
+    create_refresh_token, 
+    get_jwt_identity, 
+    get_jwt,
+    jwt_required,
+    set_access_cookies,
+    set_refresh_cookies,
+    unset_jwt_cookies
+)
+from .jwt_config import get_jwt_identity_claims
+from .jwt_auth import jwt_required_api
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -854,3 +866,240 @@ def reset_password_with_token(token):
         db.session.rollback() # Rollback in case of DB errors during commit
         return jsonify({'error': 'An error occurred during password reset.'}), 500
 # --- End Password Reset ---
+
+@auth.route('/api/auth/login-jwt', methods=['POST', 'OPTIONS'])
+@cors_preflight
+def login_jwt():
+    """Login endpoint using JWT authentication
+    
+    Returns:
+        JSON response with login status
+    """
+    if request.method == 'OPTIONS':
+        return make_response()
+
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        email = data.get('email', '').strip()
+        password = data.get('password', '').strip()
+
+        if not email or not password:
+            logger.warning(f"Login attempt failed: Email or password missing. Email: {bool(email)}, Password: {bool(password)}")
+            return jsonify({'error': 'Email and password are required'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        
+        if not user:
+            logger.warning(f"Login attempt failed: User {email} not found.")
+            # Return same error message to avoid user enumeration
+            return jsonify({'error': 'Invalid credentials'}), 401
+
+        if not user.password_hash:
+            logger.warning(f"Login attempt failed: User {email} has no password hash set.")
+            return jsonify({'error': 'Account not properly configured'}), 401
+
+        # Check if account is locked
+        if user.is_account_locked():
+            lockout_time = user.account_locked_until
+            logger.warning(f"Login attempt for locked account: {email}. Locked until {lockout_time}")
+            return jsonify({'error': 'Account temporarily locked due to too many failed attempts. Please try again later.'}), 423
+            
+        try:
+            # Verify the password
+            if user.check_password(password):
+                if not user.is_active:
+                    logger.warning(f"Login attempt failed: User {email} is inactive.")
+                    return jsonify({'error': 'Account pending approval'}), 403
+                
+                # Check if we need to migrate password to Argon2id
+                if user.password_algorithm != 'argon2' or not user.password_hash.startswith('$argon2'):
+                    user.migrate_to_argon2(password)
+                    logger.info(f"Migrated password hash for user {email} to Argon2id")
+                
+                # Get identity and claims for the JWT
+                identity, additional_claims = get_jwt_identity_claims(user)
+                
+                # Create tokens
+                access_token = create_access_token(
+                    identity=identity,
+                    additional_claims=additional_claims
+                )
+                refresh_token = create_refresh_token(
+                    identity=identity,
+                    additional_claims=additional_claims
+                )
+                
+                # Update last login and reset failed attempts
+                user.update_last_login()
+                
+                # Create response with user data
+                user_data = {
+                    'id': user.id,
+                    'email': user.email,
+                    'role': 'admin' if user.is_admin else 'user',
+                    'is_admin': user.is_admin
+                }
+                
+                # Create a response object
+                response = make_response(jsonify({
+                    'login': True,
+                    'user': user_data
+                }))
+                
+                # Set JWT cookies
+                set_access_cookies(response, access_token)
+                set_refresh_cookies(response, refresh_token)
+                
+                # Get the origin from the request
+                origin = request.headers.get('Origin')
+                allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+                
+                # Only set CORS headers for allowed origins
+                if origin and origin in allowed_origins:
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                
+                logger.info(f"JWT login successful for user {email}")
+                return response
+            else:
+                # Record the failed login attempt
+                user.record_failed_login()
+                # Get remaining attempts before lockout
+                remaining_attempts = User.MAX_FAILED_ATTEMPTS - user.failed_login_attempts
+                if remaining_attempts <= 0:
+                    logger.warning(f"Account locked: User {email} exceeded maximum failed login attempts.")
+                    return jsonify({'error': 'Account locked due to too many failed attempts. Please try again later.'}), 423
+                elif remaining_attempts <= 3:
+                    # Warn user about remaining attempts
+                    logger.warning(f"Login attempt failed: Invalid password for user {email}. {remaining_attempts} attempts remaining.")
+                    return jsonify({
+                        'error': f'Invalid credentials. You have {remaining_attempts} attempts remaining before your account is temporarily locked.'
+                    }), 401
+                else:
+                    logger.warning(f"Login attempt failed: Invalid password for user {email}.")
+                return jsonify({'error': 'Invalid credentials'}), 401
+                    
+        except AccountLockedError as e:
+            logger.warning(f"Login attempt on locked account: {email}. {str(e)}")
+            return jsonify({'error': 'Account temporarily locked due to too many failed attempts. Please try again later.'}), 423
+            
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return jsonify({'error': 'Authentication error occurred'}), 500
+
+@auth.route('/api/auth/logout-jwt', methods=['POST', 'OPTIONS'])
+@cors_preflight
+@jwt_required_api
+def logout_jwt():
+    """Logout endpoint for JWT authentication
+    
+    Returns:
+        JSON response with logout status
+    """
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    response = make_response(jsonify({'logout': True}))
+    unset_jwt_cookies(response)
+    
+    # Get the origin from the request
+    origin = request.headers.get('Origin')
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+    
+    # Only set CORS headers for allowed origins
+    if origin and origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        
+    return response
+
+@auth.route('/api/auth/refresh-jwt', methods=['POST', 'OPTIONS'])
+@cors_preflight
+@jwt_required(refresh=True)
+def refresh_jwt():
+    """Refresh JWT token endpoint
+    
+    Returns:
+        JSON response with new access token
+    """
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    # Get identity from refresh token
+    identity = get_jwt_identity()
+    
+    # Get claims from refresh token
+    claims = get_jwt()
+    
+    # Create new access token
+    access_token = create_access_token(
+        identity=identity,
+        additional_claims={
+            'role': claims.get('role'),
+            'is_admin': claims.get('is_admin'),
+            'email': claims.get('email')
+        }
+    )
+    
+    # Create response
+    response = make_response(jsonify({'refresh': True}))
+    
+    # Set new access token
+    set_access_cookies(response, access_token)
+    
+    # Get the origin from the request
+    origin = request.headers.get('Origin')
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+    
+    # Only set CORS headers for allowed origins
+    if origin and origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        
+    return response
+
+@auth.route('/api/auth/status-jwt', methods=['GET', 'OPTIONS'])
+@cors_preflight
+@jwt_required_api
+def status_jwt():
+    """Get authentication status using JWT
+    
+    Returns:
+        JSON response with authentication status and user details
+    """
+    if request.method == 'OPTIONS':
+        return make_response()
+    
+    # Get user claims from JWT
+    claims = get_jwt()
+    
+    # Create user data from claims
+    user_data = {
+        'id': get_jwt_identity(),
+        'email': claims.get('email'),
+        'role': claims.get('role'),
+        'is_admin': claims.get('is_admin')
+    }
+    
+    # Create response
+    response = make_response(jsonify({
+        'authenticated': True,
+        'user': user_data
+    }))
+    
+    # Get the origin from the request
+    origin = request.headers.get('Origin')
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+    
+    # Only set CORS headers for allowed origins
+    if origin and origin in allowed_origins:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        
+    return response
