@@ -431,3 +431,10 @@ Uploads are restricted to the following MIME types:
 - text/plain (.txt)
 
 Filenames are sanitized and prefixed with a UUID. Files with unsupported or undetectable types are rejected. See implementation_details.md for details. 
+
+## Pagination Parameters (2024-06)
+All paginated API endpoints (e.g., /api/violations, /api/users) enforce strict validation:
+- Parameters: page (default 1), per_page (default 10), limit (optional, default 10)
+- Maximum per_page/limit: 100 (MAX_PAGE_SIZE=100)
+- Requests above this return an error. Invalid or missing values default to safe values.
+- Error messages are returned for invalid or excessive values. 

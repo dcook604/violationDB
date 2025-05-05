@@ -24,18 +24,43 @@ def admin_required_api(f):
 @login_required
 @admin_required_api
 def api_list_users():
-    users = User.query.all()
-    return jsonify([
-        {
-            'id': u.id,
-            'email': u.email,
-            'first_name': u.first_name,
-            'last_name': u.last_name,
-            'role': u.role,
-            'is_active': u.is_active,
-            'is_admin': u.is_admin
-        } for u in users
-    ])
+    MAX_PAGE_SIZE = 100
+    try:
+        page = int(request.args.get('page', 1))
+    except Exception:
+        return jsonify({'error': 'Invalid page parameter'}), 400
+    try:
+        per_page = int(request.args.get('per_page', 10))
+    except Exception:
+        return jsonify({'error': 'Invalid per_page parameter'}), 400
+    if page < 1:
+        page = 1
+    if per_page < 1:
+        per_page = 10
+    if per_page > MAX_PAGE_SIZE:
+        return jsonify({'error': f'Maximum per_page is {MAX_PAGE_SIZE}'}), 400
+    users_query = User.query.order_by(User.id)
+    pagination = users_query.paginate(page=page, per_page=per_page, error_out=False)
+    users = pagination.items
+    return jsonify({
+        'users': [
+            {
+                'id': u.id,
+                'email': u.email,
+                'first_name': u.first_name,
+                'last_name': u.last_name,
+                'role': u.role,
+                'is_active': u.is_active,
+                'is_admin': u.is_admin
+            } for u in users
+        ],
+        'pagination': {
+            'total': pagination.total,
+            'page': page,
+            'per_page': per_page,
+            'pages': pagination.pages
+        }
+    })
 
 @user_api.route('/api/users', methods=['POST'])
 @login_required

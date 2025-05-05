@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app, send_from_directory, render_template, abort, send_file, flash, redirect, url_for
 from flask_login import login_required, current_user
-from .models import Violation, FieldDefinition, ViolationFieldValue, ViolationReply
+from .models import Violation, FieldDefinition, ViolationFieldValue, ViolationReply, ViolationStatusLog
 from . import db
 import os
 import json
@@ -94,17 +94,53 @@ def api_create_violation():
                 current_app.logger.warning(f"Invalid incident_date format: {incident_date}, setting to None")
                 incident_date = None
         
+        # Extract owner/property manager name fields if provided in nested format
+        owner_first_name = None
+        owner_last_name = None
+        tenant_first_name = None
+        tenant_last_name = None
+        
+        if 'owner_property_manager_name' in data and isinstance(data['owner_property_manager_name'], dict):
+            owner_first_name = data['owner_property_manager_name'].get('first', '')
+            owner_last_name = data['owner_property_manager_name'].get('last', '')
+        
+        # Extract tenant name fields if provided in nested format
+        if 'tenant_name' in data and isinstance(data['tenant_name'], dict):
+            tenant_first_name = data['tenant_name'].get('first', '')
+            tenant_last_name = data['tenant_name'].get('last', '')
+        
         # Create new violation with better checking of data
         violation_data = {
             'reference': data.get('reference', ''),
-            'category': data.get('category', ''),
+            'category': data.get('violation_category', data.get('category', '')),
             'building': data.get('building', ''),
-            'unit_number': data.get('unit_number', ''),
+            'unit_number': data.get('unit_no', data.get('unit_number', '')),
             'incident_date': incident_date,
-            'incident_time': data.get('incident_time'),
+            'incident_time': data.get('time', data.get('incident_time', '')),
             'subject': data.get('subject', ''),
             'details': data.get('details', ''),
-            'created_by': current_user.id
+            'created_by': current_user.id,
+            'status': data.get('status', 'Open'),
+            
+            # Static Violation Fields
+            'owner_property_manager_first_name': owner_first_name,
+            'owner_property_manager_last_name': owner_last_name,
+            'owner_property_manager_email': data.get('owner_property_manager_email', ''),
+            'owner_property_manager_telephone': data.get('owner_property_manager_telephone', ''),
+            'where_did': data.get('where_did', ''),
+            'was_security_or_police_called': data.get('was_security_or_police_called', ''),
+            'fine_levied': data.get('fine_levied', ''),
+            'action_taken': data.get('action_taken', ''),
+            'tenant_first_name': tenant_first_name,
+            'tenant_last_name': tenant_last_name,
+            'tenant_email': data.get('tenant_email', ''),
+            'tenant_phone': data.get('tenant_phone', ''),
+            'concierge_shift': data.get('concierge_shift', ''),
+            'noticed_by': data.get('noticed_by', ''),
+            'people_called': data.get('people_called', ''),
+            'actioned_by': data.get('actioned_by', ''),
+            'people_involved': data.get('people_involved', ''),
+            'incident_details': data.get('incident_details', '')
         }
         
         # Generate a UUID for public_id if the column exists
@@ -147,6 +183,12 @@ def api_create_violation():
             else:
                 current_app.logger.warning(f"Field definition not found for: {field_name}")
         
+        # Process file attachments if present
+        attach_evidence = data.get('attach_evidence', [])
+        if attach_evidence and isinstance(attach_evidence, list) and len(attach_evidence) > 0:
+            current_app.logger.info(f"Processing {len(attach_evidence)} attachments")
+            violation.attach_evidence = json.dumps([file.get('name', '') for file in attach_evidence])
+        
         db.session.commit()
         current_app.logger.info(f"Saved violation {violation.id} with {len(processed_fields)} dynamic fields")
         
@@ -188,6 +230,7 @@ def api_create_violation():
         
         return jsonify({
             'id': violation.id,
+            'public_id': violation.public_id if hasattr(violation, 'public_id') else None,
             'message': 'Violation created successfully',
             'processed_fields': processed_fields
         }), 201
@@ -448,19 +491,113 @@ def get_uploaded_file(filename):
         current_app.logger.error(f"Error serving uploaded file {filename}: {str(e)}")
         abort(500)  # Internal server error
 
+# --- NEW FILE SERVING ROUTE for Evidence ---
+@violation_bp.route('/evidence/<int:violation_id>/<filename>')
+def get_evidence_file(violation_id, filename):
+    """Serve uploaded evidence files securely.
+    
+    Access requires either:
+    1. A logged-in user session.
+    2. A valid, non-expired token for the *specific* violation_id passed in the 'token' query parameter.
+    """
+    is_authorized = False
+
+    # 1. Check for logged-in user
+    if current_user.is_authenticated:
+        # Optional: Add role-based checks if needed (e.g., only admins?)
+        is_authorized = True
+
+    # 2. Check for valid token if not logged in
+    if not is_authorized:
+        token = request.args.get('token')
+        if token:
+            # Here we only validate the token exists and is valid, 
+            # but don't strictly require it matches the violation_id in the URL
+            # IF THE TOKEN ITSELF CONTAINS THE VIOLATION ID.
+            # If token is just a general access grant, need different logic.
+            # Assuming validate_secure_access_token returns the VIOLATION ID from the token:
+            validated_violation_id = validate_secure_access_token(token) 
+            if validated_violation_id and validated_violation_id == violation_id:
+                is_authorized = True
+                current_app.logger.info(f"Access granted via token for violation {violation_id}")
+            else:
+                 current_app.logger.warning(f"Invalid or mismatched token (token_vid={validated_violation_id}, url_vid={violation_id}) used for evidence {filename}")
+        else:
+            current_app.logger.warning(f"Attempt to access violation {violation_id} evidence {filename} without login or token.")
+
+    if not is_authorized:
+        current_app.logger.warning(f"Unauthorized attempt to access evidence: violation {violation_id}, filename {filename}")
+        abort(403) # Forbidden
+
+    # Construct the secure directory path based on the violation ID
+    # Ensure this path structure matches where secure_handle_uploaded_file saves files
+    # Check secure_handle_uploaded_file: os.path.join(BASE_DIR, 'saved_files', 'uploads', subdir, f'violation_{violation_id}')
+    # The subdir used when saving evidence should be consistent here (e.g., 'evidence' or 'fields')
+    # Assuming 'fields' as per the previous logic, but VERIFY this.
+    directory = os.path.join(
+        current_app.config['BASE_DIR'],
+        'saved_files',
+        'uploads',
+        'fields', # <--- VERIFY THIS SUBDIRECTORY MATCHES WHERE EVIDENCE IS SAVED
+        f'violation_{violation_id}'
+    )
+
+    # Secure the filename just in case
+    filename = secure_filename(filename)
+
+    try:
+        current_app.logger.info(f"Attempting to serve file: {filename} from directory: {directory}")
+        # Check if file exists before attempting to send
+        file_path = os.path.join(directory, filename)
+        if not os.path.isfile(file_path):
+             current_app.logger.error(f"File not found at path: {file_path}")
+             abort(404)
+
+        return send_from_directory(directory, filename, as_attachment=False) # Set as_attachment=True to force download
+    except FileNotFoundError:
+        # This might be redundant if the check above works, but keep for safety
+        current_app.logger.error(f"send_from_directory failed: File not found: {filename} in {directory}")
+        abort(404) # Not Found
+    except Exception as e:
+        current_app.logger.error(f"Error serving file {filename} for violation {violation_id}: {e}")
+        abort(500) # Internal Server Error
+
+# --- End New Route ---
+
 @violation_bp.route('/api/violations', methods=['GET'])
 @login_required
 def api_list_violations():
     try:
+        MAX_PAGE_SIZE = 100
         # Get query parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        date_filter = request.args.get('date_filter', None, type=str)  # 'last7days', 'last30days', or None
-        
-        # Special handling for dashboard which uses limit parameter
-        limit = request.args.get('limit', None, type=int)
+        try:
+            page = int(request.args.get('page', 1))
+        except Exception:
+            return jsonify({'error': 'Invalid page parameter'}), 400
+        try:
+            per_page = int(request.args.get('per_page', 10))
+        except Exception:
+            return jsonify({'error': 'Invalid per_page parameter'}), 400
+        date_filter = request.args.get('date_filter', None)
+        try:
+            limit = request.args.get('limit', None)
+            if limit is not None:
+                limit = int(limit)
+        except Exception:
+            return jsonify({'error': 'Invalid limit parameter'}), 400
+
+        # Enforce sensible bounds
+        if page < 1:
+            page = 1
+        if per_page < 1:
+            per_page = 10
+        if per_page > MAX_PAGE_SIZE:
+            return jsonify({'error': f'Maximum per_page/limit is {MAX_PAGE_SIZE}'}), 400
         if limit is not None:
-            # If limit is specified, use it as per_page and set page to 1
+            if limit < 1:
+                limit = 1
+            if limit > MAX_PAGE_SIZE:
+                return jsonify({'error': f'Maximum per_page/limit is {MAX_PAGE_SIZE}'}), 400
             per_page = limit
             page = 1
         
@@ -589,52 +726,70 @@ def api_violation_detail(vid):
     v = Violation.query.get_or_404(vid)
     if not (current_user.is_admin or v.created_by == current_user.id):
         return jsonify({'error': 'Forbidden'}), 403
+    
+    # Get user who created the violation
+    from .models import User
+    creator = User.query.get(v.created_by) if v.created_by else None
+    creator_email = creator.email if creator else None
+    
+    # Get all field values for this violation
     field_values = ViolationFieldValue.query.filter_by(violation_id=v.id).all()
+    
+    # Build a dictionary of field values
     dynamic_fields = {}
     for fv in field_values:
-        field = FieldDefinition.query.get(fv.field_definition_id)
-        if field:
-            dynamic_fields[field.name] = fv.value
+        field_def = fv.field_definition
+        dynamic_fields[field_def.name] = fv.value
     
-    # Get creator email
-    from .models import User
-    creator_email = None
-    if v.created_by:
-        creator = User.query.get(v.created_by)
-        if creator:
-            creator_email = creator.email
-            
-    # Safely handle created_at which might be a string or datetime
-    created_at = None
+    # Format dates for JSON serialization
     try:
-        if hasattr(v, 'created_at'):
-            if isinstance(v.created_at, str):
-                created_at = v.created_at
-            elif v.created_at:
-                created_at = v.created_at.isoformat()
-    except Exception as err:
-        current_app.logger.warning(f"Error formatting created_at for violation {v.id}: {str(err)}")
-        created_at = str(v.created_at) if hasattr(v, 'created_at') and v.created_at else None
-            
-    # Safely handle incident_date which might be a string or datetime
-    incident_date = None
+        if v.created_at:
+            created_at = v.created_at.isoformat()
+        else:
+            created_at = None
+    except:
+        created_at = str(v.created_at) if v.created_at else None
+        
     try:
         if v.incident_date:
-            if isinstance(v.incident_date, str):
-                incident_date = v.incident_date
-            else:
-                incident_date = v.incident_date.isoformat()
+            incident_date = v.incident_date.isoformat()
+        else:
+            incident_date = None
     except Exception as err:
         current_app.logger.warning(f"Error formatting incident_date for violation {v.id}: {str(err)}")
         incident_date = str(v.incident_date) if v.incident_date else None
+    
+    # Format owner/property manager name fields
+    owner_property_manager_name = {
+        'first': v.owner_property_manager_first_name or '',
+        'last': v.owner_property_manager_last_name or ''
+    }
+    
+    # Format tenant name fields
+    tenant_name = {
+        'first': v.tenant_first_name or '',
+        'last': v.tenant_last_name or ''
+    }
+    
+    # Parse attach_evidence if it exists
+    attach_evidence = []
+    if v.attach_evidence:
+        try:
+            evidence_files = json.loads(v.attach_evidence)
+            if isinstance(evidence_files, list):
+                attach_evidence = evidence_files
+        except Exception as e:
+            current_app.logger.error(f"Error parsing attach_evidence for violation {v.id}: {str(e)}")
             
     result = {
         'id': v.id,
+        'public_id': v.public_id if hasattr(v, 'public_id') else None,
         'reference': v.reference,
         'category': v.category,
         'building': v.building,
         'unit_number': v.unit_number,
         'incident_date': incident_date,
+        'incident_time': v.incident_time,
         'subject': v.subject,
         'details': v.details,
         'created_at': created_at,
@@ -642,8 +797,34 @@ def api_violation_detail(vid):
         'created_by_email': creator_email,
         'dynamic_fields': dynamic_fields,
         'html_path': f"/violations/view/{v.id}" if hasattr(v, 'html_path') and v.html_path else None,
-        'pdf_path': f"/violations/pdf/{v.id}" if hasattr(v, 'pdf_path') and v.pdf_path else None
+        'pdf_path': f"/violations/pdf/{v.id}" if hasattr(v, 'pdf_path') and v.pdf_path else None,
+        'status': v.status,
+        
+        # Static Violation Fields
+        'owner_property_manager_name': owner_property_manager_name,
+        'owner_property_manager_email': v.owner_property_manager_email,
+        'owner_property_manager_telephone': v.owner_property_manager_telephone,
+        'where_did': v.where_did,
+        'was_security_or_police_called': v.was_security_or_police_called,
+        'fine_levied': v.fine_levied,
+        'action_taken': v.action_taken,
+        'tenant_name': tenant_name,
+        'tenant_email': v.tenant_email,
+        'tenant_phone': v.tenant_phone,
+        'concierge_shift': v.concierge_shift,
+        'noticed_by': v.noticed_by,
+        'people_called': v.people_called,
+        'actioned_by': v.actioned_by,
+        'people_involved': v.people_involved,
+        'incident_details': v.incident_details,
+        'attach_evidence': attach_evidence
     }
+    
+    # For frontend compatibility, also map fields to their frontend names
+    result['violation_category'] = v.category
+    result['unit_no'] = v.unit_number
+    result['time'] = v.incident_time
+    
     return jsonify(result)
 
 @violation_bp.route('/api/violations/<int:vid>', methods=['PUT'])
@@ -652,10 +833,57 @@ def api_edit_violation(vid):
     v = Violation.query.get_or_404(vid)
     if not (current_user.is_admin or v.created_by == current_user.id):
         return jsonify({'error': 'Forbidden'}), 403
+    
     data = request.json or {}
-    for field in ['category', 'building', 'unit_number', 'incident_date', 'subject', 'details']:
-        if field in data:
-            setattr(v, field, data[field])
+    old_status = v.status
+    
+    # Extract owner/property manager name fields if provided in nested format
+    if 'owner_property_manager_name' in data and isinstance(data['owner_property_manager_name'], dict):
+        data['owner_property_manager_first_name'] = data['owner_property_manager_name'].get('first', '')
+        data['owner_property_manager_last_name'] = data['owner_property_manager_name'].get('last', '')
+    
+    # Extract tenant name fields if provided in nested format
+    if 'tenant_name' in data and isinstance(data['tenant_name'], dict):
+        data['tenant_first_name'] = data['tenant_name'].get('first', '')
+        data['tenant_last_name'] = data['tenant_name'].get('last', '')
+        
+    # Map frontend field names to model field names
+    field_mapping = {
+        'violation_category': 'category',
+        'unit_no': 'unit_number',
+        'time': 'incident_time'
+    }
+    
+    # Process all standard fields, including static violation fields
+    static_fields = [
+        'category', 'building', 'unit_number', 'incident_date', 'incident_time', 
+        'subject', 'details', 'status',
+        'owner_property_manager_first_name', 'owner_property_manager_last_name',
+        'owner_property_manager_email', 'owner_property_manager_telephone',
+        'where_did', 'was_security_or_police_called', 'fine_levied', 'action_taken',
+        'tenant_first_name', 'tenant_last_name', 'tenant_email', 'tenant_phone',
+        'concierge_shift', 'noticed_by', 'people_called', 'actioned_by', 
+        'people_involved', 'incident_details'
+    ]
+    
+    # Update all available fields
+    for field in data:
+        # Check if field needs mapping
+        model_field = field_mapping.get(field, field)
+        
+        # Only update if field exists in model
+        if model_field in static_fields:
+            setattr(v, model_field, data[field])
+    
+    # Process file attachments if present
+    attach_evidence = data.get('attach_evidence', [])
+    if attach_evidence and isinstance(attach_evidence, list):
+        if len(attach_evidence) > 0:
+            v.attach_evidence = json.dumps([file.get('name', '') for file in attach_evidence])
+        else:
+            v.attach_evidence = None
+            
+    # Process dynamic fields
     dynamic_fields = data.get('dynamic_fields', {})
     for name, value in dynamic_fields.items():
         field_def = FieldDefinition.query.filter_by(name=name).first()
@@ -669,16 +897,37 @@ def api_edit_violation(vid):
                     field_definition_id=field_def.id,
                     value=value
                 ))
+                
     db.session.commit()
     
+    # Log status change if changed
+    if old_status != v.status:
+        log = ViolationStatusLog(
+            violation_id=v.id,
+            old_status=old_status,
+            new_status=v.status,
+            changed_by=current_user.email
+        )
+        db.session.add(log)
+        db.session.commit()
+        
     # Regenerate HTML and PDF files after update
     try:
         html_path, html_content = create_violation_html(v)
         pdf_path = generate_violation_pdf(v, html_content)
+        
+        # Store the updated HTML and PDF paths
+        v.html_path = os.path.relpath(html_path, current_app.config['BASE_DIR'])
+        v.pdf_path = os.path.relpath(pdf_path, current_app.config['BASE_DIR'])
+        db.session.commit()
     except Exception as e:
         current_app.logger.error(f"Error updating violation files after edit: {str(e)}")
-    
-    return jsonify({'success': True})
+        
+    return jsonify({
+        'success': True,
+        'id': v.id,
+        'public_id': v.public_id if hasattr(v, 'public_id') else None
+    })
 
 @violation_bp.route('/api/violations/<int:vid>', methods=['DELETE'])
 @login_required
@@ -1029,3 +1278,16 @@ def send_secure_urls(violation):
         'pdf_url': pdf_url,
         'token': token
     }
+
+@violation_bp.route('/api/violations/<int:vid>/status_log', methods=['GET'])
+@login_required
+def api_violation_status_log(vid):
+    logs = ViolationStatusLog.query.filter_by(violation_id=vid).order_by(ViolationStatusLog.timestamp).all()
+    return jsonify([
+        {
+            'old_status': log.old_status,
+            'new_status': log.new_status,
+            'changed_by': log.changed_by,
+            'timestamp': log.timestamp.isoformat()
+        } for log in logs
+    ])

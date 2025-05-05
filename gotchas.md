@@ -19,6 +19,8 @@ This document lists known edge cases, caveats, workarounds, and potential issues
 - File upload: If a user attempts to upload a file with an unsupported or undetectable type, the upload will be rejected and an error message will be shown. Only specific document/image types are allowed (see implementation_details.md).
 - File upload: If the server does not have python-magic installed, MIME type detection falls back to the browser-provided mimetype, which may be less reliable. This could result in some valid files being rejected or some invalid files being accepted (rare).
 - File upload: If a file is rejected for type or virus, it is deleted immediately and not stored.
+- Pagination: If a user requests a per_page or limit above 100, the API returns an error. If a value is missing or invalid, the API defaults to safe values (page=1, per_page=10).
+- Pagination: All paginated endpoints strictly validate integer parameters and enforce maximums to prevent DoS. Error messages are returned for invalid or excessive values.
 
 ## Warnings
 - Ensure that all static assets are correctly referenced using `url_for('static', ...)` to avoid broken links.

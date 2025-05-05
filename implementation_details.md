@@ -737,6 +737,15 @@ A migration script is required to add these columns to the `violations` table. S
 - CSS ensures the logo is centered, visually separated, and works with both light and dark themes.
 - If the logo fails to load, a fallback is shown.
 
+## Pagination and Filtering Security (2024-06)
+All API endpoints that support pagination or filtering parameters (e.g., page, per_page, limit) now enforce strict validation:
+
+- All pagination parameters are validated as integers and must be within allowed ranges.
+- The maximum allowed value for per_page or limit is 100 (MAX_PAGE_SIZE=100). Requests above this return an error.
+- Invalid or missing parameters default to safe values (page=1, per_page=10).
+- This prevents abuse and denial-of-service by requesting excessively large result sets.
+- Endpoints affected: /api/violations, /api/users (and any future paginated endpoints).
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 
