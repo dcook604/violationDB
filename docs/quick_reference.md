@@ -269,4 +269,27 @@ CREATE TABLE unit_profiles (
 
 ### Required Packages
 
-- PyMySQL: `pip install PyMySQL` (for MariaDB connectivity) 
+- PyMySQL: `pip install PyMySQL` (for MariaDB connectivity)
+
+## Password Reset
+
+### API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/request-password-reset` | POST | Sends reset email (Requires email in JSON body) |
+| `/api/auth/reset-password/<token>` | POST | Resets password using token (Requires password in JSON body) |
+
+### Key Libraries
+- `itsdangerous`: Used for generating/verifying secure, timed tokens.
+- `Flask-Mail`: Handles email sending via configured SMTP server.
+- `Flask-Limiter`: Applies rate limits to the request endpoint.
+
+### Rate Limits (`/api/auth/request-password-reset`)
+- **By IP:** 50 per hour; 10 per 5 minutes
+- **By Target Email:** 3 per hour
+
+### Configuration
+- Relies on `SECRET_KEY` from Flask config for token security.
+- Uses SMTP settings from the `Settings` database model.
+- Uses `memory://` storage for rate limiting (change for production). 

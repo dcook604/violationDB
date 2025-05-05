@@ -1,11 +1,13 @@
 import os
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_mail import Mail
 from flask_cors import CORS
 from flask_migrate import Migrate
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from .config import config_by_name
 from datetime import timedelta
 from flask.sessions import SecureCookieSessionInterface
@@ -35,6 +37,12 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 mail = Mail()
 migrate = Migrate()
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://",
+    strategy="fixed-window"
+)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -94,6 +102,34 @@ def create_app(config_name=None):
     migrate.init_app(app, db)
     login_manager.init_app(app)
     mail.init_app(app)
+    limiter.init_app(app)
+
+    # Database connection error handler
+    @app.errorhandler(Exception)
+    def handle_db_exceptions(e):
+        import sqlalchemy.exc
+        from pymysql import MySQLError
+        
+        # Handle specific database-related exceptions
+        if isinstance(e, (sqlalchemy.exc.OperationalError, 
+                         sqlalchemy.exc.InternalError,
+                         sqlalchemy.exc.DisconnectionError, 
+                         MySQLError)):
+            # Log detailed error for debugging
+            app.logger.error(f"Database error: {str(e)}")
+            
+            # For API routes, return JSON error
+            if request.path.startswith('/api/'):
+                return jsonify({
+                    'error': 'Database error',
+                    'message': 'A database connection error occurred. Please try again later.'
+                }), 500
+            
+            # For regular routes, show user-friendly error page
+            return render_template('errors/db_error.html'), 500
+            
+        # Let Flask handle other exceptions normally
+        return e
 
     # Conditional CORS Setup
     if app.config['DEBUG']:
@@ -131,6 +167,7 @@ def create_app(config_name=None):
     from .violation_routes import violation_bp as violations_blueprint
     from .user_routes import user_api as users_blueprint
     from .dashboard_routes import dashboard as dashboard_blueprint
+    from .unit_routes import unit_bp as unit_blueprint
 
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(main_blueprint)
@@ -138,6 +175,7 @@ def create_app(config_name=None):
     app.register_blueprint(violations_blueprint)
     app.register_blueprint(users_blueprint)
     app.register_blueprint(dashboard_blueprint)
+    app.register_blueprint(unit_blueprint)
     
     # Load SMTP settings from database when the app is fully initialized
     with app.app_context():

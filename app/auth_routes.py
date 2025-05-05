@@ -6,6 +6,12 @@ from . import db
 from functools import wraps
 from datetime import datetime, timedelta
 import logging
+# --- Added for Password Reset --- 
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadTimeSignature
+from flask import url_for
+from .mail_utils import send_password_reset_email
+# ------------------------------
+from . import limiter # Import the limiter instance
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -713,3 +719,138 @@ def require_recent_password(func):
 
 # In the password re-auth endpoint, after verifying password:
 # session['recent_password_time'] = datetime.utcnow().isoformat()
+
+# --- Authorization Decorators ---
+def admin_required_api(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        if not current_user.is_admin:
+            return jsonify({'error': 'Admin privileges required'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- Password Reset --- 
+
+def get_reset_serializer(secret_key=None, salt='password-reset-salt'):
+    """Creates a timed serializer for password reset tokens."""
+    if secret_key is None:
+        secret_key = current_app.config['SECRET_KEY']
+    return URLSafeTimedSerializer(secret_key, salt=salt)
+
+@auth.route('/api/auth/request-password-reset', methods=['POST', 'OPTIONS'])
+@cors_preflight
+@limiter.limit("50 per hour; 10 per 5 minutes") # IP-based limit
+@limiter.limit("3 per hour", key_func=lambda: request.get_json().get('email') if request.is_json else 'invalid_request') # Email-based limit
+def request_password_reset():
+    """Handles the request to send a password reset email."""
+    if request.method == 'OPTIONS':
+        return make_response()
+
+    data = request.get_json()
+    email = data.get('email', '').strip()
+
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+
+    user = User.query.filter_by(email=email).first()
+
+    # Security: Even if user not found, pretend to send email
+    if user:
+        s = get_reset_serializer()
+        token = s.dumps({'user_id': user.id})
+
+        # Construct frontend URL (Adjust logic based on deployment)
+        # Determine if running in development or production based on config or env var
+        is_development = current_app.config.get('DEBUG', False)
+        
+        # Base URL construction needs refinement for production vs dev
+        # For now, attempt to guess based on request origin or config
+        origin = request.headers.get('Origin')
+        if origin:
+            # Simple replacement (might break if backend/frontend ports differ significantly)
+            # Assumes frontend runs on :3001 if origin includes a port
+            if ':' in origin.split('//')[1]:
+                 base_url_parts = origin.split(':')
+                 base_url = f"{base_url_parts[0]}:{base_url_parts[1]}"
+            else:
+                 base_url = origin # No port specified in origin
+        elif current_app.config.get('BASE_URL'):
+            base_url = current_app.config['BASE_URL']
+        else:
+            # Fallback for local development if no origin/BASE_URL
+            base_url = 'http://localhost:3001' # Default frontend dev URL
+
+        # Ensure base_url ends with a slash
+        if not base_url.endswith('/'):
+            base_url += '/'
+
+        reset_url = f"{base_url}reset-password/{token}" # Use frontend route
+        logger.info(f"Generated password reset link for {email}: {reset_url}")
+
+        # Send the email
+        try:
+            send_password_reset_email(user.email, reset_url)
+        except Exception as e:
+            # Log but don't expose failure to user
+            logger.error(f"Exception while queueing/sending password reset email for {email}: {str(e)}")
+
+    # Always return generic success to prevent user enumeration
+    return jsonify({'message': 'If an account with that email exists, a password reset link has been sent.'}), 200
+
+
+@auth.route('/api/auth/reset-password/<token>', methods=['POST', 'OPTIONS'])
+@cors_preflight
+def reset_password_with_token(token):
+    """Handles the actual password reset using a token."""
+    if request.method == 'OPTIONS':
+        return make_response()
+
+    data = request.get_json()
+    new_password = data.get('password')
+
+    if not new_password:
+        return jsonify({'error': 'New password is required'}), 400
+
+    s = get_reset_serializer()
+    try:
+        # Verify token signature and expiry (max_age = 24 hours = 86400 seconds)
+        data = s.loads(token, max_age=86400)
+        user_id = data.get('user_id')
+
+        user = User.query.get(user_id)
+
+        if not user:
+             # This case could happen if the user was deleted after token generation
+            logger.warning(f"Password reset attempt for non-existent user ID: {user_id} from token")
+            return jsonify({'error': 'Invalid or expired token'}), 400 
+
+        # Set the new password (using user.set_password handles hashing)
+        user.set_password(new_password)
+        # Clear any old temp password info just in case
+        user.clear_temporary_password() 
+
+        # Important: Invalidate all other sessions
+        if hasattr(user, 'terminate_all_sessions'):
+            count = user.terminate_all_sessions()
+            logger.info(f"Terminated {count} sessions for user ID {user_id} after password reset.")
+        else:
+             logger.warning(f"User model does not have 'terminate_all_sessions' method.")
+
+        db.session.commit()
+        logger.info(f"Password successfully reset for user ID {user_id}")
+
+        return jsonify({'message': 'Password reset successfully. Please log in with your new password.'}), 200
+
+    except SignatureExpired:
+        logger.warning(f"Password reset attempt with expired token: {token[:10]}...")
+        return jsonify({'error': 'Password reset link has expired.'}), 400
+    except BadTimeSignature as e:
+        logger.warning(f"Password reset attempt with invalid token ({e}): {token[:10]}...")
+        return jsonify({'error': 'Invalid password reset link.'}), 400
+    except Exception as e:
+        logger.error(f"Error during password reset with token: {str(e)}", exc_info=True)
+        db.session.rollback() # Rollback in case of DB errors during commit
+        return jsonify({'error': 'An error occurred during password reset.'}), 500
+# --- End Password Reset ---

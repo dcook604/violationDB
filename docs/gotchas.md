@@ -153,4 +153,25 @@ When implementing the `unit_profiles` table, we encountered several migration ch
 
 ### Foreign Key Behavior
 
-The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user is deleted, the unit profile history isn't lost. This means applications should handle potential NULL values in this field. 
+The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user is deleted, the unit profile history isn't lost. This means applications should handle potential NULL values in this field.
+
+## Password Reset Gotchas
+
+### Token Security & Handling
+- **SECRET_KEY:** The security of `itsdangerous` tokens relies heavily on a strong, secret `SECRET_KEY` in the Flask configuration. Ensure this is properly set and kept confidential, especially in production.
+- **Salt:** Using a specific `salt` ('password-reset-salt') isolates these tokens from other potential uses of `itsdangerous`.
+- **Expiration:** Tokens correctly expire after 24 hours (`max_age=86400`). Attempts to use expired tokens are rejected.
+- **User Enumeration:** The `request-password-reset` endpoint deliberately avoids confirming if an email exists to prevent attackers from discovering valid user emails. It always returns a generic success message.
+- **Frontend URL Construction:** Generating the correct absolute URL for the reset link (pointing to the frontend) can be tricky. The current implementation in `auth_routes.py` tries to guess based on the request origin or `BASE_URL` config, but this might need refinement depending on the deployment setup (e.g., different ports, reverse proxies).
+
+### Email Delivery
+- **SMTP Configuration:** Email sending relies entirely on the SMTP settings configured in the `Settings` page/database. If these are incorrect or missing, password reset emails will fail silently (though errors are logged).
+- **Spam Filters:** Emails containing links, especially password reset links, can sometimes be flagged as spam. Ensure the HTML template is well-formed and consider implementing SPF/DKIM records for the sending domain to improve deliverability.
+- **Error Handling:** The `send_password_reset_email` function includes basic error logging but doesn't currently retry or explicitly notify the user/admin of failures beyond the log message.
+
+### Session Invalidation
+- **Critical Step:** Terminating all other active sessions (`user.terminate_all_sessions()`) after a successful password reset is a crucial security measure to log out potentially compromised sessions.
+
+### Rate Limiting
+- **Storage Backend:** The current implementation uses `memory://` storage for `Flask-Limiter`. This works for single-process development but **will not work correctly** if the application is deployed with multiple worker processes (e.g., using Gunicorn). For production, switch to a shared storage backend like Redis (`storage_uri="redis://localhost:6379"`).
+- **Limit Tuning:** The current limits (IP: 10/5min, 50/hr; Email: 3/hr) are starting points. Monitor logs and user feedback to potentially adjust these based on observed traffic patterns and any abuse attempts. 

@@ -46,11 +46,17 @@
 3. User logs in with temporary password
 4. User must set permanent password
 
-### Password Reset Flow
-1. Admin initiates password reset
-2. System generates new temporary password
-3. User logs in with temporary password
-4. User sets new permanent password
+### Password Reset Flow (User Initiated)
+1. User clicks "Forgot Password?" on the login page.
+2. User enters their registered email address.
+3. System sends a password reset email (if the email exists in the system).
+    - Contains a secure, time-limited (24hr) link.
+    - User is shown a generic confirmation message regardless of email existence.
+4. User clicks the link in the email.
+5. User is taken to a page to enter and confirm a new password.
+6. User submits the new password.
+7. System validates the reset link (token), updates the password, invalidates the link, and terminates all other active sessions for the user.
+8. User is redirected to the login page with a success message.
 
 ### Role Management
 - Role changes automatically update admin status

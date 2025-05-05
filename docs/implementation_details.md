@@ -307,7 +307,33 @@ class UserSession(db.Model):
 - Session tokens are 128-bit UUIDs stored as HttpOnly cookies
 - Tokens are validated against stored sessions on every request
 - Tokens are invalidated upon logout
-- Cookies cleared on both client and server during logout 
+- Cookies cleared on both client and server during logout
+
+## Password Reset Implementation
+
+### Token Generation
+- Uses `itsdangerous.URLSafeTimedSerializer` with a unique salt (`password-reset-salt`) and the app's `SECRET_KEY`.
+- Token contains the `user_id` and has a built-in expiration timestamp (24 hours).
+- Token is generated in the `/api/auth/request-password-reset` endpoint.
+
+### Email Sending
+- A dedicated utility `app/mail_utils.py` handles email construction and sending.
+- Uses `Flask-Mail` configured with SMTP settings fetched from the `Settings` database model.
+- Uses an HTML template `app/templates/email/password_reset.html` for consistent styling.
+
+### Reset Process
+- User clicks link (`/reset-password/<token>`) sent via email.
+- Frontend `ResetPasswordPage.js` captures the token and new password.
+- Backend endpoint `/api/auth/reset-password/<token>` validates the token using `itsdangerous.loads()` with `max_age=86400`.
+- If valid, updates the user's password hash using `user.set_password()`.
+- **Security:** Invalidates all existing user sessions using `user.terminate_all_sessions()`.
+
+### Rate Limiting
+- The `/api/auth/request-password-reset` endpoint is rate-limited using `Flask-Limiter`.
+- **IP Limit:** "50 per hour; 10 per 5 minutes" (default key: remote IP address).
+- **Email Limit:** "3 per hour" (key: target email from JSON payload).
+- This combination prevents general IP flooding and targeted email spamming.
+- Currently uses memory storage (consider Redis for production).
 
 # Loading State Management Implementation
 
