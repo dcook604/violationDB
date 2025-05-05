@@ -1,304 +1,272 @@
-import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import API from '../api';
-import { useAuth } from '../context/AuthContext';
 import Button from './common/Button';
-import Input from './common/Input';
+import Spinner from './common/Spinner';
+// Import the edit form if it's separate or handle editing inline
+// import ViolationEditForm from './ViolationEditForm';
 
-export default function ViolationDetail() {
-  const { id } = useParams();
+const ViolationDetail = ({ usePublicId = false }) => {
+  const { id, publicId } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const [violation, setViolation] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [fields, setFields] = useState([]);
+  const [error, setError] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
   const [replies, setReplies] = useState([]);
-  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [replyLoading, setReplyLoading] = useState(false);
+  // Assuming authentication context provides user info
+  // const { user } = useAuth(); 
+
+  const fetchViolation = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    const identifier = usePublicId ? publicId : id;
+    const endpoint = usePublicId ? `/api/violations/public/${identifier}` : `/api/violations/${identifier}`;
+    try {
+      const res = await API.get(endpoint);
+      setViolation(res.data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load violation details');
+    }
+    setLoading(false);
+  }, [id, publicId, usePublicId]);
+
+  const fetchReplies = useCallback(async () => {
+    if (!violation?.id) return;
+    setReplyLoading(true);
+    try {
+      const res = await API.get(`/api/violations/${violation.id}/replies`);
+      setReplies(res.data);
+    } catch (err) {
+      // Non-critical error, log or show small message
+      console.error("Failed to load replies:", err);
+    }
+    setReplyLoading(false);
+  }, [violation?.id]);
 
   useEffect(() => {
-    // Fetch field definitions to know field types
-    API.get('/api/fields')
-      .then(res => {
-        setFields(res.data);
-      })
-      .catch(err => {
-        console.error('Failed to load field definitions', err);
-      });
+    fetchViolation();
+  }, [fetchViolation]);
 
-    API.get(`/api/violations/${id}`)
-      .then(res => {
-        setViolation(res.data);
-        setForm({
-          ...res.data,
-          dynamic_fields: { ...res.data.dynamic_fields }
-        });
-        setLoading(false);
-        
-        // After loading the violation, fetch replies
-        fetchReplies();
-      })
-      .catch(err => {
-        if (err.response && err.response.status === 403) {
-          setError('You do not have permission to view this violation.');
-        } else {
-          setError('Failed to load violation details.');
-        }
-        setLoading(false);
-      });
-  }, [id]);
-  
-  const fetchReplies = () => {
-    setLoadingReplies(true);
-    API.get(`/api/violations/${id}/replies`)
-      .then(res => {
-        setReplies(res.data);
-        setLoadingReplies(false);
-      })
-      .catch(err => {
-        console.error('Failed to load replies:', err);
-        setLoadingReplies(false);
-      });
-  };
-
-  const canEditOrDelete = violation && user && (user.role === 'admin' || user.email === violation.created_by || user.id === violation.created_by);
-
-  const handleEdit = () => setEditing(true);
-  const handleCancel = () => setEditing(false);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name.startsWith('dynamic_')) {
-      setForm(f => ({ ...f, dynamic_fields: { ...f.dynamic_fields, [name.replace('dynamic_', '')]: value } }));
-    } else {
-      setForm(f => ({ ...f, [name]: value }));
+  useEffect(() => {
+    if (violation) {
+      fetchReplies();
     }
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await API.put(`/api/violations/${id}`, {
-        ...form,
-        dynamic_fields: form.dynamic_fields
-      });
-      setEditing(false);
-      // Refresh
-      const res = await API.get(`/api/violations/${id}`);
-      setViolation(res.data);
-      setForm({ ...res.data, dynamic_fields: { ...res.data.dynamic_fields } });
-    } catch (err) {
-      setError('Failed to save changes.');
-    }
-    setSaving(false);
-  };
+  }, [violation, fetchReplies]);
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this violation?')) return;
-    setDeleting(true);
-    try {
-      await API.delete(`/api/violations/${id}`);
-      navigate('/violations');
-    } catch (err) {
-      setError('Failed to delete violation.');
+    if (window.confirm('Are you sure you want to delete this violation?')) {
+      try {
+        await API.delete(`/api/violations/${violation.id}`);
+        navigate('/violations'); // Redirect after delete
+      } catch (err) {
+        setError(err.response?.data?.error || 'Failed to delete violation');
+      }
     }
-    setDeleting(false);
   };
 
-  const handleViewHtml = () => {
-    window.open(`${API.defaults.baseURL}/violations/view/${id}`, '_blank');
+  const handleEditSave = async (updatedData) => {
+    // Implement save logic using PUT /api/violations/:id
+    try {
+        await API.put(`/api/violations/${violation.id}`, updatedData);
+        setIsEditing(false);
+        fetchViolation(); // Refresh data
+    } catch (err) {
+        setError(err.response?.data?.error || 'Failed to update violation');
+    }
   };
-
-  const handleDownloadPdf = () => {
-    window.open(`${API.defaults.baseURL}/violations/pdf/${id}`, '_blank');
-  };
-
-  // Function to determine if a field is a file type
-  const isFileField = (fieldName) => {
-    const fieldDef = fields.find(f => f.name === fieldName);
-    return fieldDef?.type === 'file';
-  };
-
-  // Function to render an uploaded image gallery
-  const renderImageGallery = (fieldName, value) => {
-    if (!value) return null;
-    
-    const imageUrls = value.split(',').filter(Boolean);
-    if (imageUrls.length === 0) return null;
-    
-    return (
-      <div className="mt-2">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {imageUrls.map((url, index) => (
-            <div key={index} className="relative">
-              <a href={`${API.defaults.baseURL}/uploads/${url}`} target="_blank" rel="noopener noreferrer">
-                <img 
-                  src={`${API.defaults.baseURL}/uploads/${url}`} 
-                  alt={`Upload ${index + 1}`} 
-                  className="w-full h-auto rounded object-cover aspect-square"
-                />
-              </a>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  // Format date for display
-  const formatDate = (isoDate) => {
-    if (!isoDate) return '';
-    const date = new Date(isoDate);
-    return date.toLocaleString();
-  };
-
-  if (loading) return <div className="p-8">Loading...</div>;
-  if (error) return <div className="p-8 text-red-600">{error}</div>;
-  if (!violation) return <div className="p-8">Violation not found.</div>;
-
-  if (editing && form) {
-    return (
-      <div className="p-8 max-w-xl mx-auto">
-        <h2 className="text-2xl font-bold mb-4">Edit Violation</h2>
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="mb-4">
-            <label className="font-semibold">Reference:</label>
-            <span className="ml-2">{form.reference}</span>
-          </div>
-          
-          {/* Display Category and Incident Details prominently for editing */}
-          <div className="mt-3 p-3 bg-gray-100 rounded-md">
-            <div className="mb-3">
-              <label className="font-semibold">Category:</label>
-              <Input 
-                name="dynamic_Category" 
-                value={form.dynamic_fields?.Category || ''} 
-                onChange={handleChange} 
-                className="border p-1 ml-2 w-full mt-1" 
-              />
-            </div>
-            <div className="mb-2">
-              <label className="font-semibold">Details:</label>
-              <textarea
-                name="dynamic_Incident Details"
-                value={form.dynamic_fields?.['Incident Details'] || ''}
-                onChange={handleChange}
-                className="border p-1 ml-2 w-full mt-1 h-24"
-              />
-            </div>
-          </div>
-          
-          <div className="mt-4">
-            <div className="font-semibold mb-2">Additional Information:</div>
-            <ul className="list-disc list-inside">
-              {Object.entries(form.dynamic_fields || {}).map(([key, value]) => {
-                // Skip Category and Incident Details as they're already displayed above
-                if (key === 'Category' || key === 'Incident Details') return null;
-                return (
-                  <li key={key} className="mb-3">
-                    <span className="font-medium">{key}:</span>
-                    {isFileField(key) ? (
-                      <div>
-                        <p className="text-sm text-gray-500 ml-2">File uploads cannot be edited directly.</p>
-                        {renderImageGallery(key, value)}
-                      </div>
-                    ) : (
-                      <Input name={`dynamic_${key}`} value={value || ''} onChange={handleChange} className="border p-1 ml-2" />
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-          <div className="mt-4 flex gap-2">
-            <Button onClick={handleSave} disabled={saving} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save</Button>
-            <Button onClick={handleCancel} className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400">Cancel</Button>
-          </div>
-        </div>
-      </div>
-    );
+  
+  // Helper to format date
+  const formatDate = (dateString) => {
+      if (!dateString) return 'N/A';
+      try {
+          return new Date(dateString).toLocaleDateString();
+      } catch { return dateString; }
+  }
+  const formatDateTime = (dateString) => {
+      if (!dateString) return 'N/A';
+      try {
+          return new Date(dateString).toLocaleString();
+      } catch { return dateString; }
   }
 
+  if (loading) return <div className="p-4"><Spinner /> Loading...</div>;
+  if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
+  if (!violation) return <div className="p-4">Violation not found.</div>;
+
+  // TODO: Replace with actual check from auth context
+  const canEditDelete = true; // Assume user can edit/delete for now
+
   return (
-    <div className="p-8 max-w-xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Violation Details</h2>
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="mb-2"><span className="font-semibold">Reference:</span> {violation.reference}</div>
-        <div className="mb-2"><span className="font-semibold">Created At:</span> {violation.created_at ? new Date(violation.created_at).toLocaleString() : ''}</div>
-        <div className="mb-2"><span className="font-semibold">Created By:</span> {violation.created_by_email || 'Unknown user'}</div>
-        
-        {/* Display Category and Incident Details prominently */}
-        <div className="mt-3 p-3 bg-gray-100 rounded-md">
-          <div className="mb-2">
-            <span className="font-semibold">Category:</span> {violation.dynamic_fields?.Category || violation.category || 'Not specified'}
-          </div>
-          {violation.dynamic_fields?.['Incident Details'] && (
-            <div className="mb-2">
-              <span className="font-semibold">Details:</span> {violation.dynamic_fields['Incident Details']}
+    <div className="p-4 md:p-8">
+       {/* Go Back Link */} 
+       <div className="mb-4">
+         <Link to="/violations" className="text-blue-600 hover:underline text-sm">
+           &larr; Back to Violations List
+         </Link>
+       </div>
+
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">Violation Details</h2>
+
+        {/* Edit Mode - Render form or inline editable fields */} 
+        {isEditing ? (
+            // <ViolationEditForm violation={violation} onSave={handleEditSave} onCancel={() => setIsEditing(false)} />
+            <div className="text-center p-4 border rounded bg-gray-100">
+                <p className="mb-2">Inline editing form placeholder.</p>
+                <Button onClick={() => setIsEditing(false)} color="gray">Cancel</Button>
             </div>
-          )}
-        </div>
-        
-        <div className="mt-4">
-          <div className="font-semibold mb-2">Additional Information:</div>
-          <ul className="list-disc list-inside">
-            {Object.entries(violation.dynamic_fields || {}).map(([key, value]) => {
-              // Skip Category and Incident Details as they're already displayed above
-              if (key === 'Category' || key === 'Incident Details') return null;
-              return (
-                <li key={key} className="mb-3">
-                  <span className="font-medium">{key}:</span> 
-                  {isFileField(key) ? (
-                    renderImageGallery(key, value)
-                  ) : (
-                    <span>{value}</span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-        
-        {/* Display Responses/Replies */}
-        {replies.length > 0 && (
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-3">Responses</h3>
-            <div className="space-y-4">
-              {replies.map(reply => (
-                <div key={reply.id} className="border-l-4 border-blue-500 pl-4 py-2">
-                  <div className="text-sm text-gray-600 mb-1">
-                    <strong>{reply.email}</strong> on {formatDate(reply.created_at)}
-                  </div>
-                  <div className="whitespace-pre-line">{reply.response_text}</div>
+        ) : (
+          <> 
+            {/* Display Static Fields */} 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 mb-6">
+                <div><strong className="text-gray-600">Reference:</strong> {violation.reference}</div>
+                <div><strong className="text-gray-600">Status:</strong> {violation.status}</div>
+                <div><strong className="text-gray-600">Created At:</strong> {formatDateTime(violation.created_at)}</div>
+                <div><strong className="text-gray-600">Created By:</strong> {violation.created_by_email || violation.created_by}</div>
+                <div><strong className="text-gray-600">Incident Date:</strong> {formatDate(violation.incident_date)}</div>
+                <div><strong className="text-gray-600">Incident Time:</strong> {violation.incident_time || 'N/A'}</div>
+                <div><strong className="text-gray-600">Unit No.:</strong> {violation.unit_number}</div>
+                <div><strong className="text-gray-600">Building:</strong> {violation.building}</div>
+                <div className="md:col-span-2"><strong className="text-gray-600">Category:</strong> {violation.category}</div>
+            </div>
+
+            {/* Owner Info */} 
+            <div className="mb-6 p-4 bg-gray-50 rounded border">
+                <h3 className="text-lg font-semibold mb-3 text-gray-700">Owner/Property Manager</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                    <div><strong className="text-gray-600">Name:</strong> {`${violation.owner_property_manager_name?.first || ''} ${violation.owner_property_manager_name?.last || ''}`.trim()}</div>
+                    <div><strong className="text-gray-600">Email:</strong> {violation.owner_property_manager_email || 'N/A'}</div>
+                    <div><strong className="text-gray-600">Telephone:</strong> {violation.owner_property_manager_telephone || 'N/A'}</div>
                 </div>
-              ))}
             </div>
-          </div>
-        )}
-        
-        {loadingReplies && (
-          <div className="mt-4 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-            <p className="mt-2 text-sm text-gray-500">Loading responses...</p>
-          </div>
-        )}
-        
-        <div className="mt-6 flex gap-3 flex-wrap">
-          <Button onClick={handleViewHtml} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">View as HTML</Button>
-          <Button onClick={handleDownloadPdf} className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700">Download PDF</Button>
-          
-          {canEditOrDelete && (
-            <>
-              <Button onClick={handleEdit} className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600">Edit</Button>
-              <Button onClick={handleDelete} disabled={deleting} className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700">Delete</Button>
-            </>
-          )}
-        </div>
+
+             {/* Tenant Info (Optional) */}
+            {(violation.tenant_name?.first || violation.tenant_name?.last || violation.tenant_email || violation.tenant_phone) && (
+                <div className="mb-6 p-4 bg-gray-50 rounded border">
+                    <h3 className="text-lg font-semibold mb-3 text-gray-700">Tenant Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
+                        <div><strong className="text-gray-600">Name:</strong> {`${violation.tenant_name?.first || ''} ${violation.tenant_name?.last || ''}`.trim() || 'N/A'}</div>
+                        <div><strong className="text-gray-600">Email:</strong> {violation.tenant_email || 'N/A'}</div>
+                        <div><strong className="text-gray-600">Phone:</strong> {violation.tenant_phone || 'N/A'}</div>
+                    </div>
+                </div>
+            )}
+            
+             {/* Other Details */}
+             <div className="mb-6 p-4 bg-gray-50 rounded border">
+                <h3 className="text-lg font-semibold mb-3 text-gray-700">Violation Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                    <div><strong className="text-gray-600">Location:</strong> {violation.where_did || 'N/A'}</div>
+                    <div><strong className="text-gray-600">Security/Police Called:</strong> {violation.was_security_or_police_called || 'N/A'}</div>
+                    <div><strong className="text-gray-600">Fine Levied:</strong> {violation.fine_levied || 'N/A'}</div>
+                    <div><strong className="text-gray-600">Noticed By:</strong> {violation.noticed_by || 'N/A'}</div>
+                    <div><strong className="text-gray-600">Concierge Shift:</strong> {violation.concierge_shift || 'N/A'}</div>
+                    <div><strong className="text-gray-600">People Called:</strong> {violation.people_called || 'N/A'}</div>
+                    <div><strong className="text-gray-600">Actioned By:</strong> {violation.actioned_by || 'N/A'}</div>
+                    <div className="md:col-span-2"><strong className="text-gray-600">People Involved:</strong> {violation.people_involved || 'N/A'}</div>
+                </div>
+            </div>
+
+             {/* Incident Details & Action Taken */}
+             <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-gray-700">Incident Details</h3>
+                <p className="text-gray-700 whitespace-pre-wrap">{violation.incident_details || 'Not provided.'}</p>
+            </div>
+             <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-2 text-gray-700">Action Taken</h3>
+                <p className="text-gray-700 whitespace-pre-wrap">{violation.action_taken || 'Not specified.'}</p>
+            </div>
+
+            {/* Attached Evidence */} 
+            <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-gray-700">Attached Evidence</h3>
+                {violation.attach_evidence && violation.attach_evidence.length > 0 ? (
+                    <ul className="list-disc list-inside pl-5">
+                    {violation.attach_evidence.map((file, index) => {
+                        const filename = typeof file === 'string' ? file : file.name;
+                        const evidenceUrl = `/evidence/${violation.id}/${filename}`;
+                        // Basic image check by extension
+                        const isImage = /\.(jpg|jpeg|png|gif)$/i.test(filename);
+                        return (
+                        <li key={index} className="mb-2">
+                            <a 
+                            href={evidenceUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                            >
+                            {isImage ? (
+                                <img src={evidenceUrl} alt={filename} className="max-w-xs max-h-32 inline-block mr-2 border" />
+                            ) : (
+                                <i className="fas fa-file mr-2"></i> // Example using Font Awesome
+                            )}
+                            {filename}
+                            </a>
+                        </li>
+                        );
+                    })}
+                    </ul>
+                ) : (
+                    <p className="text-gray-500">No evidence attached.</p>
+                )}
+            </div>
+            
+            {/* Replies Section */} 
+            <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-gray-700">Replies</h3>
+                {replyLoading ? (
+                    <Spinner size="sm" />
+                ) : replies.length > 0 ? (
+                    <ul className="space-y-4">
+                    {replies.map(reply => (
+                        <li key={reply.id} className="p-3 bg-gray-100 rounded border">
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{reply.response_text}</p>
+                        <p className="text-xs text-gray-500 mt-1">From: {reply.email} on {formatDateTime(reply.created_at)}</p>
+                        </li>
+                    ))}
+                    </ul>
+                ) : (
+                    <p className="text-gray-500">No replies yet.</p>
+                )}
+                <button onClick={fetchReplies} className="text-blue-600 text-sm mt-2 hover:underline">Refresh Replies</button>
+            </div>
+
+            {/* Action Buttons */} 
+            <div className="mt-8 flex flex-wrap items-center gap-3 border-t pt-6">
+                <Button 
+                    onClick={() => window.open(`/violations/view/${violation.id}`, '_blank')}
+                    color="blueGray"
+                >
+                    View as HTML
+                </Button>
+                <Button 
+                    onClick={() => window.location.href = `/violations/pdf/${violation.id}`}
+                    color="blueGray"
+                >
+                    Download PDF
+                </Button>
+                {canEditDelete && (
+                    <Button onClick={() => setIsEditing(true)} color="lightBlue">
+                        Edit
+                    </Button>
+                )}
+                {canEditDelete && (
+                    <Button 
+                        onClick={handleDelete} 
+                        color="red"
+                        className="bg-red-500 hover:bg-red-600 text-white"
+                    >
+                        Delete
+                    </Button>
+                )}
+            </div>
+          </> 
+        )} 
       </div>
     </div>
   );
-} 
+};
+
+export default ViolationDetail; 

@@ -256,6 +256,18 @@ The system has fallback mechanisms for PDF generation failures:
 - Secure Cookies: SESSION_COOKIE_SECURE requires HTTPS in production. If users cannot stay logged in, check for mixed content or HTTP usage.
 - Re-authentication: Sensitive actions require password re-entry within 5 minutes. If users are prompted too often, adjust the timeout in the decorator.
 
+## Violation Detail Display
+
+- If static fields (owner, tenant, details, etc.) or evidence are missing, check `ViolationDetail.js` rendering logic and the `/api/violations/public/...` API response.
+
+## UUID URLs
+
+- Ensure links from `ViolationList.js` use `/violations/public/:publicId`. If detail pages fail to load, check the API endpoint and the `public_id` value.
+
+## Evidence Links
+
+- If evidence links (`/evidence/...`) are broken, verify the base path in `ViolationDetail.js` and the file serving logic in `violation_routes.py` (`get_evidence_file`).
+
 ---
 
 *Update this file immediately when new issues, bugs, or edge cases are discovered.* 

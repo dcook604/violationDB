@@ -1,7 +1,5 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import AdminFieldManager from './components/AdminFieldManager';
-import DynamicViolationForm from './components/DynamicViolationForm';
 import Login from './views/auth/Login';
 import Dashboard from './views/Dashboard';
 import { AuthProvider } from './context/AuthContext';
@@ -13,71 +11,95 @@ import Settings from './components/Settings';
 import Layout from './components/common/Layout';
 import LoadingOverlay from './components/common/LoadingOverlay';
 import API from './api';
+import StaticViolationForm from './components/StaticViolationForm';
 
 function NewViolationPage() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState('Submitting...'); // For more detailed feedback
   
   const handleSubmit = async (values) => {
     setIsSubmitting(true);
+    setSubmitMessage('Creating violation record...');
+    
+    // 1. Separate files from other data
+    const { attach_evidence, ...violationData } = values;
+    const filesToUpload = attach_evidence || [];
+    
+    let violationId = null;
+
     try {
-      const response = await API.post('/api/violations', values);
+      // 2. Create the violation record (without files)
+      const createResponse = await API.post('/api/violations', violationData);
       
-      // If there are file uploads, this might take a moment
-      if (response.data && response.data.id) {
-        // Return the response data for file uploads
-        const result = response.data;
-        
-        // If we have files to upload, display a different message
-        if (Object.keys(values.files || {}).length > 0) {
-          // The file upload will happen in DynamicViolationForm after submission
-          // We'll keep the loading state active during file uploads
-        } else {
-          // If no files to upload, we're done
-          setIsSubmitting(false);
-          // Navigate to the newly created violation
-          navigate(`/violations/${response.data.id}`);
-        }
-        return result;
-      } else {
-        setIsSubmitting(false);
-        navigate('/violations');
+      if (!createResponse.data || !createResponse.data.id) {
+        throw new Error('Failed to create violation record. No ID received.');
       }
-    } catch (error) {
+      violationId = createResponse.data.id;
+      console.log('Violation created with ID:', violationId);
+
+      // 3. Upload files if they exist
+      if (filesToUpload.length > 0) {
+        setSubmitMessage(`Uploading ${filesToUpload.length} evidence file(s)...`);
+        const formData = new FormData();
+        filesToUpload.forEach((file) => {
+          // The backend expects files under the key 'files'
+          formData.append('files', file);
+        });
+
+        // Use the field name 'attach_evidence' as a query parameter
+        // if your backend endpoint /api/violations/<id>/upload requires it.
+        // Check the api_upload_files route in violation_routes.py
+        // It currently expects `request.args.get('field')`, but we might not need it
+        // if we only have one file field. Let's omit it for now unless errors occur.
+        try {
+          const uploadResponse = await API.post(`/api/violations/${violationId}/upload`, formData, {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          });
+          console.log('File upload response:', uploadResponse.data);
+          if (uploadResponse.data.warnings && uploadResponse.data.warnings.length > 0) {
+             // Optionally alert user about non-critical upload warnings
+             console.warn("File upload warnings:", uploadResponse.data.warnings);
+          }
+        } catch (uploadError) {
+            console.error('File upload failed:', uploadError.response ? uploadError.response.data : uploadError);
+             // Decide how to handle upload failure: proceed with navigation? Show blocking error?
+            // For now, log the error and proceed, but alert the user.
+            alert(`Violation created (ID: ${violationId}), but evidence upload failed. Please try uploading files later via the edit page.\nError: ${uploadError.response?.data?.error || uploadError.message}`);
+             // Skip navigation or navigate anyway?
+             // Let's navigate but the user knows files failed.
+        }
+      }
+
+      // 4. Success - Navigate to the new violation detail page
+      setSubmitMessage('Success!');
       setIsSubmitting(false);
-      console.error('Error creating violation:', error);
-      alert('Failed to create violation: ' + (error.message || 'Unknown error'));
+      navigate(`/violations/${violationId}`);
+
+    } catch (error) {
+      // Handle errors from either creation or upload step
+      setIsSubmitting(false);
+      setSubmitMessage('Submission failed.'); // Reset message
+      console.error('Error during violation submission process:', error.response ? error.response.data : error);
+      alert('Failed to submit violation: ' + (error.response?.data?.error || error.message || 'Unknown error'));
+       // Do not navigate on error
     }
   };
   
-  // This callback will be called after file uploads complete
-  const handleFileUploadsComplete = () => {
-    setIsSubmitting(false);
-    // Now navigate to the violation page
-    if (window.latestViolationId) {
-      navigate(`/violations/${window.latestViolationId}`);
-    } else {
-      navigate('/violations');
-    }
-  };
+  // Remove handleFileUploadsComplete as it's no longer needed with this flow
+  // const handleFileUploadsComplete = () => { ... };
   
   return (
     <Layout>
-      {/* Loading overlay - show different messages based on the stage */}
       <LoadingOverlay 
         isLoading={isSubmitting} 
-        message={
-          window.isUploadingFiles 
-            ? "Uploading files... Please wait" 
-            : "Creating violation... Please wait"
-        } 
+        message={submitMessage} // Use the dynamic message
       />
-      
-      <h2 className="text-2xl font-bold mb-4">Create New Violation</h2>
-      <DynamicViolationForm 
+      <StaticViolationForm 
         onSubmit={handleSubmit} 
         submitLabel="Create Violation" 
-        onFileUploadsComplete={handleFileUploadsComplete}
       />
     </Layout>
   );
@@ -96,7 +118,6 @@ function App() {
           <Route path="/dashboard" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
           
           {/* Admin Routes */}
-          <Route path="/admin" element={<AdminRoute><Layout><AdminFieldManager /></Layout></AdminRoute>} />
           <Route path="/admin/users" element={<AdminRoute><Layout><UserManagement /></Layout></AdminRoute>} />
           <Route path="/admin/settings" element={<AdminRoute><Layout><Settings /></Layout></AdminRoute>} />
           
@@ -116,7 +137,14 @@ function App() {
           <Route path="/violations/:id" element={
             <PrivateRoute>
               <Layout>
-                <ViolationDetail />
+                <ViolationDetail usePublicId={false} />
+              </Layout>
+            </PrivateRoute>
+          } />
+          <Route path="/violations/public/:publicId" element={
+            <PrivateRoute>
+              <Layout>
+                <ViolationDetail usePublicId={true} />
               </Layout>
             </PrivateRoute>
           } />

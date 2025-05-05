@@ -449,3 +449,10 @@ If you need to allow external images or fonts, update the policy in the template
 - **Idle Timeout:** 30 minutes (IDLE_TIMEOUT_MINUTES in config.py)
 - **Secure Cookies:** SESSION_COOKIE_SECURE, SESSION_COOKIE_HTTPONLY, SESSION_COOKIE_SAMESITE
 - **Re-authentication:** Sensitive actions require password re-entry within 5 minutes (@require_recent_password in auth_routes.py) 
+
+## API Endpoints (2024-06)
+- `GET /api/violations/public/<uuid:public_id>`: Fetch violation details using public UUID.
+- `/evidence/<violation_id>/<filename>`: Securely serve attached evidence files.
+
+## Frontend Routes (2024-06)
+- `/violations/public/:publicId`: Violation detail page using public UUID. 

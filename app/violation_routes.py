@@ -14,7 +14,7 @@ violation_bp = Blueprint('violations', __name__)
 
 CUSTOM_FIELDS_PATH = os.path.join(os.path.dirname(__file__), 'custom_violation_fields.json')
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads')
-ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'gif'}
+ALLOWED_EXTENSIONS = {'jpg', 'jpeg', 'png', 'pdf', 'docx', 'xlsx', 'txt'}  # Must match allowed MIME types in utils.py
 
 # Create uploads directory if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -373,6 +373,7 @@ def api_upload_files(vid):
         
         # Process each file
         saved_files = []
+        file_results = []
         errors = []
         
         for file in request.files.getlist('files'):
@@ -1291,3 +1292,80 @@ def api_violation_status_log(vid):
             'timestamp': log.timestamp.isoformat()
         } for log in logs
     ])
+
+@violation_bp.route('/api/violations/public/<uuid:public_id>', methods=['GET'])
+@login_required
+def api_violation_detail_public(public_id):
+    """Fetch violation details using the public UUID."""
+    # Convert UUID object to string for filtering
+    public_id_str = str(public_id)
+    v = Violation.query.filter_by(public_id=public_id_str).first_or_404()
+    # Reuse the existing detail logic by calling the ID-based endpoint internally
+    # Or duplicate the logic here for clarity
+    if not (current_user.is_admin or v.created_by == current_user.id):
+        return jsonify({'error': 'Forbidden'}), 403
+    from .models import User
+    creator = User.query.get(v.created_by) if v.created_by else None
+    creator_email = creator.email if creator else None
+    field_values = ViolationFieldValue.query.filter_by(violation_id=v.id).all()
+    dynamic_fields = {}
+    for fv in field_values:
+        field_def = fv.field_definition
+        if field_def: # Check if field_def exists
+           dynamic_fields[field_def.name] = fv.value
+    try:
+        created_at = v.created_at.isoformat() if v.created_at else None
+    except: created_at = str(v.created_at) if v.created_at else None
+    try:
+        incident_date = v.incident_date.isoformat() if v.incident_date else None
+    except: incident_date = str(v.incident_date) if v.incident_date else None
+    owner_property_manager_name = {'first': v.owner_property_manager_first_name or '', 'last': v.owner_property_manager_last_name or ''}
+    tenant_name = {'first': v.tenant_first_name or '', 'last': v.tenant_last_name or ''}
+    attach_evidence = []
+    if v.attach_evidence:
+        try:
+            evidence_files = json.loads(v.attach_evidence)
+            if isinstance(evidence_files, list):
+                attach_evidence = evidence_files
+        except Exception as e:
+            current_app.logger.error(f"Error parsing attach_evidence for violation {v.id}: {str(e)}")
+    result = {
+        'id': v.id,
+        'public_id': v.public_id,
+        'reference': v.reference,
+        'category': v.category,
+        'building': v.building,
+        'unit_number': v.unit_number,
+        'incident_date': incident_date,
+        'incident_time': v.incident_time,
+        'subject': v.subject,
+        'details': v.details,
+        'created_at': created_at,
+        'created_by': v.created_by,
+        'created_by_email': creator_email,
+        'dynamic_fields': dynamic_fields, # Keep for potential legacy data
+        'html_path': f"/violations/view/{v.id}" if hasattr(v, 'html_path') and v.html_path else None,
+        'pdf_path': f"/violations/pdf/{v.id}" if hasattr(v, 'pdf_path') and v.pdf_path else None,
+        'status': v.status,
+        'owner_property_manager_name': owner_property_manager_name,
+        'owner_property_manager_email': v.owner_property_manager_email,
+        'owner_property_manager_telephone': v.owner_property_manager_telephone,
+        'where_did': v.where_did,
+        'was_security_or_police_called': v.was_security_or_police_called,
+        'fine_levied': v.fine_levied,
+        'action_taken': v.action_taken,
+        'tenant_name': tenant_name,
+        'tenant_email': v.tenant_email,
+        'tenant_phone': v.tenant_phone,
+        'concierge_shift': v.concierge_shift,
+        'noticed_by': v.noticed_by,
+        'people_called': v.people_called,
+        'actioned_by': v.actioned_by,
+        'people_involved': v.people_involved,
+        'incident_details': v.incident_details,
+        'attach_evidence': attach_evidence
+    }
+    result['violation_category'] = v.category
+    result['unit_no'] = v.unit_number
+    result['time'] = v.incident_time
+    return jsonify(result)

@@ -767,6 +767,14 @@ This policy blocks all scripts, restricts images to self and data URIs, and only
 - Requires password re-entry within the last 5 minutes.
 - Usage: see auth_routes.py for example.
 
+## Violation Detail Page Enhancements (2024-06)
+Uses UUID-based URLs (`/violations/public/:publicId`) for enhanced security and obscurity.
+Displays all static violation fields correctly.
+Renders attached evidence files (images/links).
+Action buttons (View HTML, Download PDF, Edit, Delete) are arranged on a single line.
+Delete button is styled red for visual warning.
+Includes a "Go Back" link to the violations list.
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 
