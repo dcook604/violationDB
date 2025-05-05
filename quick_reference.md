@@ -1,11 +1,29 @@
 # Quick Reference
 
-This file provides a quick reference for parameters, configurations, and usage examples for the Strata Violation Log application.
+This document provides a quick reference for parameters, configuration settings, and common commands.
 
 ## Login Form Fields
 - **email**: User's email address (required)
 - **password**: User's password (required)
 - **remember**: Boolean checkbox for persistent login
+
+## React Login Component
+Location: `frontend/src/views/auth/Login.js`
+
+### Usage
+The login form is implemented as a React component and uses the following fields:
+- **email**: User's email address (required)
+- **password**: User's password (required)
+
+Example:
+```jsx
+import Login from './views/auth/Login';
+<Login />
+```
+
+### Logo Handling
+- The login form displays a logo using the path `/logospectrum.png`.
+- If the logo fails to load, a base64-encoded fallback image is shown automatically.
 
 ## Example Usage
 ```html
@@ -362,6 +380,43 @@ python test_flask_email.py recipient@example.com
 - **587**: SMTP with STARTTLS
 - **2525**: Alternative SMTP port (useful when 25 is blocked)
 
+## Static Violation Fields (2024)
+
+| API Parameter Name                 | Type      | Description                                 |
+|------------------------------------|-----------|---------------------------------------------|
+| date_of_violation                  | Date      | Date of violation (YYYY-MM-DD)              |
+| time                               | String    | Time of violation (HH:MM)                   |
+| unit_no                            | String    | Unit number                                 |
+| building                           | String    | Building name                               |
+| owner_property_manager_first_name   | String    | First name of owner/property manager        |
+| owner_property_manager_last_name    | String    | Last name of owner/property manager         |
+| owner_property_manager_email        | String    | Email of owner/property manager             |
+| owner_property_manager_telephone    | String    | Telephone of owner/property manager         |
+| violation_category                  | String    | Violation category                          |
+| where_did                          | String    | Location of violation                       |
+| was_security_or_police_called       | String    | Security/Police involvement                 |
+| fine_levied                        | String    | Fine levied                                 |
+| incident_details                    | Text      | Incident details (long text)                |
+| action_taken                        | Text      | Action taken                                |
+| tenant_first_name                   | String    | Tenant first name                           |
+| tenant_last_name                    | String    | Tenant last name                            |
+| tenant_email                        | String    | Tenant email                                |
+| tenant_phone                        | String    | Tenant phone                                |
+| concierge_shift                     | String    | Concierge shift                             |
+| noticed_by                          | String    | Who noticed the violation                   |
+| people_called                       | String    | People called                               |
+| actioned_by                         | String    | Who actioned                                |
+| people_involved                     | String    | People involved                             |
+| attach_evidence                     | Text/JSON | File metadata/paths                         |
+| status                              | String    | Violation status                            |
+
 ---
 
 *Update this file as new parameters, configurations, or usage examples are added or changed.* 
+
+Note: The system now uses only static fields and the status field is editable after creation in the violation detail/edit page. 
+
+## Frontend Assets & Branding
+
+- **Login page logo:** `frontend/public/logospectrum.png`
+- **To change:** Replace the file and rebuild the frontend. 

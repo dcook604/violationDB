@@ -1,6 +1,6 @@
 # Implementation Details
 
-This file contains technical specifics about the Strata Violation Log application, including architecture, dependencies, and implementation notes.
+This document details the technical specifics, implementation decisions, and rationale behind the codebase.
 
 ## Architecture
 - Flask-based web application
@@ -153,6 +153,16 @@ When creating new components or modifying existing ones:
 .font-bold /* Bold text */
 .uppercase /* Uppercase text */
 ```
+
+### Login Component (React SPA)
+The login page is now implemented as a React SPA component in `frontend/src/views/auth/Login.js`.
+
+- Uses React hooks (`useState`) for managing form state and error messages.
+- Integrates with `AuthContext` for authentication logic (`login`).
+- Utilizes `useNavigate` from `react-router-dom` for navigation after login.
+- Displays a logo with a base64 fallback for branding and reliability.
+- Handles error display and form validation (email and password required).
+- All authentication is handled via API calls to the backend; the Flask/Jinja2 login template is no longer used for user login.
 
 ## API Error Handling Patterns
 
@@ -539,6 +549,178 @@ The system uses a comprehensive User model to store and manage user accounts:
   - Account lockout after 10 failed attempts
   - Temporary password functionality for resets
   - Session tracking with idle and absolute timeouts
+
+## StaticViolationForm Implementation (2024 Migration)
+
+### Field Structure
+The static violation form includes the following fields:
+- Date of Violation (date, required)
+- Time (time, required)
+- Unit No. (number, required)
+- Building (dropdown: Townhouse, Apartment, required)
+- Owner/Property Manager Name (first, last, required)
+- Owner/Property Manager Email (email, required)
+- Owner/Property Manager Telephone (phone, required)
+- Violation Category (dropdown, required)
+- Where did this violation happen? (dropdown, required)
+- Was Security or Police called? (dropdown, required)
+- Fine Levied (dropdown, required)
+- Incident Details (textarea, required)
+- Action Taken (textarea, required)
+- Tenant Name (first, last, optional)
+- Tenant Email (email, optional)
+- Tenant Phone (phone, optional)
+- Concierge Shift (text, optional)
+- Noticed By (text, optional)
+- People Called (text, optional)
+- Actioned By (text, optional)
+- People Involved (textarea, optional)
+- Attach Evidence (file upload, multiple, optional)
+
+### Validation
+- All required fields are enforced on the client and server.
+- Email and phone fields use format validation.
+- Dropdowns only accept the specified options.
+- File uploads are limited by type, size, and count.
+
+### Backend/API Changes
+- The violation creation endpoint now expects only the above static fields.
+- Dynamic field logic is deprecated but legacy data remains accessible.
+- File uploads are handled as part of the static form submission.
+
+### Example API Payload
+```
+{
+  "date_of_violation": "2024-06-01",
+  "time": "14:30",
+  "unit_no": "101",
+  "building": "Apartment",
+  "owner_property_manager_name": {"first": "Jane", "last": "Doe"},
+  "owner_property_manager_email": "jane@example.com",
+  "owner_property_manager_telephone": "(555) 123-4567",
+  "violation_category": "Noise Complaint",
+  "where_did": "Unit",
+  "was_security_or_police_called": "Security",
+  "fine_levied": "$100.00",
+  "incident_details": "Loud noise reported at 2:30pm.",
+  "action_taken": "Warning issued.",
+  "tenant_name": {"first": "John", "last": "Smith"},
+  "tenant_email": "john@example.com",
+  "tenant_phone": "(555) 987-6543",
+  "concierge_shift": "Evening",
+  "noticed_by": "Concierge",
+  "people_called": "Security",
+  "actioned_by": "Manager",
+  "people_involved": "John Smith, Jane Doe",
+  "attach_evidence": [/* file objects */]
+}
+```
+
+### 2024 Update: StaticViolationForm Integration
+
+- The `DynamicViolationForm` component has been fully replaced by `StaticViolationForm` in the violation creation workflow (`/violations/new`).
+- All new violations are now created using the static, hardcoded field structure.
+- The parent page (`NewViolationPage` in `App.js`) now imports and renders `StaticViolationForm`, passing the required `onSubmit` handler and label.
+- File uploads and validation are handled internally by the new component.
+- This change improves maintainability and ensures all new violations conform to the updated schema.
+
+- 2024-06: Form optimization for StaticViolationForm:
+  - Grouped required violation details at the top, followed by owner/manager info, tenant info, other details, then incident details, action taken, file upload, and submit.
+  - Added section headings for clarity.
+  - Added aria-labels and htmlFor for accessibility.
+  - Implemented scroll-to-first-error on submit for better UX.
+  - Improved mobile responsiveness and visual hierarchy.
+
+- 2024-06: The 'Create New Violation' heading was removed from the static violation form page (`/violations/new`) for a cleaner UI, as per user request.
+
+- 2024-06: Owner/Property Manager Telephone and Tenant Phone fields are now left-aligned directly under their respective name fields for improved clarity and compactness.
+
+- 2024-06: Police Report No. field removed from the static violation form for clarity and simplicity.
+
+- 2024-06: Added 'status' field to violations.
+  - Options: Open, Closed-No Fine Issued, Closed-Fines Issued, Pending Owner Response, Pending Council Response, Reject.
+  - Default: 'Open' on creation. Dropdown is disabled on create, editable on edit.
+  - All users can change status after creation.
+  - Backend: Requires new DB column, API support, and a status change log (violation_status_log table: violation_id, old_status, new_status, changed_by, timestamp).
+  - Status changes are logged for audit/history.
+
+- 2024-06: Removed all dynamic field management and AdminFieldManager. The system now uses only static fields for violations. The field manager UI and related backend endpoints/models have been removed. Status is now editable in the violation detail/edit page for all users, and all status changes are logged for audit/history.
+
+# Static Violation Field Expansion (2024)
+
+## New Violation Model Fields
+The following fields have been added to the `Violation` model and database as of June 2024:
+
+| Field Name                        | Type    | Description                                 |
+|-----------------------------------|---------|---------------------------------------------|
+| owner_property_manager_first_name | String  | First name of owner/property manager        |
+| owner_property_manager_last_name  | String  | Last name of owner/property manager         |
+| owner_property_manager_email      | String  | Email of owner/property manager             |
+| owner_property_manager_telephone  | String  | Telephone of owner/property manager         |
+| where_did                         | String  | Location of violation                       |
+| was_security_or_police_called     | String  | Security/Police involvement                 |
+| fine_levied                       | String  | Fine levied                                 |
+| action_taken                      | Text    | Action taken                                |
+| tenant_first_name                 | String  | Tenant first name                           |
+| tenant_last_name                  | String  | Tenant last name                            |
+| tenant_email                      | String  | Tenant email                                |
+| tenant_phone                      | String  | Tenant phone                                |
+| concierge_shift                   | String  | Concierge shift                             |
+| noticed_by                        | String  | Who noticed the violation                   |
+| people_called                     | String  | People called                               |
+| actioned_by                       | String  | Who actioned                                |
+| people_involved                   | String  | People involved                             |
+| incident_details                  | Text    | Incident details (long text)                |
+| attach_evidence                   | Text/JSON | File metadata/paths (see below)           |
+
+- All fields are nullable except where required by the frontend form.
+- `attach_evidence` stores file metadata/paths as a JSON-encoded string or text.
+
+## Alembic Migration
+A migration script is required to add these columns to the `violations` table. See the migrations directory for details.
+
+## API Payload Example (2024)
+```
+{
+  "date_of_violation": "2024-06-01",
+  "time": "14:30",
+  "unit_no": "101",
+  "building": "Apartment",
+  "owner_property_manager_first_name": "Jane",
+  "owner_property_manager_last_name": "Doe",
+  "owner_property_manager_email": "jane@example.com",
+  "owner_property_manager_telephone": "(555) 123-4567",
+  "violation_category": "Noise Complaint",
+  "where_did": "Unit",
+  "was_security_or_police_called": "Security",
+  "fine_levied": "$100.00",
+  "incident_details": "Loud noise reported at 2:30pm.",
+  "action_taken": "Warning issued.",
+  "tenant_first_name": "John",
+  "tenant_last_name": "Smith",
+  "tenant_email": "john@example.com",
+  "tenant_phone": "(555) 987-6543",
+  "concierge_shift": "Evening",
+  "noticed_by": "Concierge",
+  "people_called": "Security",
+  "actioned_by": "Manager",
+  "people_involved": "John Smith, Jane Doe",
+  "attach_evidence": [/* file objects or metadata */],
+  "status": "Open"
+}
+```
+
+## Validation
+- All required fields are enforced on both client and server.
+- Email and phone fields use format validation.
+- Dropdowns only accept the specified options.
+- File uploads are limited by type, size, and count.
+
+## Authentication UI and Branding
+
+- The login page imports and displays the Spectrum 4 logo from `/logospectrum.png` (in the public directory).
+- CSS ensures the logo is centered, visually separated, and works with both light and dark themes.
+- If the logo fails to load, a fallback is shown.
 
 ---
 

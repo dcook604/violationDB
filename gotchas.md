@@ -1,6 +1,6 @@
-# Gotchas & Edge Cases
+# Gotchas
 
-This file documents known issues, edge cases, and warnings for the Strata Violation Log application.
+This document lists known edge cases, caveats, workarounds, and potential issues.
 
 ## Known Issues
 - **F-string Backslash Escape Sequences**: Python f-strings cannot contain backslash escape sequences like `\n` in expression parts. These need to be handled separately using regular strings and `.format()` or by pre-formatting the content before including it in the f-string.
@@ -9,6 +9,8 @@ This file documents known issues, edge cases, and warnings for the Strata Violat
 
 ## Edge Cases
 - Login form: If the user submits an invalid email or password, the first error is displayed using flash messages or inline feedback.
+- Login form (React): If the user submits an invalid email or password, the error is displayed inline below the form. The form requires both fields before submission.
+- Login logo: If the logo fails to load from the path, a base64 fallback image is displayed automatically for reliability.
 - CSRF: All forms must include CSRF tokens to prevent cross-site request forgery.
 - Dynamic fields: If a field definition is changed (e.g., type or required status), existing violation records may have incompatible or missing values. UI and API should handle such cases gracefully.
 - Deleting field definitions: Deleting a field definition should either cascade to field values or mark the field as inactive to preserve data integrity.
@@ -28,6 +30,12 @@ This file documents known issues, edge cases, and warnings for the Strata Violat
 - Dynamic fields are returned as a nested object; if field definitions change, frontend may need to handle missing/extra columns.
 - The /api/violations/:id endpoint is role-protected. Only admins or the creator can edit or delete a violation.
 - When editing, ensure dynamic field names match backend definitions; missing fields may be lost if not included in the update.
+
+## Login Logo Troubleshooting
+
+- If the login logo does not appear, ensure `logospectrum.png` exists in the public directory and is referenced with the correct path in the Login component.
+- If the logo fails to load, a fallback will be shown, but check for typos or missing files if you want your custom branding.
+- In the React login form, the base64 fallback ensures a logo is always shown even if the file is missing or the path is incorrect.
 
 ## Database Schema Inconsistencies
 
@@ -215,6 +223,22 @@ The system has fallback mechanisms for PDF generation failures:
 - **Reply Storage Growth**: The `violation_replies` table will grow over time as more responses are added. Consider implementing archiving strategies for very old violations.
 - **IP Address Privacy**: IP addresses stored with replies might be considered personal data under privacy regulations like GDPR. Ensure your data retention policies account for this.
 - **Missing Relationships**: If a violation is deleted, all its replies should be deleted as well (cascading delete). This is implemented through the foreign key constraint but verify this behavior in testing.
+
+## Static Violation Form Migration (2024)
+
+- **Legacy Data:** Old violations with dynamic fields remain viewable. If a legacy field is not present in the static form, it will be displayed in a read-only/legacy section.
+- **File Uploads:** File uploads are limited to specific types and sizes. If users encounter browser compatibility issues, recommend using Chrome or Firefox.
+- **Dropdown Options:** If dropdown options need to change, a code update and redeployment is required. There is no longer a UI for admin-driven field changes.
+
+# Static Violation Field Expansion (2024) - Gotchas & Edge Cases
+
+- **Legacy Violations:** Violations created before June 2024 may not have values for the new static fields. API and UI must handle missing/null values gracefully.
+- **File Uploads:** The `attach_evidence` field stores file metadata/paths as JSON or text. Ensure backward compatibility with any legacy file storage formats.
+- **Migration:** The Alembic migration must be applied to all environments before deploying the updated code. If the migration is skipped, new violations will fail to save.
+- **API Backward Compatibility:** API consumers expecting the old dynamic field structure must be updated to use the new static field names.
+- **Validation:** Some fields are required in the frontend but nullable in the database for legacy compatibility. Always validate on both client and server.
+- **Data Consistency:** Ensure that all new fields are included in API responses and are properly mapped in the model's `to_dict()` method.
+- **Testing:** Test both creation and retrieval of violations with and without the new fields to ensure robust handling of all cases.
 
 ---
 

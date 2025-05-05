@@ -1,5 +1,7 @@
 # Mental Model
 
+This document describes the high-level conceptual model and architecture of the system.
+
 This file documents the conceptual understanding of the Strata Violation Log application. It provides high-level insights into the system's purpose, user flows, and core design principles.
 
 ## Purpose
@@ -12,7 +14,7 @@ The Strata Violation Log is designed to manage, track, and resolve violations wi
 - **Role Management:** Different user roles (e.g., admin, resident) with varying permissions.
 
 ## User Flows
-- Login via the login page (`login.html`).
+- Login via the login page, now implemented as a React SPA component (`frontend/src/views/auth/Login.js`). The login form uses a logo with a base64 fallback for improved reliability and branding.
 - Access violation records based on user role.
 - Admins can manage users and resolve violations.
 
@@ -56,6 +58,53 @@ Violations follow a defined lifecycle managed through the "Status" dynamic field
    - Resolved violations (any other status value)
    - This provides clear progress tracking for violation management
 
+## Migration from Dynamic to Static Violation Forms
+
+### Overview
+The violation creation process has transitioned from a dynamic, backend-driven field model to a static, hardcoded form. This change was made to improve maintainability, user experience, and validation reliability.
+
+### Rationale
+- **Simplicity:** Static forms are easier to reason about and maintain.
+- **Predictability:** All fields, validation, and options are known at build time.
+- **UX:** Users interact with a consistent, well-validated form.
+
+### Legacy Data
+- Existing violation records created with dynamic fields remain viewable and accessible.
+- The system preserves backward compatibility for legacy data display, but new violations use only the static field set.
+
+## Static Violation Field Expansion (2024)
+
+## Overview
+In June 2024, the system migrated from dynamic violation fields to a fully static, hardcoded field structure for all new violations. This change was made to improve maintainability, data integrity, and user experience. All static fields are now first-class columns in the `Violation` model and database.
+
+## New Static Fields Added
+The following fields are now directly stored in the `Violation` model:
+- owner_property_manager_first_name
+- owner_property_manager_last_name
+- owner_property_manager_email
+- owner_property_manager_telephone
+- where_did
+- was_security_or_police_called
+- fine_levied
+- action_taken
+- tenant_first_name
+- tenant_last_name
+- tenant_email
+- tenant_phone
+- concierge_shift
+- noticed_by
+- people_called
+- actioned_by
+- people_involved
+- incident_details
+- attach_evidence (file metadata/paths)
+
+## Conceptual Impact
+- All violation data is now stored in a predictable, queryable schema.
+- Legacy violations created with dynamic fields remain accessible, but new violations use only the static field set.
+- The system is now easier to maintain, audit, and extend for future requirements.
+- API payloads and frontend forms are now tightly coupled to the static schema, improving validation and reliability.
+
 ## Dynamic Violation Fields (Extension)
 
 To support evolving requirements, the system allows admin users to define custom fields for violations. These fields are dynamic and can be managed (added, edited, reordered, toggled) via an admin interface. Each violation record can store values for these custom fields, enabling flexible data capture without code changes.
@@ -93,6 +142,7 @@ The application follows the Notus React theme design system, which is built on t
    - Clean, centered login form
    - Clear error feedback
    - Smooth transitions
+   - React SPA implementation with logo and base64 fallback for branding and reliability
 
 2. Navigation
    - Fixed top navigation
@@ -182,6 +232,11 @@ The secure URL system is designed to be transparent to end users while providing
    - System tracks access through these secure links for audit purposes
 
 The mental model for users remains focused on violation reference numbers (e.g., "VIO-20250502-C8A424") as the primary identifier in the UI, while the system uses secure UUIDs for all technical operations and URLs.
+
+## User Experience and First Impressions
+
+- The login page is branded with the Spectrum 4 logo for consistency and professionalism.
+- Branding is loaded from `frontend/public/logospectrum.png` and is visible above the sign-in form.
 
 ---
 
