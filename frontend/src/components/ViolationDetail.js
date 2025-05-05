@@ -102,7 +102,7 @@ const ViolationDetail = ({ usePublicId = false }) => {
     <div className="p-4 md:p-8">
        {/* Go Back Link */} 
        <div className="mb-4">
-         <Link to="/violations" className="text-blue-600 hover:underline text-sm">
+         <Link to="/r/7a9c3b5d2f1e" className="text-blue-600 hover:underline text-sm">
            &larr; Back to Violations List
          </Link>
        </div>

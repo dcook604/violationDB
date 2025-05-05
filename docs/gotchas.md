@@ -257,3 +257,60 @@ The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user 
    - When creating custom route protection components, they should utilize router hooks
    - These components must be rendered inside Routes/Route components
    - They cannot be implemented at the same level as the Router component 
+
+## Path Obfuscation Implementation
+
+### Route Handling Approach
+
+**Issue:** Dynamic route obfuscation can lead to 404 errors when there are mismatches between how routes are generated and how they're defined in React Router.
+
+**Solution:** Use hardcoded obfuscated routes in both App.js and Layout.js rather than dynamically calculating them with the obfuscateRoute function at runtime. This ensures that the routes used in the Router component match exactly with what's expected.
+
+### Browser Compatibility
+
+**Issue:** Node.js-specific crypto libraries are not available in browser environments and can cause runtime errors.
+
+**Solution:** Instead of dynamically generating route hashes using the crypto module, use a fixed dictionary of predefined route mappings. The current implementation in routeMapper.js maintains a fixed map of routes to obfuscated paths, which ensures consistent URLs across sessions and avoids browser compatibility issues.
+
+**Note for development:** If you need to add new routes, you can generate their hashed values offline or use the `js-sha256` library directly as shown in the `generateHash` function.
+
+### Bookmarking and Deep Linking
+
+**Issue:** Because route paths are generated using a hash, changing the hashing method or values will invalidate all existing bookmarks and external links.
+
+**Solution:** The fixed dictionary approach maintains URL stability. If routes need to be changed, consider implementing a redirect system for legacy URLs.
+
+### Route Parameters with Obfuscated Paths
+
+**Issue:** Dynamic route parameters (like IDs) can be tricky to handle with obfuscated paths.
+
+**Solution:** Our implementation handles parameters by preserving them after the hashed base path. For example, `/violations/:id` becomes `/r/7a9c3b5d2f1e/:id`. Ensure all route handlers correctly extract and process these parameters.
+
+### Browser History and Navigation
+
+**Issue:** The browser history shows obfuscated paths rather than user-friendly routes.
+
+**Solution:** This is an inherent limitation of the approach. If user-readable history is important, consider implementing a separate mechanism to attach readable titles to history entries using the History API's state object.
+
+### Development vs. Production Environments
+
+**Issue:** Different implementations between development and production can lead to inconsistent behavior.
+
+**Solution:** Use the same fixed dictionary approach in all environments to ensure consistency. For adding new routes during development, use the provided `generateHash` utility function to generate consistent hash values.
+
+### UI Component Integration
+
+**Issue:** Some UI elements may be missing from standard pages.
+
+**Solution:** When implementing authentication flows, ensure all essential UI components are present. For example, the Login page needs to include a "Forgot password?" link that points to the ForgotPasswordPage component. Missing this link breaks the password reset flow from a user perspective, even if the backend functionality works correctly.
+
+### Direct Path References
+
+**Issue:** Direct path references (e.g., `/units/new` or `/units/${unit.unit_number}`) in components like Link or navigate() will bypass the path obfuscation system and result in 404 errors.
+
+**Solution:** Always use the obfuscated paths directly in Link components and navigation functions. For example, use `/r/b4d6e8f2a1c3/new` instead of `/units/new` when creating links to the unit creation page. Similarly, use `/r/b4d6e8f2a1c3/${unit.unit_number}` instead of `/units/${unit.unit_number}` for accessing unit details.
+
+**Important reminders:**
+- When adding new features, check all Link components and navigation calls to ensure they use obfuscated paths
+- Test direct URL access to all routes to verify they work correctly
+- If new routes are added, remember to update both App.js and routeMapper.js 

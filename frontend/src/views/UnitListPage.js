@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import API from '../api';
-import UnitList from '../components/UnitList'; // Fixed: UnitList is directly in the components directory
+import UnitList from '../components/units/UnitList'; // Component to display the list
 import Spinner from '../components/common/Spinner';
 import Button from '../components/common/Button';
 import { useAuth } from '../context/AuthContext'; // Corrected path
+import { obfuscateRoute } from '../utils/routeMapper'; // Import for route mapping
 
 export default function UnitListPage() {
   const [units, setUnits] = useState([]);
@@ -17,10 +18,15 @@ export default function UnitListPage() {
       setLoading(true);
       setError('');
       try {
+        console.log('Fetching units from API...');
         const response = await API.get('/api/units');
+        console.log('Units API response:', response);
         setUnits(response.data || []);
       } catch (err) {
-        setError('Failed to load unit list. ' + (err.response?.data?.error || err.message));
+        console.error('Error fetching units:', err);
+        const errorMessage = err.response?.data?.error || err.message || 'An unexpected error occurred';
+        const detailedMessage = err.response?.data?.message ? ` - ${err.response.data.message}` : '';
+        setError(`Failed to load unit list. ${errorMessage}${detailedMessage}`);
         setUnits([]); // Clear units on error
       }
       setLoading(false);
@@ -34,7 +40,7 @@ export default function UnitListPage() {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Unit Profiles</h2>
         {user?.role === 'admin' && (
-          <Link to="/units/new"> {/* Assuming a future /units/new route for creation */}
+          <Link to="/r/b4d6e8f2a1c3/new"> {/* Using the obfuscated units path with /new */}
             <Button color="lightBlue">
                <i className="fas fa-plus mr-2"></i> Create New Unit
             </Button>

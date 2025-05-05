@@ -38,7 +38,7 @@ const UnitList = ({ units }) => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <Link to={`/units/${unit.unit_number}`} className="text-indigo-600 hover:text-indigo-900 mr-4">View</Link>
+                  <Link to={`/r/b4d6e8f2a1c3/${unit.unit_number}`} className="text-indigo-600 hover:text-indigo-900 mr-4">View</Link>
                 </td>
               </tr>
             ))}

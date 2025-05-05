@@ -16,6 +16,8 @@ import UnitListPage from './views/UnitListPage';
 import UnitProfileDetailPage from './views/UnitProfileDetailPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ObfuscatedRouter from './components/ObfuscatedRouter';
+import UnitCreatePage from './views/UnitCreatePage';
 
 function NewViolationPage() {
   const navigate = useNavigate();
@@ -131,72 +133,94 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
+  // Get the obfuscated paths directly from routeMapper.js values
+  const dashboardPath = '/r/d5f8a61b2e4c';
+  const violationsPath = '/r/7a9c3b5d2f1e';
+  const violationsNewPath = '/r/e8f2c1d5a6b3';
+  const unitsPath = '/r/b4d6e8f2a1c3';
+  const adminUsersPath = '/r/c3a5b7d9e1f2';
+  const adminSettingsPath = '/r/a1b3c5d7e9f2';
+
   return (
     <Router>
       <AuthProvider>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-          <Route path="/violations/public/:public_id" element={<ViolationDetail usePublicId={true} />} />
+        <ObfuscatedRouter>
+          <Routes>
+            {/* Public Routes - Keep these clear for usability */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+            <Route path="/violations/public/:public_id" element={<ViolationDetail usePublicId={true} />} />
 
-          {/* Protected Routes */}
-          <Route path="/" element={<ProtectedRoute><Layout><Navigate to="/dashboard" replace /></Layout></ProtectedRoute>} />
-          <Route path="/dashboard" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
-          
-          {/* Unit Profile Routes */}
-          <Route path="/units" element={
-            <ProtectedRoute>
-              <Layout>
-                <UnitListPage />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/units/:unitNumber" element={
-            <ProtectedRoute>
-              <Layout>
-                <UnitProfileDetailPage />
-              </Layout>
-            </ProtectedRoute>
-          } />
+            {/* Protected Routes - Use obfuscated paths directly */}
+            <Route path="/" element={<ProtectedRoute><Layout><Navigate to={dashboardPath} replace /></Layout></ProtectedRoute>} />
+            <Route path={dashboardPath} element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+            
+            {/* Unit Profile Routes */}
+            <Route path={unitsPath} element={
+              <ProtectedRoute>
+                <Layout>
+                  <UnitListPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path={`${unitsPath}/new`} element={
+              <ProtectedRoute>
+                <Layout>
+                  <UnitCreatePage />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path={`${unitsPath}/:unitNumber`} element={
+              <ProtectedRoute>
+                <Layout>
+                  <UnitProfileDetailPage />
+                </Layout>
+              </ProtectedRoute>
+            } />
 
-          {/* Admin Routes */}
-          <Route path="/admin/users" element={<AdminRoute><Layout><UserManagement /></Layout></AdminRoute>} />
-          <Route path="/admin/settings" element={<AdminRoute><Layout><Settings /></Layout></AdminRoute>} /> 
-          
-          {/* Violation Routes */}
-          <Route path="/violations/new" element={
-            <ProtectedRoute>
-              <NewViolationPage />
-            </ProtectedRoute>
-          } />
-          <Route path="/violations" element={
-            <ProtectedRoute>
-              <Layout>
-                <ViolationList />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/violations/:id" element={
-            <ProtectedRoute>
-              <Layout>
-                <ViolationDetail usePublicId={false} />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/violations/public/:publicId" element={
-            <ProtectedRoute>
-              <Layout>
-                <ViolationDetail usePublicId={true} />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          
-          {/* Fallback Route */}
-          <Route path="*" element={<ProtectedRoute><div>404 Not Found</div></ProtectedRoute>} />
-          
-        </Routes>
+            {/* Admin Routes */}
+            <Route path={adminUsersPath} element={<AdminRoute><Layout><UserManagement /></Layout></AdminRoute>} />
+            <Route path={adminSettingsPath} element={<AdminRoute><Layout><Settings /></Layout></AdminRoute>} /> 
+            
+            {/* Violation Routes */}
+            <Route path={violationsNewPath} element={
+              <ProtectedRoute>
+                <NewViolationPage />
+              </ProtectedRoute>
+            } />
+            <Route path={violationsPath} element={
+              <ProtectedRoute>
+                <Layout>
+                  <ViolationList />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path={`${violationsPath}/:id`} element={
+              <ProtectedRoute>
+                <Layout>
+                  <ViolationDetail usePublicId={false} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path={`${violationsPath}/public/:publicId`} element={
+              <ProtectedRoute>
+                <Layout>
+                  <ViolationDetail usePublicId={true} />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            {/* No longer need to handle /r/* separately since we're using the obfuscated paths directly */}
+            
+            {/* Dashboard route again for direct access */}
+            <Route path="/dashboard" element={<ProtectedRoute><Layout><Navigate to={dashboardPath} replace /></Layout></ProtectedRoute>} />
+            
+            {/* Fallback Route */}
+            <Route path="*" element={<ProtectedRoute><div>404 Not Found</div></ProtectedRoute>} />
+            
+          </Routes>
+        </ObfuscatedRouter>
       </AuthProvider>
     </Router>
   );

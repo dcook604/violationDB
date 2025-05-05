@@ -67,7 +67,7 @@ export default function UnitProfileDetailPage() {
   // Separate error display for better layout
   if (error && !unitData) return (
      <div className="p-4 md:p-8">
-        <Link to="/units" className="text-blue-600 hover:underline text-sm mb-4 inline-block"> &larr; Back to Unit List</Link>
+        <Link to="/r/b4d6e8f2a1c3" className="text-blue-600 hover:underline text-sm mb-4 inline-block"> &larr; Back to Unit List</Link>
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error:</strong>
           <span className="block sm:inline"> {error}</span>
@@ -81,7 +81,7 @@ export default function UnitProfileDetailPage() {
     <div className="p-4 md:p-8">
        <div className="flex justify-between items-center mb-6">
            <div>
-             <Link to="/units" className="text-blue-600 hover:underline text-sm mb-1 inline-block"> &larr; Back to Unit List</Link>
+             <Link to="/r/b4d6e8f2a1c3" className="text-blue-600 hover:underline text-sm mb-1 inline-block"> &larr; Back to Unit List</Link>
              <h2 className="text-2xl font-bold text-gray-800">Unit Profile: {unitNumber}</h2>
            </div>
             {/* Show Edit button only when not editing and user has permission */}
