@@ -279,6 +279,7 @@ The system has fallback mechanisms for PDF generation failures:
 - **User Creation Fields (June 2024):** First Name, Last Name, and Position are now required for all new users. If any are missing or invalid, user creation will fail with a validation error.
 - **Position Dropdown Validation:** Only the allowed values (Council, Property Manager, Caretaker, Cleaner, Concierge) are accepted. Any other value will be rejected by the backend.
 - **Existing Users:** Existing users without first/last name or position will remain valid, but editing or re-saving may require these fields to be filled in.
+- **Violation Detail Page Links (June 2024):** When viewing violation IDs in the list view, the system now checks if `public_id` exists before using it in the URL. If `public_id` is undefined, it falls back to using the regular ID. This prevents the "undefined" error in the URL path when clicking on violation links. If you see `/violations/public/undefined` errors, ensure the backend SQL query includes the `public_id` field.
 
 ---
 
