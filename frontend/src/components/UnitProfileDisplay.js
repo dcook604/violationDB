@@ -43,7 +43,7 @@ export default function UnitProfileDisplay({ unitData, violationSummary }) {
       <ul className="list-disc pl-5 space-y-1">
         {violationSummary.outstanding_violations.map(v => (
           <li key={v.id}>
-            <Link to={`/violations/public/${v.public_id}`} className="text-blue-600 hover:underline">
+            <Link to={v.public_id ? `/violations/public/${v.public_id}` : `/violations/${v.id}`} className="text-blue-600 hover:underline">
               {v.reference}
             </Link> - {v.category} ({v.status}, Created: {formatDate(v.created_at)})
           </li>

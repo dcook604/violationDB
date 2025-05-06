@@ -410,7 +410,9 @@ def send_violation_notification(violation, html_path):
     subject = f"New Violation Report: {violation.reference}"
     
     # Generate secure token for this violation
-    token = generate_secure_access_token(violation.id)
+    # Use public_id if available, otherwise use regular ID
+    violation_id_for_token = violation.public_id if hasattr(violation, 'public_id') and violation.public_id else violation.id
+    token = generate_secure_access_token(violation_id_for_token)
     
     # Get base URL
     base_url = current_app.config.get('BASE_URL', f"http://{request.host if request else 'localhost:5004'}")
@@ -638,7 +640,7 @@ def generate_secure_access_token(violation_id, expiration_hours=24):
     Generate a signed, time-limited token for violation access
     
     Args:
-        violation_id: ID of the violation
+        violation_id: ID or public_id of the violation
         expiration_hours: Hours until token expires
         
     Returns:
@@ -650,7 +652,8 @@ def generate_secure_access_token(violation_id, expiration_hours=24):
     # Create payload with violation ID and timestamp
     payload = {
         'violation_id': violation_id,
-        'created': int(time.time())
+        'created': int(time.time()),
+        'is_uuid': not isinstance(violation_id, int)  # Flag to identify if the ID is a UUID
     }
     
     # Generate token
@@ -665,7 +668,7 @@ def validate_secure_access_token(token, max_age=86400):
         max_age: Maximum age in seconds (default 24 hours)
         
     Returns:
-        int or None: Violation ID if valid, None if invalid
+        int/str or None: Violation ID if valid, None if invalid
     """
     from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
     from flask import current_app
@@ -676,6 +679,8 @@ def validate_secure_access_token(token, max_age=86400):
     try:
         # Load and validate token
         data = serializer.loads(token, max_age=max_age)
+        
+        # Return the ID, checking if it's a UUID (str) or regular ID (int)
         return data.get('violation_id')
     except (BadSignature, SignatureExpired):
         return None
@@ -711,3 +716,31 @@ def log_violation_access(violation_id, token, request):
     db.session.commit()
     
     return log
+
+def send_secure_urls(violation):
+    """Generate secure URLs for a violation
+    
+    Args:
+        violation: The violation object
+        
+    Returns:
+        dict: Dictionary with secure URLs
+    """
+    from flask import request
+    
+    # Generate token for this violation - prefer public_id when available
+    violation_id_for_token = violation.public_id if hasattr(violation, 'public_id') and violation.public_id else violation.id
+    token = generate_secure_access_token(violation_id_for_token)
+    
+    # Get base URL
+    base_url = current_app.config.get('BASE_URL', f"http://{request.host}")
+    
+    # Create secure URLs
+    html_url = f"{base_url}/violations/secure/{token}"
+    pdf_url = f"{base_url}/violations/secure/{token}/pdf"
+    
+    return {
+        'html_url': html_url,
+        'pdf_url': pdf_url,
+        'token': token
+    }

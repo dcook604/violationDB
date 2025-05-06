@@ -1147,14 +1147,24 @@ def view_secure_violation(token):
         current_app.logger.warning(f"Invalid or expired token attempted: {token}")
         abort(403)  # Forbidden
     
-    # Get the violation (try with ID first, then with public_id if not found)
-    violation = Violation.query.get(violation_id)
+    # Try to determine if violation_id is a regular ID or a UUID
+    violation = None
+    
+    # First try to parse as integer for regular ID
+    try:
+        if isinstance(violation_id, int) or violation_id.isdigit():
+            numeric_id = int(violation_id)
+            violation = Violation.query.get(numeric_id)
+        else:
+            # If not an integer, assume it's a UUID
+            violation = Violation.query.filter_by(public_id=violation_id).first()
+    except (ValueError, AttributeError):
+        # If parsing fails, try the UUID lookup
+        violation = Violation.query.filter_by(public_id=str(violation_id)).first()
+    
     if not violation:
-        # If not found by ID, try finding by public_id
-        violation = Violation.query.filter_by(public_id=violation_id).first()
-        if not violation:
-            current_app.logger.warning(f"Violation not found for ID or public_id: {violation_id}")
-            abort(404)  # Not found
+        current_app.logger.warning(f"Violation not found for ID/public_id: {violation_id}")
+        abort(404)  # Not found
     
     # Log the access
     log_violation_access(violation.id, token, request)
@@ -1198,14 +1208,24 @@ def download_secure_violation_pdf(token):
         current_app.logger.warning(f"Invalid or expired token attempted for PDF: {token}")
         abort(403)  # Forbidden
     
-    # Get the violation (try with ID first, then with public_id if not found)
-    violation = Violation.query.get(violation_id)
+    # Try to determine if violation_id is a regular ID or a UUID
+    violation = None
+    
+    # First try to parse as integer for regular ID
+    try:
+        if isinstance(violation_id, int) or violation_id.isdigit():
+            numeric_id = int(violation_id)
+            violation = Violation.query.get(numeric_id)
+        else:
+            # If not an integer, assume it's a UUID
+            violation = Violation.query.filter_by(public_id=violation_id).first()
+    except (ValueError, AttributeError):
+        # If parsing fails, try the UUID lookup
+        violation = Violation.query.filter_by(public_id=str(violation_id)).first()
+    
     if not violation:
-        # If not found by ID, try finding by public_id
-        violation = Violation.query.filter_by(public_id=violation_id).first()
-        if not violation:
-            current_app.logger.warning(f"Violation not found for ID or public_id: {violation_id}")
-            abort(404)  # Not found
+        current_app.logger.warning(f"Violation not found for ID/public_id: {violation_id}")
+        abort(404)  # Not found
     
     # Log the access
     log_violation_access(violation.id, token, request)
