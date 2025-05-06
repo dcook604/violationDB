@@ -616,9 +616,9 @@ def api_list_violations():
         
         # Base SQL query
         if is_admin:
-            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations"
+            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path, public_id FROM violations"
         else:
-            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations WHERE created_by = :user_id"
+            sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path, public_id FROM violations WHERE created_by = :user_id"
         
         # Add date filter conditions if specified
         params = {"user_id": user_id}
@@ -640,7 +640,7 @@ def api_list_violations():
                 params["start_date"] = thirty_days_ago
         
         # Add total count query
-        count_sql = sql.replace("SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path", "SELECT COUNT(*) as total")
+        count_sql = sql.replace("SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path, public_id", "SELECT COUNT(*) as total")
         
         # Add ordering and pagination to main query
         sql += " ORDER BY created_at DESC LIMIT :limit OFFSET :offset"
@@ -683,6 +683,7 @@ def api_list_violations():
                 'details': row.details or '',
                 'html_path': f"/violations/view/{row.id}" if row.html_path else None,
                 'pdf_path': f"/violations/pdf/{row.id}" if row.pdf_path else None,
+                'public_id': row.public_id,
                 'dynamic_fields': {}
             }
             
