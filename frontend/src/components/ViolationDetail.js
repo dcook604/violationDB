@@ -18,7 +18,21 @@ const ViolationDetail = ({ usePublicId = false }) => {
   // Assuming authentication context provides user info
   // const { user } = useAuth(); 
 
+  // Check if we're trying to use an undefined publicId and redirect if needed
+  useEffect(() => {
+    if (usePublicId && (publicId === 'undefined' || publicId === undefined)) {
+      console.error('Invalid public ID: undefined');
+      navigate('/r/7a9c3b5d2f1e'); // Redirect to violations list
+      return;
+    }
+  }, [usePublicId, publicId, navigate]);
+
   const fetchViolation = useCallback(async () => {
+    // Skip fetching if we have an undefined publicId
+    if (usePublicId && (publicId === 'undefined' || publicId === undefined)) {
+      return;
+    }
+    
     setLoading(true);
     setError('');
     const identifier = usePublicId ? publicId : id;
