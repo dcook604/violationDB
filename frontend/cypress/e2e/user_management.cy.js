@@ -7,8 +7,12 @@ describe('User Management E2E', () => {
 
   it('can add a user', () => {
     cy.contains('Add User').click();
+    cy.get('input[name="first_name"]').type('Test');
+    cy.get('input[name="last_name"]').type('User');
     cy.get('input[name="email"]').type('testuser@example.com');
-    cy.get('select[name="role"]').select('user');
+    cy.get('select[name="role"]').select('User');
+    cy.get('select[name="position"]').select('Caretaker');
+    cy.get('input[name="defaultPassword"]').type('changeme123');
     cy.get('input[name="is_active"]').check();
     cy.contains('Add').click();
     cy.contains('testuser@example.com');

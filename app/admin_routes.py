@@ -1,5 +1,6 @@
 from flask import Blueprint, redirect, url_for, flash, request, jsonify, current_app
-from flask_login import login_required, current_user
+from flask_jwt_extended import get_jwt, get_jwt_identity
+from app.jwt_auth import jwt_required_api
 from .models import User, FieldDefinition, Settings
 from . import db
 from werkzeug.security import generate_password_hash
@@ -10,9 +11,11 @@ admin_bp = Blueprint('admin', __name__)
 
 # Decorator to restrict access to admin users
 def admin_required(f):
-    @login_required
     def decorated_function(*args, **kwargs):
-        if not current_user.is_admin:
+        claims = get_jwt()
+        is_admin = claims.get('is_admin')
+        user_id = get_jwt_identity()
+        if not is_admin:
             return jsonify({"error": "Admin privileges required"}), 403
         return f(*args, **kwargs)
     decorated_function.__name__ = f.__name__
@@ -196,12 +199,12 @@ def update_settings():
         settings.enable_global_notifications = data['enable_global_notifications']
     
     # Record who updated the settings
-    settings.updated_by = current_user.id
+    settings.updated_by = get_jwt_identity()
     
     db.session.commit()
     
     # Log all settings after update for debugging
-    current_app.logger.info(f"Settings updated successfully by {current_user.email}")
+    current_app.logger.info(f"Settings updated successfully by {get_jwt().get('email')}")
     current_app.logger.info(f"SMTP Server: {settings.smtp_server}")
     current_app.logger.info(f"SMTP Port: {settings.smtp_port}")
     current_app.logger.info(f"SMTP Username: {settings.smtp_username}")
@@ -220,7 +223,7 @@ def test_email():
     import traceback
     
     data = request.json or {}
-    recipient = data.get('email') or current_user.email
+    recipient = data.get('email') or get_jwt().get('email')
     
     if not recipient:
         return jsonify({'error': 'No recipient email provided'}), 400

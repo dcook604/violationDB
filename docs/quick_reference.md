@@ -293,3 +293,33 @@ CREATE TABLE unit_profiles (
 - Relies on `SECRET_KEY` from Flask config for token security.
 - Uses SMTP settings from the `Settings` database model.
 - Uses `memory://` storage for rate limiting (change for production). 
+
+# JWT Cookie Settings (Updated)
+
+## Production Settings
+- All authentication cookies:
+  - `SameSite=Lax`
+  - `HttpOnly=True`
+  - `Secure=True` (**required in production!**)
+  - `JWT_COOKIE_CSRF_PROTECT=True` (optional extra security)
+
+## Development Settings
+- All authentication cookies:
+  - `SameSite=None` (Python None value, not string 'None')
+  - `HttpOnly=True`
+  - `Secure=False` (only for local HTTP development)
+  - `JWT_COOKIE_CSRF_PROTECT=False` (required with SameSite=None)
+- Frontend API requests must include `withCredentials: true`
+
+> **WARNING:**
+> For production deployments, always set `JWT_COOKIE_SECURE = True` to ensure cookies are only sent over HTTPS. Only set it to `False` for local development and testing.
+>
+> Chrome requires cookies with SameSite=None to also be Secure, which requires HTTPS. Consider using Firefox for development or setting up local HTTPS.
+
+# CSRF Tokens
+- No CSRF token is required for any endpoint.
+- Do not send X-CSRF-TOKEN or similar headers.
+
+# Migration Note
+- As of [date], explicit CSRF tokens and the /api/csrf-token endpoint have been removed. All CSRF protection is now handled by SameSite cookie policy.
+- **For production, always use `JWT_COOKIE_SECURE = True`.** 

@@ -238,6 +238,28 @@ The mental model for users remains focused on violation reference numbers (e.g.,
 - The login page is branded with the Spectrum 4 logo for consistency and professionalism.
 - Branding is loaded from `frontend/public/logospectrum.png` and is visible above the sign-in form.
 
+# Recent Enhancements (June 2024)
+
+## CORS and Authentication Updates
+- CORS configuration updated to allow correct origins (including 172.16.16.6 and 172.16.16.26) to resolve cross-origin issues.
+- All sensitive API endpoints now enforce JWT authentication, replacing session-based `login_required` with `jwt_required_api` for improved security and SPA compatibility.
+- User identity in API routes is now accessed via `get_jwt_identity()` instead of `current_user.id` to align with JWT best practices.
+
+## UI/UX Improvements
+- User Management: Button color conventions updated for clarity (Add User: blue, Edit: yellow, Delete: red, Change Password: gray).
+- Unit Profiles: Building column removed; First Name, Last Name, Rented, Has Dog, Has Cat indicators added; Edit button (yellow) now appears next to View.
+- Unit detail page supports `edit=true` query parameter for direct edit mode.
+- Tenant information: "Phone" field renamed to "Telephone"; validation now enforces 10-digit numbers with format guidance.
+- Unit number field is now enabled when creating new units.
+
+## Architectural Rationale
+- These changes improve security, maintainability, and user experience while preserving backward compatibility. The shift to JWT and SPA-friendly endpoints supports modern frontend patterns and robust session management. UI changes enhance clarity and usability for property management workflows.
+
+## User Identity and Position (June 2024)
+- User creation now requires First Name, Last Name, and Position (Council, Property Manager, Caretaker, Cleaner, Concierge).
+- This ensures all users are uniquely identified and their role in the organization is clear for communication, reporting, and permissions.
+- These fields are required for all new users and are displayed in user management interfaces.
+
 ---
 
 *Update this file as new conceptual insights are discovered or the application's mental model evolves.* 

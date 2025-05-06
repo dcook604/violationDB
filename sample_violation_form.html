@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sample Violation Form</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <style>
+        /* Optional: Add minor styling if needed */
+    </style>
+  </head>
+  <body>
+
+    <div class="container mt-4 mb-5">
+        <h2 class="mb-4">Log New Violation (Sample)</h2>
+
+        <form action="#" method="POST" enctype="multipart/form-data" novalidate>
+            <!-- In a real form, include CSRF: <input type="hidden" name="csrf_token" value="dummy_token"> -->
+
+            <div class="row g-3">
+                <!-- Violation Date -->
+                <div class="col-md-6 mb-3">
+                    <label for="violation_date" class="form-label">Violation Date</label>
+                    <input type="date" id="violation_date" name="violation_date" class="form-control">
+                    <!-- Example Validation Error Display -->
+                    <!-- <input type="date" id="violation_date" name="violation_date" class="form-control is-invalid"> -->
+                    <!-- <div class="invalid-feedback">Please provide a valid date.</div> -->
+                    <div class="form-text">Date the violation occurred.</div>
+                </div>
+
+                <!-- Location -->
+                <div class="col-md-6 mb-3">
+                    <label for="location" class="form-label">Location</label>
+                    <input type="text" id="location" name="location" class="form-control" placeholder="e.g., Unit 101, Visitor Parking Stall 5">
+                     <!-- Example Validation Error Display -->
+                    <!-- <input type="text" id="location" name="location" class="form-control is-invalid" placeholder="e.g., Unit 101, Visitor Parking Stall 5"> -->
+                    <!-- <div class="invalid-feedback">Location cannot be empty.</div> -->
+               </div>
+
+                <!-- Category (Select Field) -->
+                <div class="col-12 mb-3">
+                     <label for="category" class="form-label">Category</label>
+                     <select id="category" name="category" class="form-select">
+                         <option selected disabled value="">Choose...</option>
+                         <option value="1">Noise Complaint</option>
+                         <option value="2">Parking Violation</option>
+                         <option value="3">Bylaw Infraction</option>
+                         <option value="4">Pet Issue</option>
+                         <option value="5">Other</option>
+                     </select>
+                     <!-- Example Validation Error Display -->
+                     <!-- <select id="category" name="category" class="form-select is-invalid"> -->
+                     <!-- <div class="invalid-feedback">Please select a category.</div> -->
+                </div>
+
+                <!-- Description -->
+                <div class="col-12 mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea id="description" name="description" class="form-control" rows="5" placeholder="Provide a detailed description of the violation..."></textarea>
+                    <!-- Example Validation Error Display -->
+                    <!-- <textarea id="description" name="description" class="form-control is-invalid" rows="5" placeholder="Provide a detailed description of the violation..."></textarea> -->
+                    <!-- <div class="invalid-feedback">Description is required.</div> -->
+                </div>
+
+                 <!-- Attachments (File Field) -->
+                 <div class="col-12 mb-3">
+                    <label for="attachments" class="form-label">Attachments (Optional)</label>
+                    <input type="file" id="attachments" name="attachments" class="form-control" multiple>
+                    <!-- Example Validation Error Display -->
+                    <!-- <input type="file" id="attachments" name="attachments" class="form-control is-invalid" multiple> -->
+                    <!-- <div class="invalid-feedback">Invalid file type or size exceeded.</div> -->
+                    <div class="form-text">Upload relevant photos or documents (e.g., JPG, PNG, PDF). Max size: 16MB.</div>
+                 </div>
+
+            </div> <!-- End .row -->
+
+            <hr class="my-4">
+
+            <!-- Submit Button -->
+            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                 <button type="button" class="btn btn-outline-secondary me-md-2">Cancel</button> <!-- Example Cancel -->
+                 <button type="submit" class="btn btn-primary btn-lg">Submit Violation</button>
+            </div>
+
+        </form>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+  </body>
+</html> 

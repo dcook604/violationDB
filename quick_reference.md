@@ -456,3 +456,81 @@ If you need to allow external images or fonts, update the policy in the template
 
 ## Frontend Routes (2024-06)
 - `/violations/public/:publicId`: Violation detail page using public UUID. 
+
+# Recent Quick Reference Updates (June 2024)
+
+## API Authentication
+- All sensitive API endpoints now require JWT authentication. Use the `Authorization: Bearer <token>` header for requests.
+- User identity is accessed via `get_jwt_identity()` in backend routes.
+
+## Unit API Endpoints
+- All unit-related endpoints now require JWT authentication.
+- Example: `GET /api/units` (requires JWT)
+
+## UI Button Color Conventions
+- Add User: `.bg-lightBlue-500` (blue)
+- Edit: `.bg-yellow-500` (yellow)
+- Delete: `.bg-red-500` (red)
+- Change Password: `.bg-blueGray-500` (gray)
+
+## Unit Profiles List
+- Building column removed.
+- Added columns: First Name, Last Name, Rented, Has Dog, Has Cat.
+- Edit button (yellow) appears next to View.
+
+## Unit Detail Page
+- Supports `edit=true` query parameter to enable edit mode directly from the list view.
+
+## Tenant Information
+- "Phone" field renamed to "Telephone".
+- Telephone validation: 10-digit numbers only. Format guidance is shown below the input.
+
+## Example: Edit Unit Detail via Query Parameter
+```
+/units/123?edit=true
+```
+
+## Example: Telephone Field Validation Message
+```
+Please enter a 10-digit telephone number (e.g., 6041234567).
+```
+
+## User Creation Fields (June 2024)
+- **first_name**: User's first name (required)
+- **last_name**: User's last name (required)
+- **email**: User's email address (required)
+- **role**: User's role (admin, user, etc.) (required)
+- **position**: User's position (required, dropdown: Council, Property Manager, Caretaker, Cleaner, Concierge)
+- **password**: User's password (required)
+- **active**: Boolean checkbox for account activation
+
+### Example Add User Payload
+```json
+{
+  "first_name": "Jane",
+  "last_name": "Doe",
+  "email": "jane@example.com",
+  "role": "user",
+  "position": "Caretaker",
+  "password": "changeme123",
+  "active": true
+}
+```
+
+### UI Field Order (Add User Modal)
+1. First Name
+2. Last Name
+3. Email
+4. Role
+5. Position (dropdown)
+6. Password
+7. Active (checkbox)
+
+### Position Dropdown Options
+- Council
+- Property Manager
+- Caretaker
+- Cleaner
+- Concierge
+
+Validation: All fields above are required for new users. Only the listed positions are accepted. 

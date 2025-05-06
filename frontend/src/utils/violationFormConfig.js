@@ -11,7 +11,7 @@ export const WHERE_DID_OPTIONS = [
   'Unit', 'Recycle/Garbage Room', 'Parkade', 'Interior Common Area',
   'Exterior Common Area', 'Garden', 'Park'
 ];
-export const SECURITY_POLICE_OPTIONS = ['Security', 'Police'];
+export const SECURITY_POLICE_OPTIONS = ['Security', 'Police', 'N/A'];
 export const FINE_LEVIED_OPTIONS = ['$50.00', '$100.00', '$200.00', '$1000.00', 'No Fine'];
 export const STATUS_OPTIONS = [
   'Open',
@@ -31,6 +31,6 @@ export function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 export function isValidPhone(phone) {
-  // Accept (000) 000-0000 or 000-000-0000
-  return /^(\(\d{3}\) \d{3}-\d{4}|\d{3}-\d{3}-\d{4})$/.test(phone);
+  // Accept (000) 000-0000 or 000-000-0000 or plain 10 digits
+  return /^(\(\d{3}\) \d{3}-\d{4}|\d{3}-\d{3}-\d{4}|\d{10})$/.test(phone);
 } 

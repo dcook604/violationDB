@@ -5,6 +5,8 @@ from sqlalchemy.exc import IntegrityError
 from . import db
 from .models import User, InvalidRoleError
 from functools import wraps
+from flask_jwt_extended import get_jwt, get_jwt_identity
+from app.jwt_auth import jwt_required_api
 
 user_api = Blueprint('user_api', __name__)
 
@@ -13,7 +15,10 @@ user_api = Blueprint('user_api', __name__)
 def admin_required_api(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated or not current_user.is_admin:
+        claims = get_jwt()
+        is_admin = claims.get('is_admin')
+        user_id = get_jwt_identity()
+        if not is_admin:
             return jsonify({'error': 'Admin access required'}), 403
         return f(*args, **kwargs)
     return decorated_function
@@ -21,7 +26,6 @@ def admin_required_api(f):
 # --- API endpoints will be added below ---
 
 @user_api.route('/api/users', methods=['GET'])
-@login_required
 @admin_required_api
 def api_list_users():
     MAX_PAGE_SIZE = 100
@@ -49,6 +53,7 @@ def api_list_users():
                 'email': u.email,
                 'first_name': u.first_name,
                 'last_name': u.last_name,
+                'position': u.position,
                 'role': u.role,
                 'is_active': u.is_active,
                 'is_admin': u.is_admin
@@ -63,23 +68,27 @@ def api_list_users():
     })
 
 @user_api.route('/api/users', methods=['POST'])
-@login_required
 @admin_required_api
 def api_create_user():
     data = request.json or {}
-    if not data.get('email') or not data.get('role'):
-        return jsonify({'error': 'Email and role are required'}), 400
+    required_fields = ['email', 'role', 'first_name', 'last_name', 'position']
+    for field in required_fields:
+        if not data.get(field):
+            return jsonify({'error': f'{field.replace("_", " ").title()} is required'}), 400
+    valid_positions = ['Council', 'Property Manager', 'Caretaker', 'Cleaner', 'Concierge']
+    if data['position'] not in valid_positions:
+        return jsonify({'error': 'Invalid position'}), 400
     try:
         # Use provided password if available, otherwise use default or generate
         if data.get('password'):
             password = data['password']
         else:
             password = User.generate_temp_password() if hasattr(User, 'generate_temp_password') else 'changeme123'
-            
         user = User(
             email=data['email'],
-            first_name=data.get('first_name', ''),
-            last_name=data.get('last_name', ''),
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            position=data['position'],
             password_hash=generate_password_hash(password),
             role=data['role'],
             is_active=data.get('is_active', True),
@@ -87,7 +96,6 @@ def api_create_user():
         )
         db.session.add(user)
         db.session.commit()
-        # Only return the password in the response if it was auto-generated
         result = {'message': 'User created', 'id': user.id}
         if not data.get('password'):
             result['temp_password'] = password
@@ -100,14 +108,21 @@ def api_create_user():
         return jsonify({'error': str(e)}), 500
 
 @user_api.route('/api/users/<int:uid>', methods=['PUT'])
-@login_required
 @admin_required_api
 def api_edit_user(uid):
     user = User.query.get_or_404(uid)
     data = request.json or {}
-    user.email = data.get('email', user.email)
-    user.first_name = data.get('first_name', user.first_name)
-    user.last_name = data.get('last_name', user.last_name)
+    if 'email' in data:
+        user.email = data['email']
+    if 'first_name' in data:
+        user.first_name = data['first_name']
+    if 'last_name' in data:
+        user.last_name = data['last_name']
+    if 'position' in data:
+        valid_positions = ['Council', 'Property Manager', 'Caretaker', 'Cleaner', 'Concierge']
+        if data['position'] not in valid_positions:
+            return jsonify({'error': 'Invalid position'}), 400
+        user.position = data['position']
     if 'role' in data:
         user.role = data['role']
         user.is_admin = (data['role'] == 'admin')
@@ -117,7 +132,6 @@ def api_edit_user(uid):
     return jsonify({'message': 'User updated'})
 
 @user_api.route('/api/users/<int:uid>', methods=['DELETE'])
-@login_required
 @admin_required_api
 def api_delete_user(uid):
     user = User.query.get_or_404(uid)
@@ -128,9 +142,11 @@ def api_delete_user(uid):
     return jsonify({'message': 'User deleted'})
 
 @user_api.route('/api/users/<int:uid>/change-password', methods=['POST'])
-@login_required
 def api_change_password(uid):
-    if not (current_user.is_admin or current_user.id == uid):
+    claims = get_jwt()
+    is_admin = claims.get('is_admin')
+    user_id = get_jwt_identity()
+    if not (is_admin or user_id == uid):
         return jsonify({'error': 'Forbidden'}), 403
     user = User.query.get_or_404(uid)
     data = request.json or {}

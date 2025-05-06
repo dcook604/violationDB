@@ -19,14 +19,9 @@ app = create_app()
 def apply_migration():
     """Apply the database migration for account lockout and Argon2id support"""
     try:
-        # Check database type
-        with app.app_context():
-            is_sqlite = 'sqlite' in db.engine.url.drivername
-            
-        # Read the appropriate SQL file
-        sql_file_path = 'add_account_lockout_sqlite.sql' if is_sqlite else 'add_account_lockout.sql'
+        sql_file_path = 'add_account_lockout.sql'
         
-        logger.info(f"Using SQL file: {sql_file_path} for database type: {'SQLite' if is_sqlite else 'MySQL/PostgreSQL'}")
+        logger.info(f"Using SQL file: {sql_file_path} for MariaDB database")
         
         with open(sql_file_path, 'r') as sql_file:
             sql_content = sql_file.read()

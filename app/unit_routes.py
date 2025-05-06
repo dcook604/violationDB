@@ -3,15 +3,17 @@ from flask_login import login_required, current_user
 from .models import UnitProfile, Violation # Import necessary models
 from . import db
 from .auth_routes import admin_required_api # Assuming admin decorator exists
+from .jwt_auth import jwt_required_api  # Add this import for JWT support
 from sqlalchemy import func # For aggregation
 from datetime import datetime, timedelta
+from flask_jwt_extended import get_jwt_identity
 
 unit_bp = Blueprint('units', __name__)
 
 # --- Unit Profile CRUD ---
 
 @unit_bp.route('/api/units', methods=['GET'])
-@login_required
+@jwt_required_api  # Changed from login_required to jwt_required_api
 def list_units():
     """List basic unit info (unit number, owner name). Add search/pagination later."""
     try:
@@ -27,7 +29,7 @@ def list_units():
         return jsonify({'error': 'Failed to retrieve units'}), 500
 
 @unit_bp.route('/api/units', methods=['POST'])
-@login_required
+@jwt_required_api  # Changed from login_required
 @admin_required_api # Protect this route
 def create_unit():
     """Create a new unit profile."""
@@ -44,6 +46,9 @@ def create_unit():
         return jsonify({'error': 'Unit number already exists'}), 409 # Conflict
 
     try:
+        # Get user ID from JWT token instead of current_user
+        user_id = get_jwt_identity()
+        
         new_unit = UnitProfile(
             unit_number=data['unit_number'],
             strata_lot_number=data.get('strata_lot_number'),
@@ -61,12 +66,12 @@ def create_unit():
             tenant_last_name=data.get('tenant_last_name') if data.get('is_rented') else None,
             tenant_email=data.get('tenant_email') if data.get('is_rented') else None,
             tenant_telephone=data.get('tenant_telephone') if data.get('is_rented') else None,
-            updated_by=current_user.id
+            updated_by=user_id
         )
         db.session.add(new_unit)
         db.session.commit()
         # TODO: Add to audit log
-        current_app.logger.info(f"Unit profile created: {new_unit.unit_number} by {current_user.email}")
+        current_app.logger.info(f"Unit profile created: {new_unit.unit_number} by user ID {user_id}")
         return jsonify(new_unit.to_dict()), 201
     except Exception as e:
         db.session.rollback()
@@ -74,7 +79,7 @@ def create_unit():
         return jsonify({'error': 'Failed to create unit profile'}), 500
 
 @unit_bp.route('/api/units/<unit_number>', methods=['GET'])
-@login_required
+@jwt_required_api  # Changed from login_required
 def get_unit_detail(unit_number):
     """Get full details for a specific unit."""
     unit = UnitProfile.query.filter_by(unit_number=unit_number).first_or_404()
@@ -82,7 +87,7 @@ def get_unit_detail(unit_number):
     return jsonify(unit.to_dict())
 
 @unit_bp.route('/api/units/<unit_number>', methods=['PUT'])
-@login_required
+@jwt_required_api  # Changed from login_required
 @admin_required_api # Or add more granular permissions
 def update_unit(unit_number):
     """Update an existing unit profile."""
@@ -94,6 +99,9 @@ def update_unit(unit_number):
     # Update fields provided in the request
     # Consider adding validation here too
     try:
+        # Get user ID from JWT token
+        user_id = get_jwt_identity()
+        
         for key, value in data.items():
             if hasattr(unit, key) and key not in ['id', 'unit_number', 'created_at', 'updated_at', 'updated_by']: # Prevent updating protected fields
                 setattr(unit, key, value)
@@ -105,10 +113,10 @@ def update_unit(unit_number):
             unit.tenant_email = None
             unit.tenant_telephone = None
             
-        unit.updated_by = current_user.id
+        unit.updated_by = user_id
         db.session.commit()
         # TODO: Add to audit log (capture diff)
-        current_app.logger.info(f"Unit profile updated: {unit.unit_number} by {current_user.email}")
+        current_app.logger.info(f"Unit profile updated: {unit.unit_number} by user ID {user_id}")
         return jsonify(unit.to_dict())
     except Exception as e:
         db.session.rollback()
@@ -116,12 +124,15 @@ def update_unit(unit_number):
         return jsonify({'error': 'Failed to update unit profile'}), 500
 
 @unit_bp.route('/api/units/<unit_number>', methods=['DELETE'])
-@login_required
+@jwt_required_api  # Changed from login_required
 @admin_required_api # Protect this route
 def delete_unit(unit_number):
     """Delete a unit profile."""
     unit = UnitProfile.query.filter_by(unit_number=unit_number).first_or_404()
     try:
+        # Get user ID from JWT token
+        user_id = get_jwt_identity()
+        
         # Consider implications: What happens to related violations?
         # Option 1: Just delete profile (violations remain associated via unit_number string)
         # Option 2: Check for violations and prevent deletion / reassign / anonymize?
@@ -129,7 +140,7 @@ def delete_unit(unit_number):
         db.session.delete(unit)
         db.session.commit()
         # TODO: Add to audit log
-        current_app.logger.info(f"Unit profile deleted: {unit.unit_number} by {current_user.email}")
+        current_app.logger.info(f"Unit profile deleted: {unit.unit_number} by user ID {user_id}")
         return jsonify({'message': 'Unit profile deleted successfully'}), 200
     except Exception as e:
         db.session.rollback()
@@ -139,7 +150,7 @@ def delete_unit(unit_number):
 # --- Violation Summary Endpoint ---
 
 @unit_bp.route('/api/units/<unit_number>/violation_summary')
-@login_required
+@jwt_required_api  # Changed from login_required
 def get_violation_summary(unit_number):
     """Get violation summary for a unit."""
     # Verify the unit exists

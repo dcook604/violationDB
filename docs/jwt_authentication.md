@@ -26,6 +26,7 @@ JWT (JSON Web Token) authentication provides a secure, stateless method for auth
 
 4. **CSRF Protection** (`/app/csrf_routes.py`)
    - `/api/csrf-token`: Endpoint to get CSRF tokens for protected requests
+   - CSRF exemption for critical authentication endpoints
 
 ### Token Types
 
@@ -61,6 +62,9 @@ Tokens are stored in HTTP-only, Secure cookies with SameSite protection:
 3. **CSRF Protection**
    - CSRF tokens required for state-changing operations
    - `/api/csrf-token` endpoint provides tokens for API requests
+   - `X-CSRF-TOKEN` header must be included in all POST, PUT, PATCH, and DELETE requests
+   - API client automatically fetches and includes CSRF tokens
+   - Critical auth endpoints use CSRF exemption for reliability
 
 4. **Token Expiration**
    - Access tokens expire after 30 minutes
@@ -87,11 +91,14 @@ Tokens are stored in HTTP-only, Secure cookies with SameSite protection:
 
 2. **CSRF Protection**
    ```javascript
-   // Get CSRF token
+   // The API client automatically handles CSRF tokens
+   // No manual token management is required for most use cases
+   
+   // If needed, you can manually get a CSRF token
    const csrfResponse = await API.get('/api/csrf-token');
    const token = csrfResponse.data.token;
    
-   // Include token in request headers
+   // Include token in request headers for a custom request
    API.defaults.headers.common['X-CSRF-TOKEN'] = token;
    ```
 
@@ -116,6 +123,28 @@ Tokens are stored in HTTP-only, Secure cookies with SameSite protection:
    );
    ```
 
+### API Client Configuration
+
+The frontend API client (`frontend/src/api.js`) includes automatic handling for both JWT authentication and CSRF protection:
+
+1. **CSRF Token Management**
+   - Automatically fetches CSRF tokens on initialization
+   - Includes CSRF tokens in all state-changing requests (POST, PUT, PATCH, DELETE)
+   - Handles token refresh when tokens expire
+   - Retries requests that fail due to CSRF issues
+   - Provides graceful fallbacks when CSRF token fetch fails
+   - Supports multiple header formats (`X-CSRF-TOKEN`, `X-CSRFToken`, `x-csrf-token`)
+
+2. **JWT Token Management**
+   - Automatically refreshes JWT tokens when they expire
+   - Queues requests during token refresh to avoid race conditions
+   - Redirects to login page when refresh token expires
+
+3. **Error Handling**
+   - Comprehensive error detection for CSRF-related issues
+   - Automatic retry mechanisms for network errors
+   - Graceful degradation when server is unavailable
+
 ### Backend Implementation
 
 1. **Protecting Routes**
@@ -138,7 +167,34 @@ Tokens are stored in HTTP-only, Secure cookies with SameSite protection:
        return jsonify({'data': 'manager or admin'})
    ```
 
-2. **Accessing User Information**
+2. **CSRF Exemption for Critical Routes**
+   ```python
+   # Define the disable_csrf decorator
+   def disable_csrf(view_function):
+       """Disable CSRF protection for a specific view function."""
+       @wraps(view_function)
+       def decorated_function(*args, **kwargs):
+           # Store original value
+           original_value = current_app.config.get('WTF_CSRF_ENABLED', True)
+           # Disable CSRF for this request
+           current_app.config['WTF_CSRF_ENABLED'] = False
+           try:
+               # Call the view function
+               response = view_function(*args, **kwargs)
+               return response
+           finally:
+               # Restore original value
+               current_app.config['WTF_CSRF_ENABLED'] = original_value
+       return decorated_function
+   
+   @app.route('/api/auth/login-jwt', methods=['POST', 'OPTIONS'])
+   @cors_preflight
+   @disable_csrf
+   def login_jwt():
+       # Login implementation
+   ```
+
+3. **Accessing User Information**
    ```python
    from flask_jwt_extended import get_jwt_identity, get_jwt, current_user
    
@@ -171,6 +227,34 @@ The following JWT settings can be configured in `jwt_config.py`:
 | JWT_COOKIE_SECURE | False (Dev), True (Prod) | Restrict cookies to HTTPS |
 | JWT_COOKIE_HTTPONLY | True | Prevent JavaScript access to cookies |
 | JWT_COOKIE_SAMESITE | Lax | SameSite cookie setting |
+| JWT_CSRF_IN_COOKIES | True | Store CSRF tokens in cookies |
+| JWT_CSRF_METHODS | POST, PUT, PATCH, DELETE | Methods requiring CSRF protection |
+
+## Troubleshooting
+
+### Common Issues
+
+1. **CSRF Token Issues**
+   - Error: "The CSRF token is missing" or "The CSRF session token is missing"
+   - Solution: Ensure the API client is properly fetching and including CSRF tokens in requests
+   - Check that cookies are being properly set and maintained across requests
+   - For auth endpoints, CSRF protection is disabled to prevent authentication issues
+
+2. **JWT Token Issues**
+   - Error: "Token has expired" or "Missing cookie 'access_token_cookie'"
+   - Solution: Ensure that token refresh is properly implemented
+   - Verify that cookies are not being blocked by browser settings
+
+3. **Cross-Origin Issues**
+   - Error: "Cross-Origin Request Blocked" or cookies not being set
+   - Solution: Ensure CORS is properly configured with `credentials: true` and proper origin settings
+   - Verify that SameSite cookie settings are appropriate for your deployment
+   - Headers must include all variants of the CSRF token header name (`X-CSRF-TOKEN`, `X-CSRFToken`, `x-csrf-token`)
+
+4. **Network Connection Issues**
+   - Error: "Network Error" or "ERR_CONNECTION_REFUSED"
+   - Solution: Verify that the Flask server is running and accessible at the configured address
+   - The API client will attempt to continue without CSRF tokens for auth endpoints in case of connection issues
 
 ## Migration from Session-Based Auth
 

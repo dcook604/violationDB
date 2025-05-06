@@ -119,4 +119,17 @@ The Unit Profile feature provides a centralized repository for unit-specific inf
 
 Unit Profiles connect to the Violation system by providing a consistent reference for unit numbers. This allows the system to maintain proper records even when tenant information changes over time.
 
-The Unit Profile system maintains audit trails for all changes, tracking who made updates and when they occurred. This helps with governance and compliance requirements for the property management team. 
+The Unit Profile system maintains audit trails for all changes, tracking who made updates and when they occurred. This helps with governance and compliance requirements for the property management team.
+
+# Security Model (Updated)
+
+## CSRF Protection
+- As of [date], explicit CSRF tokens and the /api/csrf-token endpoint have been removed.
+- CSRF is now mitigated by browser-enforced SameSite cookie policy:
+  - All authentication cookies are set with `SameSite=Lax`, `HttpOnly=True`, and `Secure=True` (in production).
+  - Browsers will not send cookies on cross-origin POSTs, preventing CSRF by design.
+- All state-changing requests are protected by cookie policy, not by explicit tokens.
+- **For production, always set `JWT_COOKIE_SECURE = True`. Only set to `False` for local development.**
+
+## Migration Note
+- If you ever need to allow cross-origin POSTs, you must reintroduce CSRF tokens for those endpoints. 

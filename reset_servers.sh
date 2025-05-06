@@ -25,6 +25,12 @@ fi
 echo "===== CHECKING DEPENDENCIES ====="
 # Activate virtual environment and install dependencies
 source .venv/bin/activate
+# Load environment variables from .env if it exists
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
 echo "Installing/updating Python dependencies..."
 pip install -r requirements.txt
 echo "Python dependencies installed!"

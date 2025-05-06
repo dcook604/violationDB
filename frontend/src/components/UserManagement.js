@@ -13,7 +13,7 @@ export default function UserManagement() {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState(''); // 'add' | 'edit' | 'delete' | 'password'
   const [selectedUser, setSelectedUser] = useState(null);
-  const [form, setForm] = useState({ email: '', role: 'user', is_active: true });
+  const [form, setForm] = useState({ first_name: '', last_name: '', email: '', role: 'user', position: '', is_active: true });
   const [password, setPassword] = useState('');
   const [defaultPassword, setDefaultPassword] = useState('changeme123');
   const [saving, setSaving] = useState(false);
@@ -35,7 +35,9 @@ export default function UserManagement() {
     setLoading(true);
     try {
       const res = await API.get('/api/users');
-      setUsers(res.data);
+      // Support both paginated and legacy array response
+      const usersArray = Array.isArray(res.data) ? res.data : res.data.users;
+      setUsers(usersArray);
     } catch (err) {
       setError('Failed to load users');
     }
@@ -48,9 +50,16 @@ export default function UserManagement() {
     setShowModal(true);
     setError(null);
     if (type === 'edit' && user) {
-      setForm({ email: user.email, role: user.role, is_active: user.is_active });
+      setForm({
+        first_name: user.first_name || '',
+        last_name: user.last_name || '',
+        email: user.email,
+        role: user.role,
+        position: user.position || '',
+        is_active: user.is_active
+      });
     } else if (type === 'add') {
-      setForm({ email: '', role: 'user', is_active: true });
+      setForm({ first_name: '', last_name: '', email: '', role: 'user', position: '', is_active: true });
       setDefaultPassword('changeme123');
     } else if (type === 'password') {
       setPassword('');
@@ -116,7 +125,10 @@ export default function UserManagement() {
   );
 
   const columns = [
+    { label: 'First Name', accessor: 'first_name' },
+    { label: 'Last Name', accessor: 'last_name' },
     { label: 'Email', accessor: 'email' },
+    { label: 'Position', accessor: 'position' },
     { label: 'Role', accessor: 'role' },
     { label: 'Active', accessor: 'is_active' },
     { label: 'Actions', accessor: 'actions' },
@@ -140,7 +152,12 @@ export default function UserManagement() {
       )}
       
       <div className="mb-4 flex items-center gap-2">
-        <Button className="bg-blue-600 text-white" onClick={() => openModal('add')}>Add User</Button>
+        <Button 
+          color="lightBlue"
+          onClick={() => openModal('add')}
+        >
+          Add User
+        </Button>
         <Input
           placeholder="Search by email or role..."
           value={search}
@@ -156,9 +173,27 @@ export default function UserManagement() {
             if (col.accessor === 'actions') {
               return (
                 <div className="flex gap-2">
-                  <Button className="bg-yellow-500 text-white text-xs px-2 py-1" onClick={() => openModal('edit', row)}>Edit</Button>
-                  <Button className="bg-red-600 text-white text-xs px-2 py-1" onClick={() => openModal('delete', row)}>Delete</Button>
-                  <Button className="bg-gray-600 text-white text-xs px-2 py-1" onClick={() => openModal('password', row)}>Change Password</Button>
+                  <Button 
+                    color="yellow"
+                    className="text-xs px-2 py-1" 
+                    onClick={() => openModal('edit', row)}
+                  >
+                    Edit
+                  </Button>
+                  <Button 
+                    color="red"
+                    className="text-xs px-2 py-1" 
+                    onClick={() => openModal('delete', row)}
+                  >
+                    Delete
+                  </Button>
+                  <Button 
+                    color="default"
+                    className="!bg-gray-500 hover:!bg-gray-600 text-white text-xs px-2 py-1" 
+                    onClick={() => openModal('password', row)}
+                  >
+                    Change Password
+                  </Button>
                 </div>
               );
             }
@@ -175,14 +210,14 @@ export default function UserManagement() {
         title={modalType === 'add' ? 'Add User' : modalType === 'edit' ? 'Edit User' : modalType === 'delete' ? 'Delete User' : 'Change Password'}
         actions={
           modalType === 'delete' ? [
-            <Button key="cancel" onClick={closeModal} className="bg-gray-300">Cancel</Button>,
-            <Button key="delete" onClick={handleDelete} className="bg-red-600 text-white" disabled={saving}>Delete</Button>
+            <Button key="cancel" onClick={closeModal} color="gray">Cancel</Button>,
+            <Button key="delete" onClick={handleDelete} color="red" disabled={saving}>Delete</Button>
           ] : modalType === 'password' ? [
-            <Button key="cancel" onClick={closeModal} className="bg-gray-300">Cancel</Button>,
-            <Button key="save" onClick={handleChangePassword} className="bg-blue-600 text-white" disabled={saving}>Change</Button>
+            <Button key="cancel" onClick={closeModal} color="gray">Cancel</Button>,
+            <Button key="save" onClick={handleChangePassword} color="lightBlue" disabled={saving}>Change</Button>
           ] : [
-            <Button key="cancel" onClick={closeModal} className="bg-gray-300">Cancel</Button>,
-            <Button key="save" onClick={handleSave} className="bg-blue-600 text-white" disabled={saving}>{modalType === 'add' ? 'Add' : 'Save'}</Button>
+            <Button key="cancel" onClick={closeModal} color="gray">Cancel</Button>,
+            <Button key="save" onClick={handleSave} color="lightBlue" disabled={saving}>{modalType === 'add' ? 'Add' : 'Save'}</Button>
           ]
         }
       >
@@ -190,27 +225,35 @@ export default function UserManagement() {
         {(modalType === 'add' || modalType === 'edit') && (
           <form onSubmit={e => { e.preventDefault(); handleSave(); }}>
             <div className="mb-2">
+              <label className="block font-semibold mb-1">First Name</label>
+              <Input name="first_name" value={form.first_name} onChange={handleChange} required />
+            </div>
+            <div className="mb-2">
+              <label className="block font-semibold mb-1">Last Name</label>
+              <Input name="last_name" value={form.last_name} onChange={handleChange} required />
+            </div>
+            <div className="mb-2">
               <label className="block font-semibold mb-1">Email</label>
-              <Input name="email" value={form.email} onChange={handleChange} />
+              <Input name="email" value={form.email} onChange={handleChange} required />
             </div>
             <div className="mb-2">
               <label className="block font-semibold mb-1">Role</label>
-              <select name="role" value={form.role} onChange={handleChange} className="border p-2 rounded w-full">
+              <select name="role" value={form.role} onChange={handleChange} className="border p-2 rounded w-full" required>
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
               </select>
             </div>
-            {modalType === 'add' && (
-              <div className="mb-4">
-                <label className="block font-semibold mb-1">Password</label>
-                <Input 
-                  name="defaultPassword"
-                  value={defaultPassword} 
-                  onChange={e => setDefaultPassword(e.target.value)}
-                  placeholder="Initial password for user"
-                />
-              </div>
-            )}
+            <div className="mb-2">
+              <label className="block font-semibold mb-1">Position</label>
+              <select name="position" value={form.position} onChange={handleChange} className="border p-2 rounded w-full" required>
+                <option value="">Select Position</option>
+                <option value="Council">Council</option>
+                <option value="Property Manager">Property Manager</option>
+                <option value="Caretaker">Caretaker</option>
+                <option value="Cleaner">Cleaner</option>
+                <option value="Concierge">Concierge</option>
+              </select>
+            </div>
             <div className="mb-2">
               <label className="flex items-center gap-2">
                 <input

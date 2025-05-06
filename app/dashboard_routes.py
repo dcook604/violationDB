@@ -1,32 +1,55 @@
 from flask import Blueprint, jsonify, current_app
 from flask_login import login_required, current_user
 from .models import Violation, User, ViolationFieldValue, FieldDefinition
-from sqlalchemy import text
+from sqlalchemy import text, func
 from . import db
+from datetime import datetime, timedelta
+from .jwt_auth import jwt_required_api
+from flask_jwt_extended import get_jwt, get_jwt_identity
 
 dashboard = Blueprint('dashboard', __name__)
 
 @dashboard.route('/api/stats', methods=['GET'])
-@login_required
+@jwt_required_api
 def get_stats():
     try:
-        # Get total violations count
-        if current_user.is_admin:
+        claims = get_jwt()
+        is_admin = claims.get('is_admin')
+        user_id = get_jwt_identity()
+        # Get violations from the last year
+        one_year_ago = datetime.utcnow() - timedelta(days=365)
+
+        # Get total violations count from the last year
+        if is_admin:
             # Admin sees all violations
-            query = text("SELECT COUNT(*) FROM violations")
-            result = db.session.execute(query)
+            last_year_count = Violation.query.filter(
+                Violation.created_at >= one_year_ago
+            ).count()
         else:
             # Regular users only see their violations
-            query = text("SELECT COUNT(*) FROM violations WHERE created_by = :user_id")
-            result = db.session.execute(query, {"user_id": current_user.id})
-            
-        total_count = result.scalar() or 0
+            last_year_count = Violation.query.filter(
+                Violation.created_by == user_id,
+                Violation.created_at >= one_year_ago
+            ).count()
         
-        # Get all violations to check their Status field
-        if current_user.is_admin:
+        # Get count of all violations (used for active/resolved)
+        if is_admin:
             violations = Violation.query.all()
         else:
-            violations = Violation.query.filter_by(created_by=current_user.id).all()
+            violations = Violation.query.filter_by(created_by=user_id).all()
+        
+        # Get repeat offenders (units with multiple violations)
+        if is_admin:
+            repeat_offenders_query = db.session.query(
+                Violation.unit_number, func.count(Violation.id).label('count')
+            ).group_by(Violation.unit_number).having(func.count(Violation.id) > 1)
+        else:
+            repeat_offenders_query = db.session.query(
+                Violation.unit_number, func.count(Violation.id).label('count')
+            ).filter(Violation.created_by == user_id
+            ).group_by(Violation.unit_number).having(func.count(Violation.id) > 1)
+        
+        repeat_offenders_count = repeat_offenders_query.count()
         
         # Count active violations (those with specific Status values in dynamic fields)
         active_violations = 0
@@ -58,17 +81,19 @@ def get_stats():
                 resolved_violations += 1
         
         return jsonify({
-            'totalViolations': total_count,
+            'totalViolationsLastYear': last_year_count,
+            'repeatOffenders': repeat_offenders_count,
             'activeViolations': active_violations,
             'resolvedViolations': resolved_violations
         })
     except Exception as e:
-        # Log the error
+        import traceback
         current_app.logger.error(f"Error in get_stats: {str(e)}")
-        
+        current_app.logger.error(traceback.format_exc())
         # Return default values in case of error
         return jsonify({
-            'totalViolations': 0,
+            'totalViolationsLastYear': 0,
+            'repeatOffenders': 0,
             'activeViolations': 0,
             'resolvedViolations': 0
         }) 

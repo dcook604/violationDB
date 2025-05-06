@@ -6,18 +6,20 @@ from . import db
 from app.forms import ViolationForm
 import os
 from datetime import datetime
+from flask_jwt_extended import get_jwt, get_jwt_identity
+from app.jwt_auth import jwt_required_api
 
 bp = Blueprint('main', __name__)
 
 @bp.route('/')
 @bp.route('/dashboard')
-@login_required
+@jwt_required_api
 def dashboard():
     return jsonify({
         'user': {
-            'id': current_user.id,
-            'email': current_user.email,
-            'role': 'admin' if current_user.is_admin else 'user'
+            'id': get_jwt_identity(),
+            'email': get_jwt().get('email'),
+            'role': 'admin' if get_jwt().get('is_admin') else 'user'
         }
     })
 

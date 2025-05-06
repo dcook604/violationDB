@@ -347,22 +347,46 @@ The `updated_by` foreign key uses `ON DELETE SET NULL` to ensure that if a user 
 - `Path`: Set to '/' to make cookies available throughout the application
 - `Domain`: Set automatically by the browser
 
-### CSRF Protection
+### CSRF Protection (Updated)
 
-**Issue:** CSRF attacks can still affect cookie-based authentication.
+## Migration Note
+- As of [date], explicit CSRF tokens and the /api/csrf-token endpoint have been removed. All CSRF protection is now handled by SameSite cookie policy.
 
-**Solution:**
-- CSRF protection is enabled for all state-changing operations (POST, PUT, DELETE)
-- `/api/csrf-token` endpoint provides tokens for protected requests
-- Tokens are included in request headers via `X-CSRF-TOKEN`
-- Frontend automatically fetches and includes CSRF tokens
+## Gotchas
+- If you ever need cross-origin POSTs (e.g., from a third-party site), you must reintroduce CSRF tokens for those endpoints.
+- Legacy browser warning: Very old browsers (pre-2019) may not enforce SameSite. If you must support these, consider a fallback or warning.
+- If you see 'CSRF token missing' errors, you are using an outdated client or backend. Update to the latest version.
+- **For production, always set `JWT_COOKIE_SECURE = True`. Only set to `False` for local development.**
 
-### Token Refresh
+### JWT Authentication Issues
 
-**Issue:** Short-lived access tokens require frequent re-authentication.
+- When using JWT authentication, ensure that CORS headers are properly set in all response paths, including error responses. The JWT decorators must add CORS headers to maintain cookie-based authentication.
 
-**Solution:**
-- Refresh tokens have longer expiration (7 days) and can be used to get new access tokens
-- Token refresh happens automatically when a request receives a 401 response
-- Queuing system ensures multiple simultaneous requests are handled properly
-- Failed refreshes redirect to login page 
+- When receiving 401 Unauthorized errors with JWT cookies, check:
+  1. The JWT identity is always stored as a string (never an integer)
+  2. The User lookup query is using `User.query.get(identity)` instead of `filter_by(id=identity).first()`
+  3. Error responses from JWT-protected routes include proper CORS headers
+  4. The refresh endpoint is properly handling exceptions
+
+- When debugging JWT authentication issues:
+  1. Check browser console for CORS errors
+  2. Verify cookies are being set correctly
+  3. Check that HttpOnly cookies are being properly transmitted
+  4. Ensure error handling in JWT-required routes returns proper CORS headers
+
+- **Cookie SameSite Settings:**
+  - For development (HTTP): Use `SameSite=None` (as Python `None` value, not string 'None') with `Secure=False`
+  - For production (HTTPS): Use `SameSite=Lax` with `Secure=True`
+  - Note: When using `SameSite=None`, frontend requests must include `withCredentials: true`
+  - Setting `JWT_COOKIE_CSRF_PROTECT = False` is required when using SameSite=None in development
+  
+- **Chrome and SameSite Cookies:**
+  - Chrome requires cookies with `SameSite=None` to also be `Secure=True` (requiring HTTPS)
+  - For local development, either:
+    1. Use SameSite=None and configure a local HTTPS setup with a self-signed certificate
+    2. Set SameSite=None (Python None value) and disable CSRF protection for cookies
+    3. Use a browser with more lenient cookie policies for development/testing
+  
+- **For production, always set `JWT_COOKIE_SECURE = True`. Only set to `False` for local development.**
+
+# (Other gotchas remain below...) 

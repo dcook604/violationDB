@@ -20,7 +20,8 @@ from flask_jwt_extended import (
     jwt_required,
     set_access_cookies,
     set_refresh_cookies,
-    unset_jwt_cookies
+    unset_jwt_cookies,
+    verify_jwt_in_request
 )
 from .jwt_config import get_jwt_identity_claims
 from .jwt_auth import jwt_required_api
@@ -39,7 +40,7 @@ def cors_preflight(f):
             if origin:  # Allow any origin in development
                 resp.headers['Access-Control-Allow-Origin'] = origin
                 resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-                resp.headers['Access-Control-Allow-Headers'] = 'Origin, Content-Type, Accept, Authorization, X-Requested-With'
+                resp.headers['Access-Control-Allow-Headers'] = 'Origin, Content-Type, Accept, Authorization, X-Requested-With, X-CSRF-TOKEN, X-CSRFToken, x-csrf-token, Expires, Cache-Control, Pragma'
                 resp.headers['Access-Control-Allow-Credentials'] = 'true'
                 resp.headers['Access-Control-Max-Age'] = '1728000'
             return resp
@@ -53,19 +54,19 @@ def check_session():
         return make_response()
     
     try:
-        if current_user.is_authenticated:
+        if get_jwt_identity():
             # Get origin for CORS
             origin = request.headers.get('Origin')
-            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.6:3000']
+            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
             
             # Include user details in response
             user_data = {
-                'id': current_user.id,
-                'email': current_user.email,
-                'first_name': current_user.first_name,
-                'last_name': current_user.last_name,
-                'role': current_user.role,
-                'is_admin': current_user.is_admin
+                'id': get_jwt_identity(),
+                'email': get_jwt().get('email'),
+                'first_name': get_jwt().get('first_name'),
+                'last_name': get_jwt().get('last_name'),
+                'role': get_jwt().get('role'),
+                'is_admin': get_jwt().get('is_admin')
             }
             
             response = make_response(jsonify({'authenticated': True, 'user': user_data}))
@@ -82,7 +83,7 @@ def check_session():
                 if session_token:
                     # Find the session by token
                     from .models import UserSession
-                    session = UserSession.query.filter_by(token=session_token, user_id=current_user.id, is_active=True).first()
+                    session = UserSession.query.filter_by(token=session_token, user_id=get_jwt_identity(), is_active=True).first()
                     if session and not session.is_expired():
                         session.update_activity()
             
@@ -93,7 +94,7 @@ def check_session():
             
             # Get origin for CORS
             origin = request.headers.get('Origin')
-            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.6:3000']
+            allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
             
             # Only set CORS headers for allowed origins
             if origin and origin in allowed_origins:
@@ -109,7 +110,7 @@ def check_session():
         
         # Get the origin from the request
         origin = request.headers.get('Origin')
-        allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+        allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
         
         # Only set CORS headers for allowed origins
         if origin and origin in allowed_origins:
@@ -192,7 +193,7 @@ def login():
                 response = make_response(jsonify({'user': user_data}))
                 # Get the origin from the request
                 origin = request.headers.get('Origin')
-                allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+                allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
                 # Only set CORS headers for allowed origins
                 if origin and origin in allowed_origins:
                     response.headers['Access-Control-Allow-Origin'] = origin
@@ -259,13 +260,13 @@ def login():
 
 @auth.route('/api/auth/logout', methods=['POST', 'OPTIONS'])
 @cors_preflight
-@login_required
+@jwt_required_api
 def logout():
     if request.method == 'OPTIONS':
         return make_response()
     
     try:
-        user_email = current_user.email
+        user_email = get_jwt().get('email')
         
         # Terminate the current session
         session_token = request.cookies.get('session_token')
@@ -323,14 +324,14 @@ def debug_session():
         return make_response()
     
     # No authentication check - just show the current session state
-    is_authenticated = current_user.is_authenticated
+    is_authenticated = get_jwt_identity()
     user_info = None
     
     if is_authenticated:
         user_info = {
-            'id': current_user.id,
-            'email': current_user.email,
-            'role': 'admin' if current_user.is_admin else 'user'
+            'id': get_jwt_identity(),
+            'email': get_jwt().get('email'),
+            'role': 'admin' if get_jwt().get('is_admin') else 'user'
         }
     
     # Check what cookies we're receiving
@@ -363,7 +364,7 @@ def debug_session():
     
     # Get the origin from the request
     origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
     
     # Only set CORS headers for allowed origins
     if origin and origin in allowed_origins:
@@ -386,7 +387,7 @@ def set_test_cookie():
     
     # Get the origin from the request
     origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
     
     # Only set CORS headers for allowed origins
     if origin and origin in allowed_origins:
@@ -420,35 +421,35 @@ def set_test_cookie():
 
 @auth.route('/api/auth/session-alt')
 def session_check():
-    if current_user.is_authenticated:
+    if get_jwt_identity():
         return jsonify({
             "user": {
-                "id": current_user.id,
-                "email": current_user.email,
-                "first_name": current_user.first_name,
-                "last_name": current_user.last_name,
-                "role": 'admin' if current_user.is_admin else 'user',
-                "is_admin": current_user.is_admin
+                "id": get_jwt_identity(),
+                "email": get_jwt().get('email'),
+                "first_name": get_jwt().get('first_name'),
+                "last_name": get_jwt().get('last_name'),
+                "role": 'admin' if get_jwt().get('is_admin') else 'user',
+                "is_admin": get_jwt().get('is_admin')
             }
         })
     else:
         return jsonify({"user": None}), 200
 
 @auth.route('/api/auth/user-debug', methods=['GET'])
-@login_required
+@jwt_required_api
 def user_debug():
     """Debug endpoint to check current user details"""
     try:
         # Return detailed user information
         user_data = {
-            'id': current_user.id,
-            'email': current_user.email,
-            'first_name': current_user.first_name,
-            'last_name': current_user.last_name,
-            'is_admin': current_user.is_admin,
-            'role': current_user.role,
-            'is_active': current_user.is_active,
-            'is_authenticated': current_user.is_authenticated
+            'id': get_jwt_identity(),
+            'email': get_jwt().get('email'),
+            'first_name': get_jwt().get('first_name'),
+            'last_name': get_jwt().get('last_name'),
+            'is_admin': get_jwt().get('is_admin'),
+            'role': get_jwt().get('role'),
+            'is_active': get_jwt().get('is_active'),
+            'is_authenticated': get_jwt_identity()
         }
         return jsonify({
             'user': user_data,
@@ -461,14 +462,14 @@ def user_debug():
 
 @auth.route('/api/auth/unlock-account', methods=['POST', 'OPTIONS'])
 @cors_preflight
-@login_required
+@jwt_required_api
 def unlock_account():
     """Admin endpoint to unlock a locked user account"""
     if request.method == 'OPTIONS':
         return make_response()
     
     # Verify admin permissions
-    if not current_user.is_admin:
+    if not get_jwt().get('is_admin'):
         return jsonify({'error': 'Admin permissions required'}), 403
     
     try:
@@ -483,7 +484,7 @@ def unlock_account():
             return jsonify({'error': 'User not found'}), 404
             
         user.unlock_account()
-        logger.info(f"Account unlocked: User {user.email} by admin {current_user.email}")
+        logger.info(f"Account unlocked: User {user.email} by admin {get_jwt().get('email')}")
         
         return jsonify({'message': f'Account for {user.email} has been unlocked successfully.'}), 200
         
@@ -493,7 +494,7 @@ def unlock_account():
 
 @auth.route('/api/auth/active-sessions', methods=['GET', 'OPTIONS'])
 @cors_preflight
-@login_required
+@jwt_required_api
 def active_sessions():
     """Get list of active sessions for the current user"""
     if request.method == 'OPTIONS':
@@ -528,7 +529,7 @@ def active_sessions():
 
 @auth.route('/api/auth/terminate-sessions', methods=['POST', 'OPTIONS'])
 @cors_preflight
-@login_required
+@jwt_required_api
 def terminate_sessions():
     """Terminate all other sessions for the current user"""
     if request.method == 'OPTIONS':
@@ -547,7 +548,7 @@ def terminate_sessions():
         # Terminate all other sessions
         count = current_user.terminate_other_sessions(current_session.id)
         
-        logger.info(f"User {current_user.email} terminated {count} other sessions")
+        logger.info(f"User {get_jwt().get('email')} terminated {count} other sessions")
         return jsonify({
             'message': f'Successfully terminated {count} other sessions',
             'count': count
@@ -558,7 +559,7 @@ def terminate_sessions():
 
 @auth.route('/api/auth/terminate-session/<int:session_id>', methods=['POST', 'OPTIONS'])
 @cors_preflight
-@login_required
+@jwt_required_api
 def terminate_specific_session(session_id):
     """Terminate a specific session"""
     if request.method == 'OPTIONS':
@@ -578,7 +579,7 @@ def terminate_specific_session(session_id):
         # Find the session to terminate
         session_to_terminate = UserSession.query.filter_by(
             id=session_id,
-            user_id=current_user.id,
+            user_id=get_jwt_identity(),
             is_active=True
         ).first()
         
@@ -588,7 +589,7 @@ def terminate_specific_session(session_id):
         # Terminate the session
         session_to_terminate.terminate()
         
-        logger.info(f"User {current_user.email} terminated session {session_id}")
+        logger.info(f"User {get_jwt().get('email')} terminated session {session_id}")
         return jsonify({'message': 'Session terminated successfully'})
     except Exception as e:
         logger.error(f"Error terminating session {session_id}: {str(e)}")
@@ -668,9 +669,16 @@ def register_api():
 # --- SESSION TIMEOUT HANDLING ---
 @auth.before_app_request
 def enforce_session_timeouts():
-    # Only enforce for authenticated users
-    if not current_user.is_authenticated:
+    # First, safely check if a JWT token exists
+    try:
+        verify_jwt_in_request(optional=True)
+        # Only enforce for authenticated users
+        if not get_jwt_identity():
+            return
+    except Exception:
+        # If there's any issue with JWT verification, just return without action
         return
+        
     now = datetime.utcnow()
     idle_timeout = current_app.config.get('IDLE_TIMEOUT_MINUTES', 30)
     absolute_timeout = current_app.config.get('PERMANENT_SESSION_LIFETIME', timedelta(hours=24))
@@ -713,8 +721,15 @@ def require_recent_password(func):
         # Require password re-entry within the last 5 minutes
         from flask import session, request, jsonify
         from datetime import datetime, timedelta
-        if not current_user.is_authenticated:
+        
+        # First, safely check if a JWT token exists
+        try:
+            verify_jwt_in_request()
+            if not get_jwt_identity():
+                return jsonify({'error': 'Authentication required'}), 401
+        except Exception:
             return jsonify({'error': 'Authentication required'}), 401
+            
         pw_time = session.get('recent_password_time')
         now = datetime.utcnow()
         if not pw_time or (now - datetime.fromisoformat(pw_time)) > timedelta(minutes=5):
@@ -736,9 +751,9 @@ def require_recent_password(func):
 def admin_required_api(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not current_user.is_authenticated:
+        if not get_jwt_identity():
             return jsonify({'error': 'Authentication required'}), 401
-        if not current_user.is_admin:
+        if not get_jwt().get('is_admin'):
             return jsonify({'error': 'Admin privileges required'}), 403
         return f(*args, **kwargs)
     return decorated_function
@@ -879,9 +894,28 @@ def login_jwt():
         return make_response()
 
     try:
-        data = request.get_json()
+        # Debug output for CSRF tracking
+        logger.info("=== login-jwt endpoint called ===")
+        logger.info(f"CSRF protection: WTF_CSRF_ENABLED={current_app.config.get('WTF_CSRF_ENABLED', 'Not set')}")
+        logger.info(f"JWT_COOKIE_SAMESITE: {current_app.config.get('JWT_COOKIE_SAMESITE')}")
+        logger.info(f"JWT_COOKIE_SECURE: {current_app.config.get('JWT_COOKIE_SECURE')}")
+        logger.info(f"JWT_COOKIE_DOMAIN: {current_app.config.get('JWT_COOKIE_DOMAIN')}")
+        logger.info(f"JWT_COOKIE_CSRF_PROTECT: {current_app.config.get('JWT_COOKIE_CSRF_PROTECT')}")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        logger.info(f"Request cookies: {dict(request.cookies)}")
+        logger.info(f"Request data: {request.data}")
+        logger.info(f"Request form: {request.form}")
+        
+        # Extract request data with explicit error handling
+        try:
+            data = request.get_json()
+            logger.info(f"Parsed JSON data: {data}")
+        except Exception as e:
+            logger.error(f"Failed to parse JSON data: {str(e)}")
+            return jsonify({'error': 'Invalid JSON data'}), 400
         
         if not data:
+            logger.error("No data provided in request")
             return jsonify({'error': 'No data provided'}), 400
 
         email = data.get('email', '').strip()
@@ -956,7 +990,7 @@ def login_jwt():
                 
                 # Get the origin from the request
                 origin = request.headers.get('Origin')
-                allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+                allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
                 
                 # Only set CORS headers for allowed origins
                 if origin and origin in allowed_origins:
@@ -964,6 +998,7 @@ def login_jwt():
                     response.headers['Access-Control-Allow-Credentials'] = 'true'
                 
                 logger.info(f"JWT login successful for user {email}")
+                logger.info(f"Response headers: {dict(response.headers)}")
                 return response
             else:
                 # Record the failed login attempt
@@ -1010,7 +1045,7 @@ def logout_jwt():
     
     # Get the origin from the request
     origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
     
     # Only set CORS headers for allowed origins
     if origin and origin in allowed_origins:
@@ -1031,38 +1066,42 @@ def refresh_jwt():
     if request.method == 'OPTIONS':
         return make_response()
     
-    # Get identity from refresh token
-    identity = get_jwt_identity()
-    
-    # Get claims from refresh token
-    claims = get_jwt()
-    
-    # Create new access token
-    access_token = create_access_token(
-        identity=identity,
-        additional_claims={
-            'role': claims.get('role'),
-            'is_admin': claims.get('is_admin'),
-            'email': claims.get('email')
-        }
-    )
-    
-    # Create response
-    response = make_response(jsonify({'refresh': True}))
-    
-    # Set new access token
-    set_access_cookies(response, access_token)
-    
-    # Get the origin from the request
-    origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
-    
-    # Only set CORS headers for allowed origins
-    if origin and origin in allowed_origins:
-        response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
+    try:
+        # Get identity from refresh token
+        identity = get_jwt_identity()
         
-    return response
+        # Get claims from refresh token
+        claims = get_jwt()
+        
+        # Create new access token
+        access_token = create_access_token(
+            identity=identity,
+            additional_claims={
+                'role': claims.get('role'),
+                'is_admin': claims.get('is_admin'),
+                'email': claims.get('email')
+            }
+        )
+        
+        # Create response
+        response = make_response(jsonify({'refresh': True}))
+        
+        # Set new access token
+        set_access_cookies(response, access_token)
+        
+        # Get the origin from the request
+        origin = request.headers.get('Origin')
+        allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
+        
+        # Only set CORS headers for allowed origins
+        if origin and origin in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            
+        return response
+    except Exception as e:
+        logger.error(f"JWT refresh error: {str(e)}")
+        return jsonify({'error': 'Refresh token invalid or expired'}), 401
 
 @auth.route('/api/auth/status-jwt', methods=['GET', 'OPTIONS'])
 @cors_preflight
@@ -1095,7 +1134,7 @@ def status_jwt():
     
     # Get the origin from the request
     origin = request.headers.get('Origin')
-    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004']
+    allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
     
     # Only set CORS headers for allowed origins
     if origin and origin in allowed_origins:
@@ -1103,3 +1142,84 @@ def status_jwt():
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         
     return response
+
+@auth.route('/api/auth/test-login', methods=['POST', 'OPTIONS'])
+@cors_preflight
+def test_login():
+    """Test login endpoint with no CSRF protection
+    
+    Returns:
+        JSON response with login status
+    """
+    if request.method == 'OPTIONS':
+        return make_response()
+
+    try:
+        # Debug output
+        logger.info("=== test-login endpoint called ===")
+        logger.info(f"Request headers: {dict(request.headers)}")
+        logger.info(f"Request cookies: {dict(request.cookies)}")
+        
+        # Get JSON data
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        email = data.get('email', '').strip()
+        password = data.get('password', '').strip()
+
+        if not email or not password:
+            return jsonify({'error': 'Email and password are required'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        
+        if not user or not user.check_password(password):
+            return jsonify({'error': 'Invalid credentials'}), 401
+            
+        if not user.is_active:
+            return jsonify({'error': 'Account pending approval'}), 403
+        
+        # Get identity and claims for the JWT
+        identity, additional_claims = get_jwt_identity_claims(user)
+        
+        # Create tokens
+        access_token = create_access_token(
+            identity=identity,
+            additional_claims=additional_claims
+        )
+        refresh_token = create_refresh_token(
+            identity=identity,
+            additional_claims=additional_claims
+        )
+        
+        # Create response with user data
+        user_data = {
+            'id': user.id,
+            'email': user.email,
+            'role': 'admin' if user.is_admin else 'user',
+            'is_admin': user.is_admin
+        }
+        
+        # Create a response object
+        response = make_response(jsonify({
+            'login': True,
+            'user': user_data
+        }))
+        
+        # Set JWT cookies
+        set_access_cookies(response, access_token)
+        set_refresh_cookies(response, refresh_token)
+        
+        # Set CORS headers
+        origin = request.headers.get('Origin')
+        allowed_origins = ['http://localhost:3001', 'http://localhost:3002', 'http://172.16.16.6:3001', 'http://172.16.16.6:5004', 'http://172.16.16.26', 'http://172.16.16.26:3001']
+        if origin:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            
+        return response
+            
+    except Exception as e:
+        logger.error(f"Test login error: {str(e)}")
+        return jsonify({'error': 'Authentication error occurred'}), 500

@@ -551,3 +551,42 @@ The Unit Profile UI is implemented using React components:
 - `UnitListPage` - Displays all units with filtering and sorting options
 - `UnitProfileDetailPage` - Shows detailed information for a specific unit
 - `UnitProfileForm` - Form for creating or editing unit profiles 
+
+# JWT Authentication and Security (Updated)
+
+## Cookie-Based CSRF Protection
+- As of [date], explicit CSRF tokens and the /api/csrf-token endpoint have been removed.
+- CSRF protection is now enforced by browser SameSite cookie policy:
+  - All authentication cookies (JWT, session) are set with:
+    - `SameSite=Lax`
+    - `HttpOnly=True`
+    - `Secure=True` (**must be True in production!**, set to False only for local development)
+- No CSRF token headers are required or accepted by the backend.
+
+## JWT Cookie Settings
+- In production: 
+  - `JWT_COOKIE_SAMESITE = 'Lax'`
+  - `JWT_COOKIE_HTTPONLY = True`
+  - `JWT_COOKIE_SECURE = True` (**must be True in production!**)
+  - `JWT_COOKIE_CSRF_PROTECT = True` (optional extra security layer)
+
+- In development: 
+  - `JWT_COOKIE_SAMESITE = None` (Python None value, not string 'None')
+  - `JWT_COOKIE_HTTPONLY = True`
+  - `JWT_COOKIE_SECURE = False` (only for local development with HTTP)
+  - `JWT_COOKIE_CSRF_PROTECT = False` (required when SameSite=None)
+
+> **WARNING:**
+> For production deployments, always set `JWT_COOKIE_SECURE = True` to ensure cookies are only sent over HTTPS. Only set it to `False` for local development and testing.
+>
+> When using `SameSite=None`, frontend API requests must include `withCredentials: true` to ensure cookies are sent with cross-origin requests.
+> 
+> Modern browsers (especially Chrome) require cookies with `SameSite=None` to also be `Secure=True`. This presents a challenge for HTTP development servers. If cookies aren't working in development, consider using Firefox with more lenient cookie settings or set up HTTPS locally.
+
+## Rationale
+- Production: Modern browsers block cookies on cross-origin POSTs when SameSite=Lax is set, preventing CSRF by design.
+- Development: SameSite=None allows cookies to be sent in cross-origin requests, which is needed when frontend and backend are on different ports.
+
+## Migration Note
+- As of [date], all CSRF token logic has been removed. If you need cross-origin POSTs in the future, you must reintroduce CSRF tokens for those endpoints.
+- **For production, always use `JWT_COOKIE_SECURE = True`.** 

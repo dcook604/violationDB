@@ -278,6 +278,22 @@ Key tables:
 - violation_access_logs: Security logs for all access attempts
 - settings: System-wide configuration
 
+## Database Configuration
+
+- **Production database is MariaDB** (see `SQLALCHEMY_DATABASE_URI` in `config.py`). Project was migrated from SQLite to MariaDB for better scalability and production reliability.
+- MariaDB connection uses proper connection pooling parameters:
+  - `pool_size`: Number of connections to keep in the pool (5 in production, 10 in development)
+  - `pool_recycle`: Recycle connections after 30 minutes to prevent stale connections
+  - `pool_pre_ping`: Verify connections are still valid before using them
+  - `pool_timeout`: Maximum time to wait for a connection from the pool
+  - `max_overflow`: Maximum number of connections to create above pool_size
+- Robust error handling added for database operations in `app/db_utils.py`:
+  - `handle_db_errors`: Decorator for graceful error handling in database operations
+  - `safe_commit`: Safely commit changes with error handling
+  - `with_transaction`: Transaction handling decorator
+  - `check_database_connection`: Connection health check
+- Database connection errors are handled gracefully with user-friendly error pages
+
 ---
 
 ## [2025-05-02] User Identity Enhancement

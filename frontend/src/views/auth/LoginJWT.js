@@ -29,7 +29,13 @@ export default function LoginJWT() {
       await login({ email, password });
       // No need to redirect here, the AuthContext will handle it
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Please check your credentials and try again.');
+      // Show more detailed error information
+      console.error("Login error details:", err);
+      let errorMessage = err.response?.data?.error || 'Login failed. Please check your credentials and try again.';
+      if (err.message) {
+        errorMessage += ` (${err.message})`;
+      }
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

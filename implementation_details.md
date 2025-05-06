@@ -775,6 +775,48 @@ Action buttons (View HTML, Download PDF, Edit, Delete) are arranged on a single 
 Delete button is styled red for visual warning.
 Includes a "Go Back" link to the violations list.
 
+# Recent Implementation Details (June 2024)
+
+## CORS and Authentication
+- CORS allowed origins updated to include 172.16.16.6 and 172.16.16.26, resolving cross-origin issues for frontend-backend communication.
+- All API endpoints requiring authentication now use `@jwt_required_api` instead of `@login_required` for SPA compatibility and stateless session management.
+- User identity is accessed via `get_jwt_identity()` in API routes, replacing `current_user.id` for JWT-based flows.
+
+## Form and Validation Updates
+- Unit creation form: Unit number field is now enabled for new units.
+- Tenant information: "Phone" field renamed to "Telephone"; validation updated to require 10-digit numbers. Format guidance is displayed below the input.
+
+## UI/UX Enhancements
+- User Management: Button color conventions standardized (Add User: blue, Edit: yellow, Delete: red, Change Password: gray).
+- Unit Profiles: Building column removed; First Name, Last Name, Rented, Has Dog, Has Cat indicators added; Edit button (yellow) appears next to View.
+- Unit detail page now supports `edit=true` query parameter to enable direct edit mode from the list view.
+
+## API Endpoint Changes
+- All unit-related API endpoints now require JWT authentication and use `get_jwt_identity()` for user context.
+- Example: In `unit_routes.py`, all `@login_required` decorators replaced with `@jwt_required_api`.
+
+## Rationale
+- These changes improve security, maintain SPA compatibility, and enhance user experience while maintaining backward compatibility.
+
+## User Creation: First/Last Name and Position (June 2024)
+- The Add User modal now includes required First Name and Last Name fields above Email.
+- A required Position dropdown is added below Role, with options: Council, Property Manager, Caretaker, Cleaner, Concierge.
+- Backend user creation API updated to accept and store `first_name`, `last_name`, and `position`.
+- Validation ensures all fields are present; error messages are shown for missing/invalid input.
+- User management UI displays these fields for all users.
+- Example API payload:
+```
+{
+  "first_name": "Jane",
+  "last_name": "Doe",
+  "email": "jane@example.com",
+  "role": "user",
+  "position": "Caretaker",
+  "password": "changeme123",
+  "active": true
+}
+```
+
 ---
 
 *Update this file with new technical insights, optimizations, or architectural changes as they arise.* 

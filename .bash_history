@@ -1199,3 +1199,425 @@ npm run build
 chmod +x debug_session.py && python debug_session.py
 source .venv/bin/activate && python debug_session.py
 source /home/violation/.venv/bin/activate
+cd ~
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+w
+ps aux
+ls
+tail -f flask.log
+ls
+tail -f flask_error.log 
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git add .
+git commit -m "feat: Prepare application for production deployment"
+git push origin redesign
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cat app/__init__.py | grep -A 3 "origins"
+cat app/__init__.py | grep -A 2 "if origin and origin in"
+git status
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git diff app/__init__.py
+cat app/__init__.py | grep -A 3 \"origins\"
+git stash save "CORS configuration for 100.75.244.2"
+git pull origin redesign
+git stash pop
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git status
+cd ~
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+cd ~
+ls
+ls -a
+nano .venv
+cd .venv
+dir
+ls -a
+cd ..
+ls
+cd venv
+dir
+cd ..
+ld
+ls -a
+exit
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+flask db upgrade
+source .venv/bin/activate && pip show flask-cors
+flask db upgrade
+alembic upgrade head
+pip install mysqlclient
+alembic upgrade head
+pip install pymysql
+alembic upgrade head
+alembic revision --autogenerate -m "Recreate violations table with static fields"
+alembic upgrade head
+alembic stamp head
+cd ~
+dor
+dir
+cd app
+ls
+cd ..
+updatedb
+exit
+source /home/violation/.venv/bin/activate
+pip install alembic
+alembic upgrade head
+source /home/violation/.venv/bin/activate
+dir
+python3
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+alembic upgrade head
+source venv/bin/activate && pip install alembic
+alembic upgrade head
+flask shell -c "from app import db; from app.models import Violation, ViolationStatusLog; print('Violation:', db.session.query(Violation).first()); print('Status Log:', db.session.query(ViolationStatusLog).first())"
+python3 -c "from app import db; from app.models import Violation, ViolationStatusLog; print('Violation:', db.session.query(Violation).first()); print('Status Log:', db.session.query(ViolationStatusLog).first())"
+pip install argon2-cffi
+python3 -c "from app import db; from app.models import Violation, ViolationStatusLog; print('Violation:', db.session.query(Violation).first()); print('Status Log:', db.session.query(ViolationStatusLog).first())"
+python3 -c "from app import app, db; from app.models import Violation, ViolationStatusLog; with app.app_context(): print('Violation:', db.session.query(Violation).first()); print('Status Log:', db.session.query(ViolationStatusLog).first())"
+python3
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+alembic revision --autogenerate -m "Recreate violations table with static fields"
+source .venv/bin/activate && alembic revision --autogenerate -m "Recreate violations table with static fields"
+python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all(); print('Tables created.')"
+alembic stamp head
+sqlite3 app.db .schema
+python sqlite_to_mariadb_schema.py
+python sqlite_to_mariadb_data.py
+python update_db_config.py
+mysql --version
+sudo systemctl status mariadb
+sudo systemctl status mysql
+mysql -h localhost -P 3309
+mysql -h localhost -P 3309 -u violation -pn2hm13i
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+mysql -h localhost -P 3309 -u violation -pn2hm13i -e "SHOW DATABASES;"
+mysql -h localhost -P 3309 -u violation -pn2hm13i -e "USE violationdb; SHOW TABLES;"
+mysql -h localhost -P 3309 -u violation -pn2hm13i violationdb < mariadb_schema.sql
+mysql -h localhost -P 3309 -u violation -pn2hm13i -e "USE violationdb; SHOW TABLES;"
+mysql -h localhost -P 3309 -u violation -pn2hm13i violationdb < mariadb_data.sql
+mysql -h localhost -P 3309 -u violation -pn2hm13i -e "USE violationdb; SELECT COUNT(*) FROM users; SELECT COUNT(*) FROM field_definitions; SELECT COUNT(*) FROM violation_field_values;"
+flask db stamp head
+source .venv/bin/activate && flask db stamp head
+mysql -h localhost -P 3309 -u violation -pn2hm13i -e "USE violationdb; SELECT * FROM alembic_version;"
+python -c "from app import db; print(db.engine.dialect.name)"
+python -c "from app import create_app, db; app = create_app(); with app.app_context(): print(db.engine.dialect.name)"
+python check_db.py
+mkdir -p app/templates/errors
+source .venv/bin/activate && python check_db.py
+cd frontend && npm run build
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+python3 -c "from app import create_app, db; app = create_app(); with app.app_context(): db.create_all(); print('All tables created.')"
+alembic revision -m "Add static violation fields to violations table" --autogenerate
+source .venv/bin/activate && alembic revision -m "Add static violation fields to violations table" --autogenerate
+alembic upgrade head
+mysql -u root -p -e 'DESCRIBE violation.violations;'
+sqlite3 app.db ".schema violations"
+alembic upgrade head
+sqlite3 app.db "DROP TABLE IF EXISTS violations;"
+alembic upgrade head
+mysql -h localhost -P 3306 -u violationuser -p -e "DROP TABLE IF EXISTS violation.violations;"
+mysql -h localhost -P 3306 -u root -p -e "DROP TABLE IF EXISTS violation.violations;"
+alembic upgrade head
+flask db upgrade
+alembic stamp head
+source /home/violation/.venv/bin/activate
+mysql -u root -p -e "DROP TABLE IF EXISTS violation.violations;"
+ls
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+cd app
+dir
+w
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git add mental_model.md implementation_details.md gotchas.md quick_reference.md && git commit -m "docs: update documentation to reflect React SPA Login component, logo fallback, and new authentication flow" && git push
+git add app/utils.py implementation_details.md gotchas.md quick_reference.md && git commit -m "security: enforce filename sanitization and strict content type validation for uploads; update docs with allowed types and edge cases" && git push
+git add app/violation_routes.py app/user_routes.py implementation_details.md gotchas.md quick_reference.md && git commit -m "security: enforce strict validation and maximum limits for pagination parameters on all paginated endpoints; update docs and gotchas" && git push
+git add app/templates/violations/detail.html implementation_details.md gotchas.md quick_reference.md && git commit -m "security: add restrictive Content Security Policy (CSP) to generated HTML/PDFs to prevent XSS; update docs and gotchas" && git push
+npx tailwindcss -i ./frontend/src/assets/styles/index.css -c ./frontend/tailwind.config.js -o ./app/static/tailwind.css --minify
+npx --yes tailwindcss -i ./frontend/src/assets/styles/index.css -c ./frontend/tailwind.config.js -o ./app/static/tailwind.css --minify
+npm install tailwindcss
+npx tailwindcss -i ./frontend/src/assets/styles/index.css -c ./frontend/tailwind.config.js -o ./app/static/tailwind.css --minify
+npx tailwindcss@latest -i ./frontend/src/assets/styles/index.css -c ./frontend/tailwind.config.js -o ./app/static/tailwind.css --minify
+./node_modules/.bin/tailwindcss -i ./frontend/src/assets/styles/index.css -c ./frontend/tailwind.config.js -o ./app/static/tailwind.css --minify
+cd frontend && npx tailwindcss -i ./src/assets/styles/index.css -c ./tailwind.config.js -o ../app/static/tailwind.css --minify && cd ..
+cd frontend && npx tailwindcss build ./src/assets/styles/index.css -c ./tailwind.config.js -o ../app/static/tailwind.css --minify && cd ..
+sudo systemctl restart gunicorn || sudo systemctl restart violation || sudo systemctl restart app || sudo systemctl restart nginx
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+mkdir frontend/src/utils
+mkdir frontend/src/hooks
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+git add app/auth_routes.py app/config.py implementation_details.md gotchas.md quick_reference.md && git commit -m "security: enforce session idle/absolute timeout, secure cookies, and re-authentication for sensitive actions; update docs" && git push
+git add frontend/src/utils/violationFormConfig.js frontend/src/components/StaticViolationForm.js && git commit -m "fix: allow phone numbers in (000) 000-0000 or 000-000-0000 format on create violation form" && git push
+pip show weasyprint
+npx tailwindcss -i ./frontend/src/assets/styles/index.css -c ./frontend/tailwind.config.js -o ./app/static/tailwind.css --minify
+./node_modules/.bin/tailwindcss -i ./frontend/src/assets/styles/index.css -c ./frontend/tailwind.config.js -o ./app/static/tailwind.css --minify
+cd frontend && npx tailwindcss -i ./src/assets/styles/index.css -c ./tailwind.config.js -o ../app/static/tailwind.css --minify && cd ..
+cd frontend && npx tailwindcss build ./src/assets/styles/index.css -c ./tailwind.config.js -o ../app/static/tailwind.css --minify && cd ..
+git add app/violation_routes.py frontend/src/components/ViolationList.js frontend/src/components/ViolationsTable.js frontend/src/components/ViolationDetail.js frontend/src/App.js implementation_details.md quick_reference.md gotchas.md && git commit -m "feat: enhance Violation Detail page" -m "- Use public_id (UUID) in URLs and API" -m "- Display all static fields and evidence" -m "- Improve button layout and add Go Back link" -m "- Update documentation" && git push
+git add frontend/src/components/common/Layout.js frontend/src/views/Dashboard.js && git commit -m "refactor: update UI text and dashboard table" -m "- Rename header to 'Spectrum 4 Violation System'" -m "- Add 'Unit No.' column to dashboard recent violations table" && git push
+mysql -h localhost -P 3309 -u violation -pn2hm13i violationdb -e "SELECT id FROM violations WHERE reference = 'VIO-20250505-702083';"
+mysql -h localhost -P 3309 -u violation -pn2hm13i violationdb -e "DELETE FROM violation_field_values WHERE violation_id = 1; DELETE FROM violation_status_log WHERE violation_id = 1; DELETE FROM violation_replies WHERE violation_id = 1; DELETE FROM violations WHERE id = 1;"
+flask db migrate -m "Add unit_profiles table"
+source .venv/bin/activate && pip install Flask-Cors
+source .venv/bin/activate && flask db migrate -m "Add unit_profiles table"
+source venv/bin/activate && alembic revision --autogenerate -m 'Add unit_profiles table'
+source venv/bin/activate && pip install PyMySQL
+source venv/bin/activate && alembic revision --autogenerate -m 'Add unit_profiles table'
+source venv/bin/activate && alembic upgrade head
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+source venv/bin/activate && alembic upgrade head
+source venv/bin/activate && alembic stamp b7b558b58f31
+source venv/bin/activate && alembic upgrade head
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+source venv/bin/activate && alembic upgrade head
+mysql -h localhost -P 3309 -u violation -p violationdb -e "DESCRIBE unit_profiles;"
+mysql -h localhost -P 3309 -u root -p violationdb -e "DESCRIBE unit_profiles;"
+git add app/models.py migrations/versions/893169bd5579_add_unit_profiles_table.py app/unit_routes.py migrations/env.py alembic.ini docs/mental_model.md docs/implementation_details.md docs/gotchas.md docs/quick_reference.md
+git commit -m "Add Unit Profile feature with database migration and documentation"
+source venv/bin/activate && pip install Flask-Limiter
+git add app/mail_utils.py app/templates/email/password_reset.html app/auth_routes.py frontend/src/pages/LoginPage.js frontend/src/pages/ForgotPasswordPage.js frontend/src/pages/ResetPasswordPage.js frontend/src/App.js app/__init__.py docs/mental_model.md docs/implementation_details.md docs/gotchas.md docs/quick_reference.md requirements.txt
+git commit -m "feat: Implement Forgot Password feature with email tokens and rate limiting"
+cd frontend && npm run test -- --testPathPattern=setupTests.js
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd frontend && npm run build > build.log 2>&1 && echo "Build completed" || echo "Build failed" && tail -n 15 build.log
+cd frontend && npm run build > build.log 2>&1 && echo "Build completed" || echo "Build failed" && tail -n 20 build.log
+cd frontend && ls -la && npm run build > build.log 2>&1 && echo "Build completed" || echo "Build failed" && tail -n 20 build.log
+ls -la && cd /home/violation/frontend && ls -la
+cd /home/violation/frontend && mkdir -p src/components/units
+cd /home/violation/frontend && npm run build > build.log 2>&1 && echo "Build completed successfully" || echo "Build failed" && tail -n 20 build.log
+npm run build > build.log 2>&1 && echo "Build completed successfully" || echo "Build failed" && tail -n 20 build.log
+cd /home/violation && ls -la .venv/bin
+cd /home/violation && chmod +x reset_servers.sh && ./reset_servers.sh
+cd /home/violation && ./reset_servers.sh
+cd /home/violation && echo "===== SHUTTING DOWN PROCESSES ====="; fuser -k 3001/tcp; sleep 1; ./reset_servers.sh
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && ls -la | grep -i doc
+cd /home/violation && git status
+cd /home/violation && git add docs/development.md docs/gotchas.md reset_servers.sh requirements.txt frontend/src/components/units/UnitList.js frontend/src/views/UnitListPage.js frontend/src/views/UnitProfileDetailPage.js frontend/src/pages/*.js frontend/src/components/common/Layout.js frontend/src/App.js
+cd /home/violation && git commit -m "Fix build issues and improve developer experience. Update documentation for server management and dependency resolution."
+cd /home/violation && git push
+cd /home/violation && git add frontend/src/App.js docs/gotchas.md && git commit -m "Fix React Router order issue in App.js and add Router documentation" && git push
+cd /home/violation && mysql -u root -p -e "SHOW GRANTS FOR 'violation'@'localhost'; SHOW GRANTS FOR 'violation'@'%'; SHOW GRANTS FOR 'violation'@'172.17.0.1';" -p$MYSQL_ROOT_PASSWORD 2>&1 || echo "Cannot connect to MySQL"
+cd /home/violation && mysql -h localhost -P 3309 -u root -p -e "SHOW GRANTS FOR 'violation'@'localhost'; SHOW GRANTS FOR 'violation'@'%';" -pn2hm13i 2>&1 || echo "Cannot connect to MySQL"
+cd /home/violation && mysql -h localhost -P 3309 -u root -p -e "SELECT User, Host FROM mysql.user;" -pn2hm13i
+cd /home/violation && mysql -h localhost -P 3309 -u root -p -e "GRANT ALL PRIVILEGES ON violationdb.* TO 'violation'@'172.17.0.1' IDENTIFIED BY 'n2hm13i'; FLUSH PRIVILEGES;" -pn2hm13i
+cd /home/violation && ./reset_servers.sh
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && tail -n 30 flask.log
+cd /home/violation && curl -s http://localhost:5004/api/units | head -n 20
+cd /home/violation && grep -r "def get_units" app/
+cd /home/violation && grep -r "@unit_api.route('/units'" app/
+cd /home/violation && grep -r "Blueprint('unit" app/
+cd /home/violation && python -m flask db current
+cd /home/violation && python3 -m flask db current
+cd /home/violation && source .venv/bin/activate && python -m flask db current
+cd /home/violation && mysql -h localhost -P 3309 -u root -p -e "SHOW TABLES FROM violationdb;" -pn2hm13i
+cd /home/violation && curl -s -X POST http://localhost:5004/api/units -H "Content-Type: application/json" -b "session=test" -d '{"unit_number":"101", "owner_first_name":"Test", "owner_last_name":"Owner", "owner_email":"test@example.com", "owner_telephone":"123-456-7890"}' | jq
+cd /home/violation && mysql -h localhost -P 3309 -u root -p -e "DESCRIBE violationdb.unit_profiles;" -pn2hm13i
+cd /home/violation && echo "from app import create_app, db; from app.models import User, UnitProfile; app = create_app('development'); with app.app_context(): unit_count = UnitProfile.query.count(); print(f'Current unit count: {unit_count}'); if unit_count == 0: test_unit = UnitProfile(unit_number='101', owner_first_name='Test', owner_last_name='Owner', owner_email='test@example.com', owner_telephone='555-123-4567', has_dog=False, has_cat=True, is_rented=False); db.session.add(test_unit); db.session.commit(); print(f'Created test unit: {test_unit.unit_number}'); units = UnitProfile.query.all(); print(f'Total units: {len(units)}');" > create_unit.py && source .venv/bin/activate && python create_unit.py
+cd /home/violation && source .venv/bin/activate && python create_unit.py
+cd /home/violation && ./reset_servers.sh
+source /home/violation/.venv/bin/activate
+source venv/bin/activate && alembic upgrade head
+cd frontend && npm run build
+npm run bild
+cd frontend && npm run build
+cd ..
+cd frontend && npm run build
+cd ..
+cd frontend && npm run build
+cd ..
+cd frontend && npm run build
+cd ..
+cd frontend && npm run build > build.log 2>&1 && echo "Build completed" || echo "Build failed" && tail -n 15 build.log
+npm install
+npm run build
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+find /home/violation/frontend/src -name "App.js" | xargs cat
+cat /home/violation/frontend/src/api.js
+cd /home/violation/frontend && cat src/App.js | grep -A5 "path={dashboardPath}"
+cd /home/violation/frontend && cat src/utils/routeMapper.js | grep dashboardPath
+cd /home/violation/frontend && cat src/utils/routeMapper.js | head -15
+cd /home/violation && grep -r "/r/d5f8a61b2e4c" --include="*.js" .
+cd /home/violation/frontend && grep -r "dashboardPath" --include="*.js" .
+cd /home/violation/frontend && grep -r "ObfuscatedRouter" --include="*.js" .
+cd /home/violation/frontend && grep -r "import.*obfuscateRoute" --include="*.js" .
+grep -r "NewViolationPage" --include="*.js" /home/violation/frontend/src/
+grep -r "units\/new" --include="*.js" /home/violation/frontend/src/
+find /home/violation/frontend/src -type f -name "*Unit*.js" | xargs grep -l "create\|new" | sort
+find /home/violation/frontend/src/views -type f -name "UnitCreatePage.js" || echo "File not found"
+cd /home/violation && bash ./reset_servers.sh
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && git status
+cd /home/violation && git add docs/gotchas.md docs/path_obfuscation.md frontend/src/App.js frontend/src/components/ViolationDetail.js frontend/src/components/ObfuscatedRouter.js frontend/src/components/units/UnitList.js frontend/src/views/UnitListPage.js frontend/src/views/UnitProfileDetailPage.js frontend/src/views/UnitCreatePage.js frontend/src/utils/routeMapper.js
+cd /home/violation && git commit -m "Implement path obfuscation and fix route handling issues"
+cd /home/violation && git push origin redesign
+cd /home/violation && source .venv/bin/activate && pip install flask-jwt-extended flask-wtf
+cd /home/violation && git add app/jwt_config.py app/jwt_auth.py app/csrf_routes.py app/test_jwt_routes.py app/__init__.py app/auth_routes.py frontend/src/context/AuthContextJWT.js frontend/src/views/auth/LoginJWT.js frontend/src/api.js docs/jwt_authentication.md docs/gotchas.md test_jwt.py
+cd /home/violation && git add -f app/test_jwt_routes.py test_jwt.py
+cd /home/violation && git commit -m "Implement JWT-based authentication with HttpOnly cookies and CSRF protection"
+cd /home/violation && git push origin redesign
+pip install Flask-JWT-Extended==4.5.3
+pip install Flask-JWT-Extended==4.7.1
+python test_jwt.py admin@example.com password123
+ps aux | grep flask
+python test_jwt.py admin@example.com password123
+python jwt_login_test.py
+python -c "import requests; r = requests.get('http://172.16.16.6:5004/api/csrf-token', allow_redirects=False); print(f'Status: {r.status_code}'); print('Headers:'); [print(f'  {k}: {v}') for k, v in r.headers.items()]; print('Cookies:'); [print(f'  {c.name}: {c.value}') for c in r.cookies]; print('Body:'); print(r.text)"
+python jwt_login_test.py
+cd /home/violation && git status
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && tail -n 50 flask_error.log
+cd frontend && npm run build
+cd ..
+cd frontend && npm run build
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+mysql -h localhost -P 3306 -u violationuser -p
+mysql -h localhost -P 3309 -u violation -p violationdb
+mysql -h localhost -P 3309 -u root -p violationdb
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+cd frontend/
+tail -f react.log 
+ls
+cd ..
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+cd frontend/
+dir
+tail -f react.log 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f react.log 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+vcd ..
+cd ..
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+cd frontend/
+dir
+tail -f react.log 
+ls
+tail -f flask_error.log 
+cd ..
+ls
+tail -f flask_error.log 
+ls
+cd frontend/
+dir
+tail -f react.log 
+cd ..
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+cd frontend/
+dir
+tail -f react.log 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f react.log 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+cd ..
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+cd frontend/
+ls
+tail react.log 
+cd ..
+tail -f flask_error.log 
+./reset_servers.sh
+ls
+tail -f flask_error.log 
+ls
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+./reset_servers.sh
+ls
+nano reset_servers.sh 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+nano reset_servers.sh 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask_error.log 
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+ls
+tail -f flask_error.log 
+ls
+tail -f flask.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+w
+ps aux
+w
+ls
+tail -f flask_error.log 
+w
+ps aux
+w
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask_error.log 
+./reset_servers.sh
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask_error.log 
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask_error.log 
+ls
+tail -f flask.log
+./reset_servers.sh
+tail -f flask.log
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask.log
+./reset_servers.sh
+tail -f flask.log
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask.log
+./reset_servers.sh
+lsof -i -P -n | grep LISTEN | grep -E '3001|5004'
+tail -f flask.log
+./reset_servers.sh
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+find . -type f -not -path "*/node_modules/*" -not -path "*/.git/*" -exec grep -l "176\.16\.16" {} \;
+find ./frontend/build -type f -name "*.js" -exec grep -l "176\.16\.16" {} \; 2>/dev/null || echo "No matching files found"
+find ./frontend -type f -name "*.js" -not -path "*/node_modules/*" -not -path "*/.git/*" -exec grep -l "176\.16\.16" {} \; 2>/dev/null || echo "No matching files found"
+ls -la ./frontend/build/ 2>/dev/null || echo "No build directory found"
+find ./frontend/build/static -type f -name "*.js" -exec grep -l "176\.16\.16" {} \; 2>/dev/null || echo "No matching files found"
+grep -r "176\.16\.16" ./frontend/build/ 2>/dev/null
+grep -r "176\.16\.16" ./frontend/public/ 2>/dev/null || echo "No matching files found"
+ls -la ./frontend/.env* 2>/dev/null || echo "No .env files found"
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+tail -n 100 /home/violation/flask_error.log | grep -A 10 "ERROR"
+ps aux | grep python
+cd /home/violation && find . -name "*.log" -type f
+. "\home\violation\.cursor-server\cli\servers\Stable-0781e811de386a0c5bcb07ceb259df8ff8246a50\server\out\vs\workbench\contrib\terminal\common\scripts\shellIntegration-bash.sh"
+cd /home/violation && python -c "import logging; logging.basicConfig(level=logging.DEBUG); print('Debugging level set to DEBUG')"
+cd /home/violation && python3 -c "import logging; logging.basicConfig(level=logging.DEBUG); print('Debugging level set to DEBUG')"
+cd /home/violation && tail -n 200 flask.log

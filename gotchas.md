@@ -268,6 +268,18 @@ The system has fallback mechanisms for PDF generation failures:
 
 - If evidence links (`/evidence/...`) are broken, verify the base path in `ViolationDetail.js` and the file serving logic in `violation_routes.py` (`get_evidence_file`).
 
+## New Edge Cases and Troubleshooting (June 2024)
+
+- **CORS Misconfiguration**: If the frontend cannot access the backend API, verify that the backend's allowed origins include the correct IPs (e.g., 172.16.16.6, 172.16.16.26). CORS errors will appear in the browser console if not configured properly.
+- **JWT Session Timeout/Password Recency**: If users are unexpectedly logged out or denied access, check the `enforce_session_timeouts` and `require_recent_password` logic. Ensure JWT tokens are refreshed and password recency is enforced as intended.
+- **Telephone Validation**: The tenant "Telephone" field now requires a 10-digit number. Users may encounter validation errors if entering non-numeric or incorrectly formatted numbers. Format guidance is shown below the input.
+- **UI Color Consistency**: Button colors in User Management and Unit Profiles have been standardized. If colors appear incorrect, verify CSS class assignments and ensure the latest styles are loaded.
+- **Edit Button Placement**: The Edit button in Unit Profiles is now yellow and appears next to the View button. If missing, check for correct rendering logic and updated component code.
+- **Unit Profile Display Issues**: If fields are missing or not visible in the unit profile page, ensure the latest frontend code is deployed and that the backend API returns all expected fields. Debug by checking API responses and React component props.
+- **User Creation Fields (June 2024):** First Name, Last Name, and Position are now required for all new users. If any are missing or invalid, user creation will fail with a validation error.
+- **Position Dropdown Validation:** Only the allowed values (Council, Property Manager, Caretaker, Cleaner, Concierge) are accepted. Any other value will be rejected by the backend.
+- **Existing Users:** Existing users without first/last name or position will remain valid, but editing or re-saving may require these fields to be filled in.
+
 ---
 
 *Update this file immediately when new issues, bugs, or edge cases are discovered.* 

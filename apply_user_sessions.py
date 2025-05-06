@@ -19,46 +19,19 @@ app = create_app()
 def apply_migration():
     """Apply the database migration for user session management"""
     try:
-        # Check database type
-        with app.app_context():
-            is_sqlite = 'sqlite' in db.engine.url.drivername
-            
-        # Read the appropriate SQL file
-        sql_file_path = 'add_user_sessions_sqlite.sql' if is_sqlite else 'add_user_sessions.sql'
+        sql_file_path = 'add_user_sessions.sql'
         
-        logger.info(f"Using SQL file: {sql_file_path} for database type: {'SQLite' if is_sqlite else 'MySQL/PostgreSQL'}")
+        logger.info(f"Using SQL file: {sql_file_path} for MariaDB database")
         
         try:
             with open(sql_file_path, 'r') as sql_file:
                 sql_content = sql_file.read()
         except FileNotFoundError:
             logger.error(f"SQL file {sql_file_path} not found. Creating one...")
-            if is_sqlite:
-                # Create SQLite migration
-                with open('add_user_sessions_sqlite.sql', 'w') as f:
-                    f.write("""-- Add user sessions table for SQLite
-
--- Create user_sessions table
-CREATE TABLE user_sessions (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    token VARCHAR(64) NOT NULL UNIQUE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_activity DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at DATETIME NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT 1,
-    user_agent VARCHAR(255),
-    ip_address VARCHAR(45),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- Add indexes
-CREATE INDEX idx_user_sessions_user_active ON user_sessions(user_id, is_active);
-CREATE INDEX idx_user_sessions_token ON user_sessions(token);""")
-            else:
-                # Create MySQL/PostgreSQL migration
-                with open('add_user_sessions.sql', 'w') as f:
-                    f.write("""-- Add user sessions table for session management
+            
+            # Create MariaDB migration file with proper engine and collation settings
+            with open('add_user_sessions.sql', 'w') as f:
+                f.write("""-- Add user sessions table for session management in MariaDB
 
 -- Create user_sessions table
 CREATE TABLE user_sessions (
@@ -72,11 +45,12 @@ CREATE TABLE user_sessions (
     user_agent VARCHAR(255),
     ip_address VARCHAR(45),
     FOREIGN KEY (user_id) REFERENCES users(id)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Add indexes
+-- Add indexes for performance optimization
 CREATE INDEX idx_user_sessions_user_active ON user_sessions(user_id, is_active);
-CREATE INDEX idx_user_sessions_token ON user_sessions(token);""")
+CREATE INDEX idx_user_sessions_token ON user_sessions(token);
+CREATE INDEX idx_user_sessions_expires ON user_sessions(expires_at);""")
             
             # Read the newly created file
             with open(sql_file_path, 'r') as sql_file:
@@ -91,7 +65,6 @@ CREATE INDEX idx_user_sessions_token ON user_sessions(token);""")
             
             try:
                 # Split SQL into individual statements, removing comments and empty lines
-                # This regex matches SQL statements terminated by semicolons, ignoring semicolons in comments
                 statements = []
                 for statement in re.split(r';(?=[^-])', sql_content):
                     # Remove comments and empty lines

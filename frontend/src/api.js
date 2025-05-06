@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://172.16.16.6:5004',  // Updated to use IP address instead of localhost
+  baseURL: 'http://172.16.16.6:5004',  // Reverted to correct backend server IP
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -14,12 +14,12 @@ let isRefreshing = false;
 let failedQueue = [];
 
 // Process the queue of failed requests
-const processQueue = (error, token = null) => {
+const processQueue = (error) => {
   failedQueue.forEach(prom => {
     if (error) {
       prom.reject(error);
     } else {
-      prom.resolve(token);
+      prom.resolve();
     }
   });
   
@@ -29,8 +29,15 @@ const processQueue = (error, token = null) => {
 // Add request interceptor to handle request configuration
 API.interceptors.request.use(
   (config) => {
-    // Ensure withCredentials is set for all requests
     config.withCredentials = true;
+    
+    // Add cache control headers for GET requests to prevent caching
+    if (config.method === 'get') {
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+    }
+    
     console.log(`API Request: ${config.method.toUpperCase()} ${config.url}`);
     return config;
   },
@@ -57,15 +64,16 @@ API.interceptors.response.use(
     // Handle network errors
     if (!error.response) {
       console.error('Network Error:', error);
+      
       return Promise.reject({
         response: {
           data: {
-            error: 'Network error. Please check your connection and try again.'
+            error: 'Network error. Server may be unavailable or not accessible at this address. Please check your connection and try again.'
           }
         }
       });
     }
-
+    
     // Handle 401 Unauthorized with token refresh
     if (error.response.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

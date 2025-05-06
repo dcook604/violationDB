@@ -4,6 +4,13 @@ A modern, modular web application for logging, managing, and reporting strata vi
 
 ---
 
+## Branding Update
+
+- The application is now branded as **Spectrum 4 Violation Tracking**.
+- The login page displays the Spectrum 4 logo (`logospectrum.png`) above the sign-in form for a professional, branded experience.
+
+---
+
 ## Changelog
 
 2025-04-29: Fixed login, register, and reset password templates to display forms correctly by moving content from block 'container' to block 'content' as per base.html structure.
@@ -24,6 +31,7 @@ A modern, modular web application for logging, managing, and reporting strata vi
 
 ## Features
 - User authentication (login, registration, password reset)
+- **Branded login page with Spectrum 4 logo**
 - Dashboard with quick access to violation logging and records
 - Submit violation reports with file uploads (photos, PDFs)
 - PDF generation for each violation (WeasyPrint)
@@ -227,3 +235,38 @@ This application is designed to be deployed using a production-grade WSGI server
 9.  **DNS & Firewall:** Ensure your DNS points to the server IP and firewall rules allow traffic on ports 80 and 443.
 
 Refer to the specific configuration files (`gunicorn.conf.py`, `nginx_violation.spectrum4.ca.conf`, `violation.service`, `app/config.py`) for detailed settings.
+
+## Database
+
+This project uses MariaDB as the database. The configuration is in `app/config.py` with proper connection pooling 
+and error handling. Database connections are managed by SQLAlchemy with the following features:
+
+- Connection pooling to efficiently manage database connections
+- Connection recycling to prevent stale connections
+- Connection validation with pre-ping
+- Comprehensive error handling for database operations
+- Graceful error recovery for common database issues
+
+### Database Connection Parameters
+
+The application uses the following MariaDB connection parameters:
+
+```python
+# Development
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_size': 10,          # Default number of database connections in the pool
+    'max_overflow': 20,       # Maximum number of connections to create above pool_size
+    'pool_timeout': 30,       # Seconds to wait before giving up on getting a connection
+    'pool_recycle': 1800,     # Recycle connections after 30 minutes to avoid stale connections
+    'pool_pre_ping': True,    # Issue a test query on the connection to check if it's still valid
+}
+
+# Production (more conservative)
+SQLALCHEMY_ENGINE_OPTIONS = {
+    'pool_size': 5,           # Start with fewer connections for better server resource management
+    'max_overflow': 10,       # Allow fewer overflow connections
+    'pool_timeout': 60,       # Wait longer in production before giving up
+    'pool_recycle': 1800,     # Recycle connections after 30 minutes
+    'pool_pre_ping': True,    # Always verify connection is valid before using it
+}
+```

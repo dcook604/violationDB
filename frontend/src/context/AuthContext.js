@@ -13,7 +13,7 @@ export function AuthProvider({ children }) {
   const checkSession = useCallback(async () => {
     try {
       console.log("Checking session...");
-      const response = await API.get('/api/auth/session');
+      const response = await API.get('/api/auth/status-jwt');
       console.log("Session response:", response.data);
       
       if (response.data.user) {
@@ -37,7 +37,10 @@ export function AuthProvider({ children }) {
   }, [navigate]);
 
   useEffect(() => {
+    // Failsafe: set loading to false after 5 seconds no matter what
+    const timeout = setTimeout(() => setLoading(false), 5000);
     checkSession();
+    return () => clearTimeout(timeout);
   }, [checkSession]);
 
   const login = async (credentials) => {
@@ -45,10 +48,16 @@ export function AuthProvider({ children }) {
       setError(null);
       console.log("Attempting login with:", credentials.email);
       
-      const response = await API.post('/api/auth/login', credentials);
+      // Use JWT login endpoint which has CSRF exemption
+      const response = await API.post('/api/auth/login-jwt', credentials);
       console.log("Login response:", response.data);
       
+      // JWT login returns user differently
       if (response.data.user) {
+        setUser(response.data.user);
+        navigate('/dashboard');
+        return response.data;
+      } else if (response.data.login === true && response.data.user) {
         setUser(response.data.user);
         navigate('/dashboard');
         return response.data;
@@ -66,7 +75,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       console.log("Logging out...");
-      await API.post('/api/auth/logout');
+      await API.post('/api/auth/logout-jwt');
       setUser(null);
       navigate('/login');
     } catch (error) {
@@ -75,6 +84,7 @@ export function AuthProvider({ children }) {
   };
 
   if (loading) {
+    console.log("AuthProvider loading:", loading, "user:", user);
     return <div className="flex justify-center items-center h-screen">
       <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
     </div>;

@@ -60,6 +60,7 @@ class User(UserMixin, db.Model):
     last_failed_login = db.Column(db.DateTime)
     account_locked_until = db.Column(db.DateTime)
     password_algorithm = db.Column(db.String(20), default='argon2')  # Track password hash algorithm
+    position = db.Column(db.String(50), nullable=True)  # Council, Property Manager, Caretaker, Cleaner, Concierge
 
     @classmethod
     def generate_temp_password(cls, length=12):

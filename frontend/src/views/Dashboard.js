@@ -4,13 +4,16 @@ import API from "../api";
 import { Link } from "react-router-dom";
 
 // Components
-const StatCard = ({ title, value, icon, color }) => (
+const StatCard = ({ title, value, icon, color, subtitle }) => (
   <div className="relative flex flex-col min-w-0 break-words bg-white rounded mb-6 xl:mb-0 shadow-lg">
     <div className="flex-auto p-4">
       <div className="flex flex-wrap">
         <div className="relative w-full pr-4 max-w-full flex-grow flex-1">
           <h5 className="text-blueGray-400 uppercase font-bold text-xs">
             {title}
+            {subtitle && (
+              <span className="block pt-1 text-xs">{subtitle}</span>
+            )}
           </h5>
           <span className="font-semibold text-xl text-blueGray-700">
             {value}
@@ -18,7 +21,7 @@ const StatCard = ({ title, value, icon, color }) => (
         </div>
         <div className="relative w-auto pl-4 flex-initial">
           <div className={`text-white p-3 text-center inline-flex items-center justify-center w-12 h-12 shadow-lg rounded-full ${color}`}>
-            <i className={icon}></i>
+            <i className={`${icon} text-lg`}></i>
           </div>
         </div>
       </div>
@@ -115,7 +118,8 @@ const RecentViolationsTable = ({ violations }) => (
 export default function Dashboard() {
   const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState({
-    totalViolations: 0,
+    totalViolationsLastYear: 0,
+    repeatOffenders: 0,
     activeViolations: 0,
     resolvedViolations: 0
   });
@@ -184,15 +188,24 @@ export default function Dashboard() {
         <div className="px-4 md:px-10 mx-auto w-full">
           <div>
             <div className="flex flex-wrap">
-              <div className="w-full lg:w-6/12 xl:w-4/12 px-4">
+              <div className="w-full lg:w-6/12 xl:w-3/12 px-4">
                 <StatCard
                   title="Total Violations"
-                  value={stats.totalViolations}
+                  subtitle="(Last Year)"
+                  value={stats.totalViolationsLastYear}
                   icon="fas fa-chart-bar"
                   color="bg-red-500"
                 />
               </div>
-              <div className="w-full lg:w-6/12 xl:w-4/12 px-4">
+              <div className="w-full lg:w-6/12 xl:w-3/12 px-4">
+                <StatCard
+                  title="Repeat Offenders"
+                  value={stats.repeatOffenders}
+                  icon="fas fa-exclamation-triangle"
+                  color="bg-yellow-500"
+                />
+              </div>
+              <div className="w-full lg:w-6/12 xl:w-3/12 px-4">
                 <StatCard
                   title="Active Violations"
                   value={stats.activeViolations}
@@ -200,7 +213,7 @@ export default function Dashboard() {
                   color="bg-orange-500"
                 />
               </div>
-              <div className="w-full lg:w-6/12 xl:w-4/12 px-4">
+              <div className="w-full lg:w-6/12 xl:w-3/12 px-4">
                 <StatCard
                   title="Resolved Violations"
                   value={stats.resolvedViolations}

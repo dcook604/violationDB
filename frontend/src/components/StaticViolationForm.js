@@ -123,7 +123,7 @@ export default function StaticViolationForm({ onSubmit, submitLabel = 'Submit' }
     if (!f.owner_email) errs.owner_email = 'Email is required.';
     else if (!isValidEmail(f.owner_email)) errs.owner_email = 'Invalid email.';
     if (!f.owner_telephone) errs.owner_telephone = 'Telephone is required.';
-    else if (!isValidPhone(f.owner_telephone)) errs.owner_telephone = 'Format: (000) 000-0000 or 000-000-0000';
+    else if (!isValidPhone(f.owner_telephone)) errs.owner_telephone = 'Format: (000) 000-0000 or 000-000-0000 or 10 digits';
     if (!f.violation_category) errs.violation_category = 'Category is required.';
     if (!f.where_did) errs.where_did = 'Location is required.';
     if (!f.was_security_or_police_called) errs.was_security_or_police_called = 'This field is required.';
@@ -133,7 +133,7 @@ export default function StaticViolationForm({ onSubmit, submitLabel = 'Submit' }
 
     // Optional fields format validation
     if (f.tenant_email && !isValidEmail(f.tenant_email)) errs.tenant_email = 'Invalid email.';
-    if (f.tenant_phone && !isValidPhone(f.tenant_phone)) errs.tenant_phone = 'Format: (000) 000-0000 or 000-000-0000';
+    if (f.tenant_phone && !isValidPhone(f.tenant_phone)) errs.tenant_phone = 'Format: (000) 000-0000 or 000-000-0000 or 10 digits';
 
     // File validation handled in handleFileChange, just check if an error exists
     if (errors.attach_evidence) errs.attach_evidence = errors.attach_evidence;
@@ -267,7 +267,7 @@ export default function StaticViolationForm({ onSubmit, submitLabel = 'Submit' }
           {/* --- Row 2: Unit & Building --- */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
              {renderFormGroup('Unit No.', 'unit_no', true,
-               <input type="number" id="unit_no" name="unit_no" value={form.unit_no} onChange={handleChange} className={`border p-2 rounded w-full ${errors.unit_no ? 'border-red-500' : 'border-gray-300'}`} required placeholder="ex: 23" />,
+               <input type="text" id="unit_no" name="unit_no" value={form.unit_no} onChange={handleChange} className={`border p-2 rounded w-full ${errors.unit_no ? 'border-red-500' : 'border-gray-300'}`} required placeholder="ex: TH12 or 23" />,
                errors.unit_no
              )}
              {renderSelect('Building', 'building', BUILDING_OPTIONS, true, errors.building)}
@@ -292,7 +292,10 @@ export default function StaticViolationForm({ onSubmit, submitLabel = 'Submit' }
                errors.owner_email
             )}
             {renderFormGroup('Telephone', 'owner_telephone', true,
-               <input type="tel" id="owner_telephone" name="owner_telephone" value={form.owner_telephone} onChange={handleChange} className={`border p-2 rounded w-full ${errors.owner_telephone ? 'border-red-500' : 'border-gray-300'}`} required placeholder="(000) 000-0000" />,
+               <>
+                 <input type="tel" id="owner_telephone" name="owner_telephone" value={form.owner_telephone} onChange={handleChange} className={`border p-2 rounded w-full ${errors.owner_telephone ? 'border-red-500' : 'border-gray-300'}`} required placeholder="(000) 000-0000, 000-000-0000, or 10 digits" />
+                 <div className="text-xs text-red-500 mt-1">Format: (000) 000-0000 or 000-000-0000</div>
+               </>,
                errors.owner_telephone
             )}
           </div>
@@ -315,8 +318,11 @@ export default function StaticViolationForm({ onSubmit, submitLabel = 'Submit' }
                 <input type="email" id="tenant_email" name="tenant_email" value={form.tenant_email} onChange={handleChange} className={`border p-2 rounded w-full ${errors.tenant_email ? 'border-red-500' : 'border-gray-300'}`} placeholder="example@example.com" />,
                 errors.tenant_email
              )}
-             {renderFormGroup('Phone', 'tenant_phone', false,
-                <input type="tel" id="tenant_phone" name="tenant_phone" value={form.tenant_phone} onChange={handleChange} className={`border p-2 rounded w-full ${errors.tenant_phone ? 'border-red-500' : 'border-gray-300'}`} placeholder="(000) 000-0000" />,
+             {renderFormGroup('Telephone', 'tenant_phone', false,
+                <>
+                  <input type="tel" id="tenant_phone" name="tenant_phone" value={form.tenant_phone} onChange={handleChange} className={`border p-2 rounded w-full ${errors.tenant_phone ? 'border-red-500' : 'border-gray-300'}`} placeholder="(000) 000-0000, 000-000-0000, or 10 digits" />
+                  <div className="text-xs text-red-500 mt-1">Format: (000) 000-0000 or 000-000-0000</div>
+                </>,
                 errors.tenant_phone
              )}
            </div>

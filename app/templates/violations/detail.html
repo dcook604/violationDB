@@ -5,36 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; script-src 'none';">
     <title>Violation {{ violation.reference }}</title>
-    <!-- Include Tailwind CSS via CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Optional: Configure Tailwind (can customize colors, etc.)
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        // Add Notus-specific colors if needed, e.g., lightBlue
-                        lightBlue: {
-                            500: '#0ea5e9', // Example color
-                            600: '#0284c7'  // Example hover/active color
-                        },
-                        blueGray: { // Example palette
-                           50: '#f8fafc',
-                           100: '#f1f5f9',
-                           200: '#e2e8f0',
-                           300: '#cbd5e1',
-                           400: '#94a3b8',
-                           500: '#64748b',
-                           600: '#475569',
-                           700: '#334155',
-                           800: '#1e293b',
-                           900: '#0f172a'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="stylesheet" href="/static/tailwind.css">
     <style>
         /* Minimal extra styles if needed */
         body {
@@ -128,11 +99,11 @@
                     <div class="flex flex-wrap">
                         <div class="w-full px-4 mb-3">
                              <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Incident Details</label>
-                             <p class="text-sm text-blueGray-700 nl2br">{{ violation.incident_details or 'Not provided.' }}</p>
+                             <p class="text-sm text-blueGray-700">{{ violation.incident_details|replace('\n', '<br>')|safe if violation.incident_details else 'Not provided.' }}</p>
                         </div>
                          <div class="w-full px-4 mb-3">
                              <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">Action Taken</label>
-                             <p class="text-sm text-blueGray-700 nl2br">{{ violation.action_taken or 'Not specified.' }}</p>
+                             <p class="text-sm text-blueGray-700">{{ violation.action_taken|replace('\n', '<br>')|safe if violation.action_taken else 'Not specified.' }}</p>
                         </div>
                     </div>
 
@@ -212,7 +183,7 @@
                         {% if violation.people_involved %}
                         <div class="w-full px-4 mb-3">
                             <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2">People Involved</label>
-                            <p class="text-sm text-blueGray-700 nl2br">{{ violation.people_involved }}</p>
+                            <p class="text-sm text-blueGray-700">{{ violation.people_involved|replace('\n', '<br>')|safe }}</p>
                         </div>
                         {% endif %}
                     </div>
@@ -235,7 +206,8 @@
                                         {# Pass violation_id along with filename #}
                                         <a href="{{ url_for('get_evidence_file', violation_id=violation.id, filename=file_info.filename) }}" 
                                            target="_blank" 
-                                           class="text-lightBlue-500 hover:text-lightBlue-600 hover:underline">
+                                           class="text-lightBlue-500 hover:text-lightBlue-600 hover:underline"
+                                           aria-label="{{ file_info.originalname }}">
                                             {{ file_info.originalname }}
                                         </a>
                                         {% if file_info.size %} {# Optionally display size #}
@@ -265,7 +237,7 @@
                                 <p class="text-xs text-blueGray-500 mb-2">
                                     {{ reply.created_at.strftime('%B %d, %Y at %I:%M %p') }}
                                 </p>
-                                <p class="text-sm text-blueGray-600 nl2br">{{ reply.response_text }}</p>
+                                <p class="text-sm text-blueGray-600">{{ reply.response_text|replace('\n', '<br>')|safe }}</p>
                             </div>
                             {% endfor %}
                         </div>
@@ -286,14 +258,14 @@
                 <form action="{{ url_for('violations.submit_violation_reply', vid=violation.id) }}" method="post">
                      <div class="flex flex-wrap">
                          <div class="w-full px-4 mb-3">
-                             <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2" htmlFor="email">
+                             <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2" for="email">
                                  Your Email:
                              </label>
                              <input type="email" id="email" name="email" required
                                     class="border-0 px-3 py-3 placeholder-blueGray-300 text-blueGray-600 bg-white rounded text-sm shadow focus:outline-none focus:ring w-full ease-linear transition-all duration-150">
                          </div>
                          <div class="w-full px-4 mb-3">
-                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2" htmlFor="response">
+                            <label class="block uppercase text-blueGray-600 text-xs font-bold mb-2" for="response">
                                 Your Response:
                             </label>
                             <textarea id="response" name="response_text" required rows="4"
@@ -302,7 +274,8 @@
                         </div>
                         <div class="w-full px-4 text-right mt-4">
                             <button type="submit"
-                                    class="bg-lightBlue-500 text-white active:bg-lightBlue-600 text-sm font-bold uppercase px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150">
+                                    class="bg-lightBlue-500 text-white active:bg-lightBlue-600 text-sm font-bold uppercase px-6 py-3 rounded shadow hover:shadow-lg outline-none focus:outline-none mr-1 mb-1 ease-linear transition-all duration-150"
+                                    aria-label="Submit Response">
                                 Submit Response
                             </button>
                         </div>
@@ -318,18 +291,6 @@
          </div>
 
     </div> {# End Max Width Wrapper #}
-
-    {# Add Jinja filter for nl2br if not globally available #}
-    {% macro nl2br(value) -%}
-        {{ value | replace('\n', '<br>\n') | safe }}
-    {%- endmacro %}
-
-    <script>
-        // Add nl2br functionality to paragraphs with the class
-        document.querySelectorAll('.nl2br').forEach(el => {
-           el.innerHTML = el.innerHTML.replace(/\n/g, '<br>\n');
-        });
-    </script>
 
 </body>
 </html> 

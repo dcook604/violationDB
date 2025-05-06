@@ -82,78 +82,18 @@ def save_uploaded_file(file_storage, folder):
 
 def generate_pdf_from_html(html_content, pdf_path):
     """
-    Generate a PDF file from HTML content
-    
-    Args:
-        html_content: HTML content to convert to PDF
-        pdf_path: Path to save the PDF file
-        
-    Returns:
-        str: Path to the generated PDF file
+    Generate a PDF file from HTML content (WeasyPrint 61+ API)
     """
     try:
-        # First attempt: Direct conversion using document.render() for WeasyPrint 61+
         from weasyprint import HTML
         current_app.logger.info(f"Generating PDF at {pdf_path} using WeasyPrint 61+ API")
-        
-        # Generate HTML document and render
         html = HTML(string=html_content)
-        document = html.render()
-        
-        # Write to PDF file
-        with open(pdf_path, 'wb') as pdf_file:
-            try:
-                document.write_pdf(pdf_file)
-                current_app.logger.info(f"Successfully generated PDF ({os.path.getsize(pdf_path)} bytes)")
-                return pdf_path
-            except TypeError as err:
-                if "PDF.__init__() takes 1 positional argument but 3 were given" in str(err):
-                    current_app.logger.warning(f"pydyf compatibility issue detected: {err}")
-                    # Close the file and use alternative approach
-                    pdf_file.close()
-                    raise Exception("pydyf compatibility issue - using fallback approach")
-                else:
-                    raise
-            
+        html.write_pdf(pdf_path)  # WeasyPrint 61+ API
+        current_app.logger.info(f"Successfully generated PDF ({os.path.getsize(pdf_path)} bytes)")
+        return pdf_path
     except Exception as e:
-        current_app.logger.error(f"Error in generate_pdf_from_html (attempt 1): {str(e)}")
-        
-        # Second attempt: Using a temporary file and command-line tools
-        try:
-            import tempfile
-            import subprocess
-            
-            current_app.logger.info(f"Trying command-line PDF generation")
-            temp_html = tempfile.NamedTemporaryFile(suffix='.html', delete=False)
-            
-            try:
-                # Write HTML to temp file
-                with open(temp_html.name, 'w', encoding='utf-8') as f:
-                    f.write(html_content)
-                
-                # Try using wkhtmltopdf command-line tool if available
-                try:
-                    cmd = ['/usr/bin/wkhtmltopdf', temp_html.name, pdf_path]
-                    current_app.logger.info(f"Executing: {' '.join(cmd)}")
-                    result = subprocess.run(cmd, capture_output=True, text=True)
-                    
-                    if result.returncode == 0:
-                        current_app.logger.info(f"PDF successfully generated using wkhtmltopdf")
-                        return pdf_path
-                    else:
-                        current_app.logger.error(f"wkhtmltopdf error: {result.stderr}")
-                        raise Exception(f"wkhtmltopdf failed: {result.stderr}")
-                except (subprocess.SubprocessError, FileNotFoundError) as e:
-                    current_app.logger.error(f"Could not use wkhtmltopdf: {str(e)}")
-                    raise Exception("Command-line PDF generation failed")
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_html.name):
-                    os.unlink(temp_html.name)
-                    
-        except Exception as e2:
-            current_app.logger.error(f"Error in generate_pdf_from_html (attempt 2): {str(e2)}")
-            raise Exception(f"Failed to generate PDF: {str(e2)}")
+        current_app.logger.error(f"Error in generate_pdf_from_html: {str(e)}")
+        raise
 
 def send_email(subject, recipients, body, attachments=None, cc=None, html=None):
     from .models import Settings
@@ -367,73 +307,44 @@ def create_violation_html(violation, field_defs=None):
 
 def generate_violation_pdf(violation, html_content=None):
     """
-    Generate PDF for a violation with UUID-based filename
-    
-    Args:
-        violation: The violation object
-        html_content: Optional HTML content to convert
-        
-    Returns:
-        str: Path to the generated PDF file
+    Generate PDF for a violation with UUID-based filename (WeasyPrint 61+ API)
     """
     try:
-        # Generate UUID-based filename
+        import uuid, os, tempfile
+        from flask import current_app
+        from weasyprint import HTML
         unique_id = str(uuid.uuid4())
         filename = f"{unique_id}_{violation.id}.pdf"
-        
-        # Create secure directory path
         secure_dir = os.path.join(current_app.config['BASE_DIR'], 'saved_files', 'pdf')
         os.makedirs(secure_dir, exist_ok=True)
-        
-        # Generate full file path
         file_path = os.path.join(secure_dir, filename)
-        
-        # Get HTML content if not provided
         if not html_content:
             if violation.html_path and os.path.exists(os.path.join(current_app.config['BASE_DIR'], violation.html_path)):
                 with open(os.path.join(current_app.config['BASE_DIR'], violation.html_path), 'r', encoding='utf-8') as f:
                     html_content = f.read()
             else:
-                # Generate HTML if no path or file doesn't exist
                 _, html_content = create_violation_html(violation)
-        
-        # Generate PDF from HTML content
         try:
-            # Method 1: Using string content directly (WeasyPrint 52+)
-            # Local import to avoid module-level dependencies
-            from weasyprint import HTML
             HTML(string=html_content).write_pdf(file_path)
             current_app.logger.info(f"Generated PDF using direct HTML string: {file_path}")
         except Exception as e:
             current_app.logger.warning(f"Direct HTML string PDF generation failed: {str(e)}")
-            
             try:
-                # Method 2: Using temporary file approach (more compatible)
                 with tempfile.NamedTemporaryFile(suffix='.html', delete=False) as temp_html:
                     temp_html.write(html_content.encode('utf-8'))
                     temp_html_path = temp_html.name
-                
-                # Use the temporary file for PDF generation
-                from weasyprint import HTML
                 HTML(filename=temp_html_path).write_pdf(file_path)
-                
-                # Clean up temporary file
                 os.unlink(temp_html_path)
                 current_app.logger.info(f"Generated PDF using temporary file approach: {file_path}")
             except Exception as e2:
                 current_app.logger.error(f"Temporary file PDF generation failed: {str(e2)}")
-                
-                # Method 3: Fallback to an empty PDF (just to have something)
                 with open(file_path, 'w') as f:
                     f.write("%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 0 >>\nstream\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f\n0000000010 00000 n\n0000000059 00000 n\n0000000118 00000 n\n0000000217 00000 n\ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n267\n%%EOF")
                 current_app.logger.warning(f"Created empty fallback PDF: {file_path}")
-        
-        # Store the secure relative path in the database
         from . import db
         relative_path = os.path.join('saved_files', 'pdf', filename)
         violation.pdf_path = relative_path
         db.session.commit()
-        
         return file_path
     except Exception as e:
         current_app.logger.error(f"Error generating PDF: {str(e)}")

@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_account_lockout'
-down_revision = 'violation_reply_table'
+down_revision = '5ed23f8a9b12'
 branch_labels = None
 depends_on = None
 

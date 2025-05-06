@@ -31,6 +31,10 @@ def get_csrf_token():
     Returns:
         CSRF token
     """
+    # First get a session cookie
+    response = session.get(BASE_URL)
+    
+    # Now get the CSRF token
     response = session.get(CSRF_TOKEN_URL)
     if response.status_code == 200:
         token = response.json().get('token')
@@ -39,6 +43,7 @@ def get_csrf_token():
         return token
     else:
         print(f"Failed to get CSRF token: {response.status_code}")
+        print(response.text)
         return None
 
 def login(email, password):
@@ -52,20 +57,33 @@ def login(email, password):
         True if login successful, False otherwise
     """
     # Get CSRF token first
-    get_csrf_token()
+    csrf_token = get_csrf_token()
+    if not csrf_token:
+        print("Failed to get CSRF token, cannot proceed with login")
+        return False
     
     # Login
     data = {
         'email': email,
         'password': password
     }
-    response = session.post(LOGIN_URL, json=data)
+    
+    # Update headers with CSRF token
+    headers = {
+        'X-CSRF-TOKEN': csrf_token,
+        'Content-Type': 'application/json'
+    }
+    
+    response = session.post(LOGIN_URL, json=data, headers=headers)
     
     if response.status_code == 200:
         print("Login successful!")
         print("Cookies received:")
         for cookie in session.cookies:
-            print(f"  {cookie.name}: {cookie.value[:10]}... (truncated)")
+            if cookie.value and len(cookie.value) > 20:
+                print(f"  {cookie.name}: {cookie.value[:10]}... (truncated)")
+            else:
+                print(f"  {cookie.name}: {cookie.value}")
         pretty_print_json(response.json())
         return True
     else:
@@ -84,10 +102,14 @@ def test_jwt_authentication():
         True if test successful, False otherwise
     """
     # Get CSRF token first
-    get_csrf_token()
+    csrf_token = get_csrf_token()
+    if not csrf_token:
+        print("Failed to get CSRF token, cannot proceed with authentication test")
+        return False
     
     # Test JWT authentication
-    response = session.get(TEST_JWT_URL)
+    headers = {'X-CSRF-TOKEN': csrf_token}
+    response = session.get(TEST_JWT_URL, headers=headers)
     
     if response.status_code == 200:
         print("JWT authentication test successful!")
@@ -109,10 +131,14 @@ def check_status():
         True if authenticated, False otherwise
     """
     # Get CSRF token first
-    get_csrf_token()
+    csrf_token = get_csrf_token()
+    if not csrf_token:
+        print("Failed to get CSRF token, cannot proceed with status check")
+        return False
     
     # Check status
-    response = session.get(STATUS_URL)
+    headers = {'X-CSRF-TOKEN': csrf_token}
+    response = session.get(STATUS_URL, headers=headers)
     
     if response.status_code == 200:
         print("Status check successful!")
@@ -134,17 +160,24 @@ def refresh_token():
         True if refresh successful, False otherwise
     """
     # Get CSRF token first
-    get_csrf_token()
+    csrf_token = get_csrf_token()
+    if not csrf_token:
+        print("Failed to get CSRF token, cannot proceed with token refresh")
+        return False
     
     # Refresh token
-    response = session.post(REFRESH_URL)
+    headers = {'X-CSRF-TOKEN': csrf_token}
+    response = session.post(REFRESH_URL, headers=headers)
     
     if response.status_code == 200:
         print("Token refresh successful!")
         pretty_print_json(response.json())
         print("Updated cookies:")
         for cookie in session.cookies:
-            print(f"  {cookie.name}: {cookie.value[:10]}... (truncated)")
+            if cookie.value and len(cookie.value) > 20:
+                print(f"  {cookie.name}: {cookie.value[:10]}... (truncated)")
+            else:
+                print(f"  {cookie.name}: {cookie.value}")
         return True
     else:
         print(f"Token refresh failed: {response.status_code}")
@@ -162,10 +195,14 @@ def logout():
         True if logout successful, False otherwise
     """
     # Get CSRF token first
-    get_csrf_token()
+    csrf_token = get_csrf_token()
+    if not csrf_token:
+        print("Failed to get CSRF token, cannot proceed with logout")
+        return False
     
     # Logout
-    response = session.post(LOGOUT_URL)
+    headers = {'X-CSRF-TOKEN': csrf_token}
+    response = session.post(LOGOUT_URL, headers=headers)
     
     if response.status_code == 200:
         print("Logout successful!")
@@ -185,12 +222,14 @@ def logout():
 
 def main():
     """Main function"""
+    # Use default credentials if none provided
     if len(sys.argv) < 3:
-        print("Usage: python test_jwt.py <email> <password>")
-        return
-    
-    email = sys.argv[1]
-    password = sys.argv[2]
+        print("No credentials provided, using default admin credentials")
+        email = "admin@example.com"
+        password = "admin123"
+    else:
+        email = sys.argv[1]
+        password = sys.argv[2]
     
     # Step 1: Login
     print("\n=== Step 1: Login ===")

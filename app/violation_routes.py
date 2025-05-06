@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, current_app, send_from_directory, render_template, abort, send_file, flash, redirect, url_for
+from flask import Blueprint, request, jsonify, current_app, send_from_directory, render_template, abort, send_file, flash, redirect, url_for, make_response
 from flask_login import login_required, current_user
 from .models import Violation, FieldDefinition, ViolationFieldValue, ViolationReply, ViolationStatusLog
 from . import db
@@ -9,6 +9,9 @@ from werkzeug.utils import secure_filename
 import uuid
 from .utils import create_violation_html, generate_violation_pdf, send_violation_notification, get_cached_fields, clear_field_cache, secure_handle_uploaded_file, generate_secure_access_token, validate_secure_access_token, log_violation_access
 import datetime
+from . import limiter
+from .jwt_auth import jwt_required_api
+from flask_jwt_extended import get_jwt, get_jwt_identity
 
 violation_bp = Blueprint('violations', __name__)
 
@@ -69,9 +72,10 @@ def api_list_active_fields():
     } for f in fields])
 
 @violation_bp.route('/api/violations', methods=['POST'])
-@login_required
+@jwt_required_api
 def api_create_violation():
     try:
+        claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
         data = request.json or {}
         current_app.logger.info(f"Received violation data: {json.dumps(data)}")
         
@@ -119,7 +123,7 @@ def api_create_violation():
             'incident_time': data.get('time', data.get('incident_time', '')),
             'subject': data.get('subject', ''),
             'details': data.get('details', ''),
-            'created_by': current_user.id,
+            'created_by': user_id,
             'status': data.get('status', 'Open'),
             
             # Static Violation Fields
@@ -275,13 +279,14 @@ def view_violation_html(vid):
     return send_from_directory(html_dir, html_filename)
 
 @violation_bp.route('/violations/pdf/<int:vid>')
-@login_required
+@jwt_required_api
 def download_violation_pdf(vid):
     """Download a violation PDF - requires authentication"""
     violation = Violation.query.get_or_404(vid)
     
     # Check if the user has permission to view this violation
-    if not (current_user.is_admin or violation.created_by == current_user.id):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
+    if not (is_admin or violation.created_by == user_id):
         return jsonify({'error': 'Forbidden'}), 403
     
     # Check if a PDF file already exists
@@ -346,7 +351,7 @@ def download_violation_pdf(vid):
     )
 
 @violation_bp.route('/api/violations/<int:vid>/upload', methods=['POST'])
-@login_required
+@jwt_required_api
 def api_upload_files(vid):
     """Handle file uploads for a violation with virus scanning"""
     try:
@@ -354,7 +359,8 @@ def api_upload_files(vid):
         violation = Violation.query.get_or_404(vid)
         
         # Check if the user has permission to modify this violation
-        if not (current_user.is_admin or violation.created_by == current_user.id):
+        claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
+        if not (is_admin or violation.created_by == user_id):
             return jsonify({'error': 'Forbidden'}), 403
         
         # Get the field name from query parameters
@@ -443,7 +449,7 @@ def api_upload_files(vid):
         return jsonify({'error': str(e)}), 500
 
 @violation_bp.route('/uploads/<path:filename>')
-@login_required
+@jwt_required_api
 def get_uploaded_file(filename):
     """Securely serve uploaded files with access control"""
     try:
@@ -477,7 +483,8 @@ def get_uploaded_file(filename):
         
         # Check if the user has permission to access this violation's files
         violation = Violation.query.get_or_404(violation_id)
-        if not (current_user.is_admin or violation.created_by == current_user.id):
+        claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
+        if not (is_admin or violation.created_by == user_id):
             abort(403)  # Forbidden
         
         # Determine the base directory
@@ -504,7 +511,8 @@ def get_evidence_file(violation_id, filename):
     is_authorized = False
 
     # 1. Check for logged-in user
-    if current_user.is_authenticated:
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
+    if user_id:
         # Optional: Add role-based checks if needed (e.g., only admins?)
         is_authorized = True
 
@@ -566,9 +574,10 @@ def get_evidence_file(violation_id, filename):
 # --- End New Route ---
 
 @violation_bp.route('/api/violations', methods=['GET'])
-@login_required
+@jwt_required_api
 def api_list_violations():
     try:
+        claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
         MAX_PAGE_SIZE = 100
         # Get query parameters
         try:
@@ -606,13 +615,13 @@ def api_list_violations():
         offset = (page - 1) * per_page
         
         # Base SQL query
-        if current_user.is_admin:
+        if is_admin:
             sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations"
         else:
             sql = "SELECT id, reference, category, building, unit_number, created_at, created_by, subject, details, html_path, pdf_path FROM violations WHERE created_by = :user_id"
         
         # Add date filter conditions if specified
-        params = {"user_id": current_user.id}
+        params = {"user_id": user_id}
         
         if date_filter:
             current_app.logger.info(f"Applying date filter: {date_filter}")
@@ -722,10 +731,11 @@ def api_list_violations():
         return jsonify({'violations': [], 'pagination': {'total': 0, 'page': 1, 'per_page': 10, 'pages': 0}})
 
 @violation_bp.route('/api/violations/<int:vid>', methods=['GET'])
-@login_required
+@jwt_required_api
 def api_violation_detail(vid):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
     v = Violation.query.get_or_404(vid)
-    if not (current_user.is_admin or v.created_by == current_user.id):
+    if not (is_admin or v.created_by == user_id):
         return jsonify({'error': 'Forbidden'}), 403
     
     # Get user who created the violation
@@ -829,10 +839,11 @@ def api_violation_detail(vid):
     return jsonify(result)
 
 @violation_bp.route('/api/violations/<int:vid>', methods=['PUT'])
-@login_required
+@jwt_required_api
 def api_edit_violation(vid):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
     v = Violation.query.get_or_404(vid)
-    if not (current_user.is_admin or v.created_by == current_user.id):
+    if not (is_admin or v.created_by == user_id):
         return jsonify({'error': 'Forbidden'}), 403
     
     data = request.json or {}
@@ -907,7 +918,7 @@ def api_edit_violation(vid):
             violation_id=v.id,
             old_status=old_status,
             new_status=v.status,
-            changed_by=current_user.email
+            changed_by=user_id
         )
         db.session.add(log)
         db.session.commit()
@@ -931,10 +942,11 @@ def api_edit_violation(vid):
     })
 
 @violation_bp.route('/api/violations/<int:vid>', methods=['DELETE'])
-@login_required
+@jwt_required_api
 def api_delete_violation(vid):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
     v = Violation.query.get_or_404(vid)
-    if not (current_user.is_admin or v.created_by == current_user.id):
+    if not (is_admin or v.created_by == user_id):
         return jsonify({'error': 'Forbidden'}), 403
     ViolationFieldValue.query.filter_by(violation_id=v.id).delete()
     db.session.delete(v)
@@ -942,7 +954,9 @@ def api_delete_violation(vid):
     return jsonify({'success': True})
 
 @violation_bp.route('/api/violations/<int:vid>/fields', methods=['GET'])
+@jwt_required_api
 def api_violation_field_values(vid):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
     values = ViolationFieldValue.query.filter_by(violation_id=vid).all()
     return jsonify([{
         'field_definition_id': v.field_definition_id,
@@ -950,14 +964,15 @@ def api_violation_field_values(vid):
     } for v in values])
 
 @violation_bp.route('/api/violations/<int:vid>/replies', methods=['GET'])
-@login_required
+@jwt_required_api
 def api_violation_replies(vid):
     """Get replies for a violation"""
     from .models import ViolationReply
     
     # Check permission
     violation = Violation.query.get_or_404(vid)
-    if not (current_user.is_admin or violation.created_by == current_user.id):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
+    if not (is_admin or violation.created_by == user_id):
         return jsonify({'error': 'Forbidden'}), 403
         
     # Get replies
@@ -1281,8 +1296,9 @@ def send_secure_urls(violation):
     }
 
 @violation_bp.route('/api/violations/<int:vid>/status_log', methods=['GET'])
-@login_required
+@jwt_required_api
 def api_violation_status_log(vid):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
     logs = ViolationStatusLog.query.filter_by(violation_id=vid).order_by(ViolationStatusLog.timestamp).all()
     return jsonify([
         {
@@ -1294,7 +1310,7 @@ def api_violation_status_log(vid):
     ])
 
 @violation_bp.route('/api/violations/public/<uuid:public_id>', methods=['GET'])
-@login_required
+@jwt_required_api
 def api_violation_detail_public(public_id):
     """Fetch violation details using the public UUID."""
     # Convert UUID object to string for filtering
@@ -1302,7 +1318,8 @@ def api_violation_detail_public(public_id):
     v = Violation.query.filter_by(public_id=public_id_str).first_or_404()
     # Reuse the existing detail logic by calling the ID-based endpoint internally
     # Or duplicate the logic here for clarity
-    if not (current_user.is_admin or v.created_by == current_user.id):
+    claims = get_jwt(); is_admin = claims.get('is_admin'); user_id = get_jwt_identity()
+    if not (is_admin or v.created_by == user_id):
         return jsonify({'error': 'Forbidden'}), 403
     from .models import User
     creator = User.query.get(v.created_by) if v.created_by else None

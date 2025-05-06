@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useNavigate } from 'react-router-dom';
 import API from '../api';
+import axios from 'axios';
 
 const AuthContextJWT = createContext();
 
@@ -10,28 +11,12 @@ export function AuthProviderJWT({ children }) {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // Function to fetch CSRF token
-  const fetchCsrfToken = useCallback(async () => {
-    try {
-      const response = await API.get('/api/csrf-token');
-      API.defaults.headers.common['X-CSRF-TOKEN'] = response.data.token;
-      return response.data.token;
-    } catch (error) {
-      console.error('Failed to fetch CSRF token:', error);
-      return null;
-    }
-  }, []);
-
   // Check session with JWT
   const checkSession = useCallback(async () => {
     try {
       console.log("Checking JWT session...");
-      // Fetch CSRF token first if needed for any subsequent requests
-      await fetchCsrfToken();
-      
       const response = await API.get('/api/auth/status-jwt');
       console.log("JWT session response:", response.data);
-      
       if (response.data.user) {
         setUser(response.data.user);
         if (window.location.pathname === '/login') {
@@ -44,16 +29,14 @@ export function AuthProviderJWT({ children }) {
     } catch (error) {
       console.log('JWT session check failed:', error);
       setUser(null);
-      // Only redirect to login if not already there
       if (window.location.pathname !== '/login') {
         navigate('/login');
       }
     } finally {
       setLoading(false);
     }
-  }, [navigate, fetchCsrfToken]);
+  }, [navigate]);
 
-  // Initialize authentication state
   useEffect(() => {
     checkSession();
   }, [checkSession]);
@@ -64,12 +47,10 @@ export function AuthProviderJWT({ children }) {
       setError(null);
       console.log("Attempting JWT login with:", credentials.email);
       
-      // Fetch CSRF token first
-      await fetchCsrfToken();
-      
+      // Use the API client instead of direct axios call
       const response = await API.post('/api/auth/login-jwt', credentials);
-      console.log("JWT login response:", response.data);
       
+      console.log("JWT login response:", response.data);
       if (response.data.user) {
         setUser(response.data.user);
         navigate('/dashboard');
@@ -89,8 +70,6 @@ export function AuthProviderJWT({ children }) {
   const logout = async () => {
     try {
       console.log("Logging out with JWT...");
-      // Fetch CSRF token first
-      await fetchCsrfToken();
       await API.post('/api/auth/logout-jwt');
       setUser(null);
       navigate('/login');
@@ -103,8 +82,6 @@ export function AuthProviderJWT({ children }) {
   const refreshToken = async () => {
     try {
       console.log("Refreshing JWT token...");
-      // Fetch CSRF token first
-      await fetchCsrfToken();
       await API.post('/api/auth/refresh-jwt');
       return true;
     } catch (error) {
@@ -113,7 +90,6 @@ export function AuthProviderJWT({ children }) {
     }
   };
 
-  // Loading indicator
   if (loading) {
     return <div className="flex justify-center items-center h-screen">
       <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
@@ -129,7 +105,6 @@ export function AuthProviderJWT({ children }) {
       error,
       checkSession,
       refreshToken,
-      fetchCsrfToken,
       isAuthenticated: !!user 
     }}>
       {children}

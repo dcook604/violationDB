@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import UnitProfileDisplay from '../components/UnitProfileDisplay';
 import UnitProfileForm from '../components/UnitProfileForm';
 import Spinner from '../components/common/Spinner';
@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function UnitProfileDetailPage() {
   const { unitNumber } = useParams();
+  const location = useLocation();
   const { user } = useAuth(); // Get user for permission checks
   const [unitData, setUnitData] = useState(null);
   const [violationSummary, setViolationSummary] = useState(null);
@@ -17,13 +18,23 @@ export default function UnitProfileDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Check if edit=true is in query params
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('edit') === 'true' && user?.role === 'admin') {
+      setIsEditing(true);
+    }
+  }, [location.search, user]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
+      // Add cache busting parameter using timestamp
+      const timestamp = new Date().getTime();
       const [unitRes, summaryRes] = await Promise.all([
-        API.get(`/api/units/${unitNumber}`),
-        API.get(`/api/units/${unitNumber}/violation_summary`)
+        API.get(`/api/units/${unitNumber}?_=${timestamp}`),
+        API.get(`/api/units/${unitNumber}/violation_summary?_=${timestamp}`)
       ]);
       setUnitData(unitRes.data);
       setViolationSummary(summaryRes.data);
@@ -42,10 +53,9 @@ export default function UnitProfileDetailPage() {
     setError('');
     try {
       const response = await API.put(`/api/units/${unitNumber}`, formData);
-      setUnitData(response.data); // Update local state with saved data
+      // Force a complete fresh data reload after update
+      await fetchData(); 
       setIsEditing(false);
-      // Potentially refetch violation summary if needed, though unlikely to change on profile update
-      // fetchData(); 
     } catch (err) {
       setError('Failed to save unit profile. ' + (err.response?.data?.error || err.message));
       // Keep editing mode open on error
@@ -86,7 +96,7 @@ export default function UnitProfileDetailPage() {
            </div>
             {/* Show Edit button only when not editing and user has permission */}
             {!isEditing && canEdit && (
-                <Button color="lightBlue" onClick={() => setIsEditing(true)}>
+                <Button color="yellow" onClick={() => setIsEditing(true)}>
                     <i className="fas fa-pencil-alt mr-2"></i> Edit Unit
                 </Button>
             )}
