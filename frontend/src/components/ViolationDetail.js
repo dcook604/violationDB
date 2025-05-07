@@ -37,11 +37,21 @@ const ViolationDetail = ({ usePublicId = false }) => {
     setError('');
     const identifier = usePublicId ? publicId : id;
     const endpoint = usePublicId ? `/api/violations/public/${identifier}` : `/api/violations/${identifier}`;
+    
     try {
+      console.log(`Fetching violation details from endpoint: ${endpoint}`);
       const res = await API.get(endpoint);
+      console.log('Violation data received:', res.data);
       setViolation(res.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to load violation details');
+      console.error('Error fetching violation:', err);
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to load violation details';
+      setError(errorMessage);
+      
+      // If authentication error, might need to redirect to login
+      if (err.response?.status === 401) {
+        setError('Authentication error: Please log in again to view this violation');
+      }
     }
     setLoading(false);
   }, [id, publicId, usePublicId]);
@@ -73,7 +83,7 @@ const ViolationDetail = ({ usePublicId = false }) => {
     if (window.confirm('Are you sure you want to delete this violation?')) {
       try {
         await API.delete(`/api/violations/${violation.id}`);
-        navigate('/violations'); // Redirect after delete
+        navigate('/r/7a9c3b5d2f1e'); // Redirect after delete
       } catch (err) {
         setError(err.response?.data?.error || 'Failed to delete violation');
       }
@@ -105,9 +115,34 @@ const ViolationDetail = ({ usePublicId = false }) => {
       } catch { return dateString; }
   }
 
-  if (loading) return <div className="p-4"><Spinner /> Loading...</div>;
-  if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
-  if (!violation) return <div className="p-4">Violation not found.</div>;
+  if (loading) return <div className="p-4"><Spinner /> Loading violation details...</div>;
+  if (error) return (
+    <div className="p-4">
+      <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+        <p><strong>Error:</strong> {error}</p>
+        {error.includes('Authentication') && (
+          <p className="mt-2">
+            <Link to="/login" className="text-blue-600 hover:underline">Log in again</Link> or return to the 
+            <Link to="/r/7a9c3b5d2f1e" className="text-blue-600 hover:underline ml-1">violations list</Link>.
+          </p>
+        )}
+      </div>
+      <Link to="/r/7a9c3b5d2f1e" className="text-blue-600 hover:underline">
+        &larr; Back to Violations List
+      </Link>
+    </div>
+  );
+  
+  if (!violation) return (
+    <div className="p-4">
+      <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded mb-4">
+        <p>Violation not found. The record may have been deleted or you may not have permission to view it.</p>
+      </div>
+      <Link to="/r/7a9c3b5d2f1e" className="text-blue-600 hover:underline">
+        &larr; Back to Violations List
+      </Link>
+    </div>
+  );
 
   // TODO: Replace with actual check from auth context
   const canEditDelete = true; // Assume user can edit/delete for now

@@ -1105,6 +1105,7 @@ def refresh_jwt():
 
 @auth.route('/api/auth/status-jwt', methods=['GET', 'OPTIONS'])
 @cors_preflight
+@limiter.limit("200 per hour")  # Increased rate limit to 200 per hour from the default of 50
 @jwt_required_api
 def status_jwt():
     """Get authentication status using JWT

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'http://172.16.16.6:5004',  // Reverted to correct backend server IP
+  baseURL: 'http://172.16.16.6:5004',  // Ensure this matches your backend server IP
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -38,7 +38,15 @@ API.interceptors.request.use(
       config.headers['Expires'] = '0';
     }
     
+    // Log the request for debugging
     console.log(`API Request: ${config.method.toUpperCase()} ${config.url}`);
+    
+    // Check if there's a token in localStorage that we can use as a fallback
+    const token = localStorage.getItem('access_token');
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    
     return config;
   },
   (error) => {
@@ -55,6 +63,13 @@ API.interceptors.response.use(
       window.location.href = response.data.location;
       return Promise.reject('Redirect');
     }
+    
+    // If response includes a token, store it
+    if (response.headers && response.headers.authorization) {
+      const token = response.headers.authorization.replace('Bearer ', '');
+      localStorage.setItem('access_token', token);
+    }
+    
     return response;
   },
   async (error) => {
@@ -97,7 +112,12 @@ API.interceptors.response.use(
 
       try {
         // Try to refresh the token
-        await API.post('/api/auth/refresh-jwt');
+        const refreshResponse = await API.post('/api/auth/refresh-jwt');
+        
+        // If the token was refreshed successfully, store the new token
+        if (refreshResponse.data && refreshResponse.data.access_token) {
+          localStorage.setItem('access_token', refreshResponse.data.access_token);
+        }
         
         // Refresh successful, mark refresh as complete
         isRefreshing = false;
@@ -110,6 +130,9 @@ API.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed
         isRefreshing = false;
+        
+        // Clear stored token if refresh failed
+        localStorage.removeItem('access_token');
         
         // Process queued requests with error
         processQueue(refreshError);
@@ -125,8 +148,9 @@ API.interceptors.response.use(
     }
 
     // Handle other error responses
-    const errorMessage = error.response.data?.error || 'An error occurred';
+    const errorMessage = error.response.data?.error || error.response.data?.message || 'An error occurred';
     error.message = errorMessage;
+    console.error(`API Error (${error.response.status}):`, errorMessage);
     return Promise.reject(error);
   }
 );
