@@ -262,4 +262,26 @@ The mental model for users remains focused on violation reference numbers (e.g.,
 
 ---
 
-*Update this file as new conceptual insights are discovered or the application's mental model evolves.* 
+*Update this file as new conceptual insights are discovered or the application's mental model evolves.*
+
+## System Architecture & Conceptual Overview
+
+_Describe the high-level architecture, main components, and their interactions. Use diagrams if helpful._
+
+---
+
+## Design Principles & Philosophy
+
+_Outline the guiding principles, patterns, and philosophies that shape the system._
+
+---
+
+## Key Workflows
+
+_Describe the most important workflows and how data flows through the system._
+
+---
+
+## Evolution & Rationale
+
+_Document major architectural decisions, trade-offs, and their rationale over time._ 

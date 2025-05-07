@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as Sentry from "@sentry/react";
 
 const API = axios.create({
   baseURL: 'http://172.16.16.6:5004',  // Ensure this matches your backend server IP
@@ -12,6 +13,7 @@ const API = axios.create({
 // Keep track of refresh attempts to prevent infinite loops
 let isRefreshing = false;
 let failedQueue = [];
+let refreshPromise = null;
 
 // Process the queue of failed requests
 const processQueue = (error) => {
@@ -24,6 +26,23 @@ const processQueue = (error) => {
   });
   
   failedQueue = [];
+};
+
+// Function to handle token refresh
+const refreshTokenFn = async () => {
+  if (refreshPromise) return refreshPromise;
+  
+  refreshPromise = API.post('/api/auth/refresh-jwt')
+    .then(response => {
+      refreshPromise = null;
+      return response;
+    })
+    .catch(error => {
+      refreshPromise = null;
+      throw error;
+    });
+  
+  return refreshPromise;
 };
 
 // Add request interceptor to handle request configuration
@@ -40,12 +59,6 @@ API.interceptors.request.use(
     
     // Log the request for debugging
     console.log(`API Request: ${config.method.toUpperCase()} ${config.url}`);
-    
-    // Check if there's a token in localStorage that we can use as a fallback
-    const token = localStorage.getItem('access_token');
-    if (token && !config.headers.Authorization) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
     
     return config;
   },
@@ -64,12 +77,6 @@ API.interceptors.response.use(
       return Promise.reject('Redirect');
     }
     
-    // If response includes a token, store it
-    if (response.headers && response.headers.authorization) {
-      const token = response.headers.authorization.replace('Bearer ', '');
-      localStorage.setItem('access_token', token);
-    }
-    
     return response;
   },
   async (error) => {
@@ -79,6 +86,21 @@ API.interceptors.response.use(
     // Handle network errors
     if (!error.response) {
       console.error('Network Error:', error);
+      
+      // Track network errors in Sentry
+      Sentry.captureException(error, {
+        tags: {
+          type: 'network_error',
+          url: originalRequest?.url
+        },
+        contexts: {
+          request: {
+            method: originalRequest?.method,
+            url: originalRequest?.url,
+            baseURL: originalRequest?.baseURL
+          }
+        }
+      });
       
       return Promise.reject({
         response: {
@@ -112,12 +134,7 @@ API.interceptors.response.use(
 
       try {
         // Try to refresh the token
-        const refreshResponse = await API.post('/api/auth/refresh-jwt');
-        
-        // If the token was refreshed successfully, store the new token
-        if (refreshResponse.data && refreshResponse.data.access_token) {
-          localStorage.setItem('access_token', refreshResponse.data.access_token);
-        }
+        await refreshTokenFn();
         
         // Refresh successful, mark refresh as complete
         isRefreshing = false;
@@ -131,20 +148,45 @@ API.interceptors.response.use(
         // Refresh failed
         isRefreshing = false;
         
-        // Clear stored token if refresh failed
-        localStorage.removeItem('access_token');
-        
         // Process queued requests with error
         processQueue(refreshError);
         
+        // Clear any stored auth data
+        localStorage.removeItem('auth_remember');
+        
         // If refresh failed and we're not on the login page, redirect to login
-        if (window.location.pathname !== '/login') {
+        if (window.location.pathname !== '/login' && 
+            !window.location.pathname.includes('/forgot-password') && 
+            !window.location.pathname.includes('/reset-password/')) {
           console.log('Token refresh failed, redirecting to login');
           window.location.href = '/login';
         }
         
         return Promise.reject(refreshError);
       }
+    }
+
+    // Handle 500 server errors and other error responses
+    if (error.response.status >= 500) {
+      // Track server errors in Sentry
+      Sentry.captureException(error, {
+        tags: {
+          type: 'server_error',
+          status: error.response.status,
+          url: originalRequest?.url
+        },
+        contexts: {
+          request: {
+            method: originalRequest?.method,
+            url: originalRequest?.url,
+          },
+          response: {
+            data: error.response.data,
+            status: error.response.status,
+            statusText: error.response.statusText
+          }
+        }
+      });
     }
 
     // Handle other error responses

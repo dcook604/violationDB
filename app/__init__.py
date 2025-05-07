@@ -12,6 +12,37 @@ from .config import config_by_name
 from datetime import timedelta
 from flask.sessions import SecureCookieSessionInterface
 import os.path
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
+
+# Initialize Sentry
+def init_sentry(app):
+    sentry_dsn = app.config.get('SENTRY_DSN')
+    environment = app.config.get('FLASK_ENV', 'development')
+    
+    if sentry_dsn:
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            integrations=[FlaskIntegration()],
+            environment=environment,
+            
+            # Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring
+            # We recommend adjusting this value in production
+            traces_sample_rate=1.0,
+            
+            # By default the SDK will try to use the SENTRY_RELEASE
+            # environment variable, or infer a git commit
+            # release=os.environ.get("SENTRY_RELEASE"),
+            
+            # Enable performance monitoring
+            enable_tracing=True,
+            
+            # Send IP address with errors
+            send_default_pii=True,
+        )
+        app.logger.info(f"Sentry initialized in {environment} mode")
+    else:
+        app.logger.warning("Sentry DSN not found. Sentry integration disabled.")
 
 # Custom session interface to fix SameSite issue
 class CustomSessionInterface(SecureCookieSessionInterface):
@@ -39,7 +70,7 @@ mail = Mail()
 migrate = Migrate()
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
+    default_limits=["1000 per day", "200 per hour"],
     storage_uri="memory://",
     strategy="fixed-window"
 )
@@ -90,6 +121,9 @@ def create_app(config_name=None):
             app.logger.warning("Using default development SECRET_KEY. Set a proper SECRET_KEY environment variable.")
             app.config['SECRET_KEY'] = 'dev-key-please-change-in-production'
 
+    # Initialize Sentry
+    init_sentry(app)
+
     # Register custom Jinja2 filters
     app.jinja_env.filters['basename'] = basename_filter
     app.jinja_env.filters['nl2br'] = nl2br_filter
@@ -108,6 +142,29 @@ def create_app(config_name=None):
     from .jwt_config import init_jwt
     jwt = init_jwt(app)
 
+    # Add security headers to all responses
+    @app.after_request
+    def add_security_headers(response):
+        # Add basic security headers for development
+        # These should be more restrictive in production
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        # Add Content-Security-Policy in development
+        # This should be more restrictive in production
+        if app.config['DEBUG']:
+            csp = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self' *.ingest.sentry.io"
+        else:
+            # More restrictive CSP for production
+            csp = "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' *.ingest.sentry.io"
+        
+        # Only set Content-Security-Policy for HTML responses to avoid breaking API calls
+        if response.mimetype == 'text/html':
+            response.headers['Content-Security-Policy'] = csp
+            
+        return response
+        
     # Database connection error handler
     @app.errorhandler(Exception)
     def handle_db_exceptions(e):
@@ -138,31 +195,76 @@ def create_app(config_name=None):
     # Conditional CORS Setup
     if app.config['DEBUG']:
         # Development CORS (more permissive)
-        allowed_origins = ["http://localhost:3001", "http://localhost:3002", "http://172.16.16.6:3001", "http://172.16.16.6:5004", "http://100.75.244.2", "http://100.75.244.2:3001", "http://100.75.244.2:5004", "http://172.16.16.26", "http://172.16.16.26:3001"]
-        CORS(app, 
-             resources={r"/*": {
-                 "origins": allowed_origins,
-                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-CSRF-TOKEN", "X-CSRFToken", "x-csrf-token", "Expires", "Cache-Control", "Pragma"],
-                 "supports_credentials": True,
-                 "expose_headers": ["Content-Type", "Authorization", "X-CSRF-TOKEN"]
-             }},
-             supports_credentials=True)
+        allowed_origins = [
+            "http://localhost:3001", 
+            "http://localhost:3002", 
+            "http://172.16.16.6:3001", 
+            "http://172.16.16.6:5004",
+            "http://172.16.16.6",
+            "http://172.16.16.26", 
+            "http://172.16.16.26:3001",
+            "http://172.16.16.26:5004"
+        ]
+        
+        # Create a basic CORS configuration first
+        cors = CORS(app, 
+                  resources={r"/*": {"origins": "*"}},  # Start with a permissive setting
+                  supports_credentials=True)
+        
+        # Then manually handle CORS for specific routes with after_request
+        @app.after_request
+        def handle_cors(response):
+            # Only modify headers for API requests to avoid conflicting with other middleware
+            if request.path.startswith('/api/'):
+                origin = request.headers.get('Origin')
+                if origin in allowed_origins:
+                    # Clear any existing CORS headers to avoid duplicates
+                    for header in list(response.headers.keys()):
+                        if header.startswith('Access-Control-'):
+                            del response.headers[header]
+                    
+                    # Set the proper CORS headers for the specific origin
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-TOKEN, X-CSRFToken, x-csrf-token, Expires, Cache-Control, Pragma'
+                    response.headers['Vary'] = 'Origin'
+            
+            return response
+        
         app.logger.info(f"Development CORS enabled for: {', '.join(allowed_origins)}")
     else:
         # Production CORS (restrictive)
         allowed_origins = [app.config.get('BASE_URL')] # Use BASE_URL from config
         if not allowed_origins[0]:
              raise ValueError("BASE_URL must be configured for production CORS.")
-        CORS(app,
-             resources={r"/api/*": { # Often only needed for /api/* routes
-                 "origins": allowed_origins,
-                 "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-                 "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-CSRF-TOKEN", "X-CSRFToken", "x-csrf-token", "Expires", "Cache-Control", "Pragma"],
-                 "supports_credentials": True,
-                 "expose_headers": ["Content-Type", "Authorization", "X-CSRF-TOKEN"]
-             }},
-             supports_credentials=True)
+        
+        # Create a basic CORS configuration first
+        cors = CORS(app, 
+                  resources={r"/api/*": {"origins": allowed_origins[0]}},
+                  supports_credentials=True)
+        
+        # Then manually handle CORS for specific routes with after_request
+        @app.after_request
+        def handle_cors(response):
+            # Only modify headers for API requests
+            if request.path.startswith('/api/'):
+                origin = request.headers.get('Origin')
+                if origin == allowed_origins[0]:
+                    # Clear any existing CORS headers to avoid duplicates
+                    for header in list(response.headers.keys()):
+                        if header.startswith('Access-Control-'):
+                            del response.headers[header]
+                    
+                    # Set the proper CORS headers for the specific origin
+                    response.headers['Access-Control-Allow-Origin'] = origin
+                    response.headers['Access-Control-Allow-Credentials'] = 'true'
+                    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+                    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, X-CSRF-TOKEN, X-CSRFToken, x-csrf-token, Expires, Cache-Control, Pragma'
+                    response.headers['Vary'] = 'Origin'
+            
+            return response
+        
         app.logger.info(f"Production CORS enabled for: {allowed_origins[0]}")
 
     from .auth_routes import auth as auth_blueprint

@@ -18,6 +18,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ObfuscatedRouter from './components/ObfuscatedRouter';
 import UnitCreatePage from './views/UnitCreatePage';
+import SentryTest from './components/debug/SentryTest';
 
 function NewViolationPage() {
   const navigate = useNavigate();
@@ -215,6 +216,11 @@ function App() {
             
             {/* Dashboard route again for direct access */}
             <Route path="/dashboard" element={<ProtectedRoute><Layout><Navigate to={dashboardPath} replace /></Layout></ProtectedRoute>} />
+            
+            {/* Sentry Test Route */}
+            <Route path="/debug/sentry-test" element={
+              <SentryTest />
+            } />
             
             {/* Fallback Route */}
             <Route path="*" element={<ProtectedRoute><div>404 Not Found</div></ProtectedRoute>} />

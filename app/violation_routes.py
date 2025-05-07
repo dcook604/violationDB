@@ -574,6 +574,7 @@ def get_evidence_file(violation_id, filename):
 # --- End New Route ---
 
 @violation_bp.route('/api/violations', methods=['GET'])
+@limiter.limit("200 per hour")  # Increased rate limit from default 50 per hour
 @jwt_required_api
 def api_list_violations():
     try:

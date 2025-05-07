@@ -534,3 +534,19 @@ Please enter a 10-digit telephone number (e.g., 6041234567).
 - Concierge
 
 Validation: All fields above are required for new users. Only the listed positions are accepted. 
+
+## Parameters & Configuration Reference
+
+_List all important parameters, configuration options, and their meanings._
+
+---
+
+## Usage Patterns & Examples
+
+_Provide concise usage examples and command references for common tasks._
+
+---
+
+## Cheatsheet
+
+_Add a cheatsheet for quick lookups of commands, options, or patterns._ 

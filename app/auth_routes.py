@@ -23,8 +23,10 @@ from flask_jwt_extended import (
     unset_jwt_cookies,
     verify_jwt_in_request
 )
-from .jwt_config import get_jwt_identity_claims
+from .jwt_config import get_jwt_identity_claims, get_token_expiration, JWT_REFRESH_TOKEN_EXPIRES, JWT_EXTENDED_REFRESH_TOKEN_EXPIRES
 from .jwt_auth import jwt_required_api
+from .sentry_utils import set_sentry_user, capture_exception, add_sentry_tag, with_sentry_transaction
+import sentry_sdk
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -894,6 +896,10 @@ def login_jwt():
         return make_response()
 
     try:
+        # Add Sentry tags directly instead of using the decorator
+        sentry_sdk.set_tag("transaction", "auth.login_jwt")
+        sentry_sdk.set_tag("operation", "auth")
+        
         # Debug output for CSRF tracking
         logger.info("=== login-jwt endpoint called ===")
         logger.info(f"CSRF protection: WTF_CSRF_ENABLED={current_app.config.get('WTF_CSRF_ENABLED', 'Not set')}")
@@ -920,6 +926,7 @@ def login_jwt():
 
         email = data.get('email', '').strip()
         password = data.get('password', '').strip()
+        remember = data.get('remember', False)
 
         if not email or not password:
             logger.warning(f"Login attempt failed: Email or password missing. Email: {bool(email)}, Password: {bool(password)}")
@@ -957,14 +964,19 @@ def login_jwt():
                 # Get identity and claims for the JWT
                 identity, additional_claims = get_jwt_identity_claims(user)
                 
-                # Create tokens
+                # Get token expiration times based on remember me setting
+                access_expires, refresh_expires = get_token_expiration(remember)
+                
+                # Create tokens with appropriate expiration
                 access_token = create_access_token(
                     identity=identity,
-                    additional_claims=additional_claims
+                    additional_claims=additional_claims,
+                    expires_delta=access_expires
                 )
                 refresh_token = create_refresh_token(
                     identity=identity,
-                    additional_claims=additional_claims
+                    additional_claims=additional_claims,
+                    expires_delta=refresh_expires
                 )
                 
                 # Update last login and reset failed attempts
@@ -978,10 +990,16 @@ def login_jwt():
                     'is_admin': user.is_admin
                 }
                 
+                # Set Sentry user context for tracking
+                set_sentry_user()
+                add_sentry_tag('auth_method', 'jwt')
+                add_sentry_tag('remember_me', str(remember))
+                
                 # Create a response object
                 response = make_response(jsonify({
                     'login': True,
-                    'user': user_data
+                    'user': user_data,
+                    'remember': remember
                 }))
                 
                 # Set JWT cookies
@@ -1026,6 +1044,12 @@ def login_jwt():
         logger.error(f"Login error: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
+        # Track the exception in Sentry with additional context
+        capture_exception(e, login_attempt={
+            'email': data.get('email') if data else None,
+            'user_agent': request.headers.get('User-Agent'),
+            'ip_address': request.remote_addr
+        })
         return jsonify({'error': 'Authentication error occurred'}), 500
 
 @auth.route('/api/auth/logout-jwt', methods=['POST', 'OPTIONS'])
@@ -1073,6 +1097,23 @@ def refresh_jwt():
         # Get claims from refresh token
         claims = get_jwt()
         
+        # Check if this was a "remember me" login originally
+        # We can tell by examining the refresh token's expiration
+        from .jwt_config import JWT_REFRESH_TOKEN_EXPIRES, JWT_EXTENDED_REFRESH_TOKEN_EXPIRES, get_token_expiration
+        
+        # Calculate remaining time in seconds on refresh token
+        exp_timestamp = claims.get('exp', 0)
+        current_timestamp = int(datetime.utcnow().timestamp())
+        remaining_seconds = exp_timestamp - current_timestamp
+        
+        # Determine if this was a "remember me" session by checking refresh token expiration
+        # If remaining time is greater than regular refresh expiration, it's a "remember me" session
+        regular_expiry_seconds = JWT_REFRESH_TOKEN_EXPIRES.total_seconds()
+        is_remembered = remaining_seconds > regular_expiry_seconds
+        
+        # Get appropriate expiration times
+        access_expires, _ = get_token_expiration(is_remembered)
+        
         # Create new access token
         access_token = create_access_token(
             identity=identity,
@@ -1080,11 +1121,12 @@ def refresh_jwt():
                 'role': claims.get('role'),
                 'is_admin': claims.get('is_admin'),
                 'email': claims.get('email')
-            }
+            },
+            expires_delta=access_expires
         )
         
         # Create response
-        response = make_response(jsonify({'refresh': True}))
+        response = make_response(jsonify({'refresh': True, 'remember': is_remembered}))
         
         # Set new access token
         set_access_cookies(response, access_token)
@@ -1116,8 +1158,15 @@ def status_jwt():
     if request.method == 'OPTIONS':
         return make_response()
     
+    # Add Sentry tags directly instead of using the decorator
+    sentry_sdk.set_tag("transaction", "auth.status_jwt")
+    sentry_sdk.set_tag("operation", "auth")
+    
     # Get user claims from JWT
     claims = get_jwt()
+    
+    # Set Sentry user context
+    set_sentry_user()
     
     # Create user data from claims
     user_data = {

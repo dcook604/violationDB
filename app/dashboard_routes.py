@@ -6,10 +6,12 @@ from . import db
 from datetime import datetime, timedelta
 from .jwt_auth import jwt_required_api
 from flask_jwt_extended import get_jwt, get_jwt_identity
+from . import limiter
 
 dashboard = Blueprint('dashboard', __name__)
 
 @dashboard.route('/api/stats', methods=['GET'])
+@limiter.limit("200 per hour")  # Increased rate limit from default 50 per hour
 @jwt_required_api
 def get_stats():
     try:

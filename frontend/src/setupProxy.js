@@ -5,7 +5,7 @@ module.exports = function(app) {
   app.use(
     '/api',
     createProxyMiddleware({
-      target: 'http://localhost:5004',
+      target: 'http://172.16.16.6:5004',
       changeOrigin: true,
       secure: false,
       pathRewrite: {
@@ -13,7 +13,7 @@ module.exports = function(app) {
       },
       // This is important for cookie handling
       cookieDomainRewrite: {
-        '*': 'localhost'  // Rewrite all cookie domains to localhost
+        '*': '172.16.16.6'  // Rewrite all cookie domains to backend IP
       },
       // Pass cookies from the frontend to the backend
       onProxyReq: (proxyReq) => {

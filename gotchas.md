@@ -283,4 +283,20 @@ The system has fallback mechanisms for PDF generation failures:
 
 ---
 
-*Update this file immediately when new issues, bugs, or edge cases are discovered.* 
+*Update this file immediately when new issues, bugs, or edge cases are discovered.*
+
+## Edge Cases & Caveats
+
+_List known edge cases, tricky behaviors, and non-obvious limitations._
+
+---
+
+## Workarounds & Solutions
+
+_Document workarounds for known issues and their context._
+
+---
+
+## Bugs & Issues Log
+
+_Log bugs, their root causes, and resolutions here for future reference._ 

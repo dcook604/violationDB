@@ -31,6 +31,13 @@ if [ -f .env ]; then
   source .env
   set +a
 fi
+
+# Set Sentry DSN for backend if not already set
+if [ -z "$SENTRY_DSN" ]; then
+  echo "Setting SENTRY_DSN for backend..."
+  export SENTRY_DSN="https://430e59de3774687749e13e2b1adab024@o4509251436150789.ingest.us.sentry.io/4509251457187840"
+fi
+
 echo "Installing/updating Python dependencies..."
 pip install -r requirements.txt
 echo "Python dependencies installed!"
@@ -52,9 +59,27 @@ else
   tail -n 20 flask.log
 fi
 
+# Create or update .env file for React with Sentry DSN
+echo "Setting up Sentry for frontend..."
+cd frontend
+
+# Check if .env exists, create if not
+if [ ! -f .env ]; then
+  echo "Creating new .env file for frontend..."
+  echo "REACT_APP_API_URL=http://172.16.16.6:5004" > .env
+fi
+
+# Add/update Sentry DSN if needed
+if ! grep -q "REACT_APP_SENTRY_DSN" .env; then
+  echo "Adding Sentry DSN to frontend .env..."
+  echo "REACT_APP_SENTRY_DSN=https://430e59de3774687749e13e2b1adab024@o4509251436150789.ingest.us.sentry.io/4509251457187840" >> .env
+else
+  echo "Updating existing Sentry DSN in frontend .env..."
+  sed -i 's|REACT_APP_SENTRY_DSN=.*|REACT_APP_SENTRY_DSN=https://430e59de3774687749e13e2b1adab024@o4509251436150789.ingest.us.sentry.io/4509251457187840|g' .env
+fi
+
 # Start frontend server
 echo "Starting frontend on port 3001..."
-cd frontend
 npm start > react.log 2>&1 &
 FRONTEND_PID=$!
 echo "Frontend started with PID: $FRONTEND_PID"
@@ -66,4 +91,5 @@ echo "Backend logs: flask.log"
 echo "Frontend logs: frontend/react.log"
 echo ""
 echo "To test backend, go to: http://localhost:5004/api/auth/session"
-echo "To test frontend, go to: http://localhost:3001" 
+echo "To test frontend, go to: http://localhost:3001"
+echo "To test Sentry integration, go to: http://localhost:3001/debug/sentry-test" 

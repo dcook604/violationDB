@@ -11,6 +11,9 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'development-key-change-me' # MUST be set via env var in production
     BASE_DIR = os.path.dirname(basedir)
     
+    # Sentry configuration
+    SENTRY_DSN = os.environ.get('SENTRY_DSN')
+    
     # Default Database configuration
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'mysql+pymysql://violation:n2hm13i@localhost:3309/violationdb'
@@ -61,6 +64,8 @@ class Config:
 
 class DevelopmentConfig(Config):
     DEBUG = True
+    SESSION_COOKIE_SECURE = False  # Override for HTTP development
+    REMEMBER_COOKIE_SECURE = False # Also override this if used
     # Development specific settings can go here if needed
     BASE_URL = os.environ.get('BASE_URL') or 'http://localhost:5004' # Or your dev IP
 

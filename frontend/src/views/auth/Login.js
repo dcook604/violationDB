@@ -7,6 +7,7 @@ import Input from "../../components/common/Input";
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -22,7 +23,7 @@ export default function Login() {
       return;
     }
     try {
-      await login({ email, password });
+      await login({ email, password }, rememberMe);
     } catch (err) {
       if (err.response?.data?.error) {
         setError(err.response.data.error);
@@ -68,7 +69,17 @@ export default function Login() {
                 />
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center">
-                    {/* Empty space for alignment, could add a "Remember me" checkbox here later */}
+                    <input
+                      id="remember-me"
+                      name="remember-me"
+                      type="checkbox"
+                      className="h-4 w-4 text-lightBlue-500 focus:ring-lightBlue-400 border-gray-300 rounded"
+                      checked={rememberMe}
+                      onChange={e => setRememberMe(e.target.checked)}
+                    />
+                    <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                      Remember me
+                    </label>
                   </div>
                   <div>
                     <Link

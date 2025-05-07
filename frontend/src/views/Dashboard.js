@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import API from "../api";
 import { Link } from "react-router-dom";
+import { fetchWithCache, invalidateCache } from "../utils/apiCache";
 
 // Components
 const StatCard = ({ title, value, icon, color, subtitle }) => (
@@ -127,39 +128,66 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!user) return; // Don't fetch if not authenticated
-      
-      setLoading(true);
-      setError(null);
-      
-      try {
-        const [statsResponse, violationsResponse] = await Promise.all([
-          API.get('/api/stats'),
-          API.get('/api/violations?limit=5')
-        ]);
-        
-        setStats(statsResponse.data);
-        
-        // Handle both old and new API response formats
-        if (violationsResponse.data.violations) {
-          setRecentViolations(violationsResponse.data.violations);
-        } else {
-          setRecentViolations(violationsResponse.data || []);
-        }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setError('Failed to load dashboard data. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Cache duration constants
+  const STATS_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  const VIOLATIONS_CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
+  // Function to fetch dashboard data with caching
+  const fetchDashboardData = async (forceFresh = false) => {
+    if (!user) return; // Don't fetch if not authenticated
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // If forcing fresh data, invalidate the cache
+      if (forceFresh) {
+        invalidateCache('/api/stats', { method: 'GET', credentials: 'include' });
+        invalidateCache('/api/violations?limit=5', { method: 'GET', credentials: 'include' });
+      }
+
+      // Fetch stats with caching
+      const statsData = await fetchWithCache(
+        '/api/stats',
+        { method: 'GET', credentials: 'include' },
+        STATS_CACHE_DURATION
+      );
+      
+      // Fetch violations with caching
+      const violationsData = await fetchWithCache(
+        '/api/violations?limit=5',
+        { method: 'GET', credentials: 'include' },
+        VIOLATIONS_CACHE_DURATION
+      );
+      
+      // Update stats
+      setStats(statsData);
+      
+      // Handle both old and new API response formats for violations
+      if (violationsData.violations) {
+        setRecentViolations(violationsData.violations);
+      } else {
+        setRecentViolations(violationsData || []);
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError('Failed to load dashboard data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial data fetch
+  useEffect(() => {
     if (!authLoading) {
       fetchDashboardData();
     }
   }, [user, authLoading]);
+
+  // Function to manually refresh the dashboard
+  const refreshDashboard = () => {
+    fetchDashboardData(true);
+  };
 
   if (authLoading || loading) {
     return (
@@ -177,6 +205,12 @@ export default function Dashboard() {
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error!</strong>
           <span className="block sm:inline"> {error}</span>
+          <button 
+            onClick={refreshDashboard}
+            className="mt-3 bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
@@ -186,6 +220,15 @@ export default function Dashboard() {
     <>
       <div className="relative md:pt-32 pb-32 pt-12">
         <div className="px-4 md:px-10 mx-auto w-full">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-semibold">Dashboard</h1>
+            <button 
+              onClick={refreshDashboard}
+              className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center"
+            >
+              <i className="fas fa-sync-alt mr-2"></i> Refresh
+            </button>
+          </div>
           <div>
             <div className="flex flex-wrap">
               <div className="w-full lg:w-6/12 xl:w-3/12 px-4">

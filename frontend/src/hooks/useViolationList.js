@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { fetchWithCache, invalidateCache } from '../utils/apiCache';
 
 export default function useViolationList() {
   const [violations, setViolations] = useState([]);
@@ -11,28 +12,51 @@ export default function useViolationList() {
   const [totalItems, setTotalItems] = useState(0);
   const [dateFilter, setDateFilter] = useState('');
 
-  useEffect(() => {
+  // Cache duration - 2 minutes
+  const CACHE_DURATION = 2 * 60 * 1000;
+
+  const fetchViolations = useCallback(async (forceFresh = false) => {
     setLoading(true);
+    setError(null);
+
     let url = `/api/violations?page=${page}&per_page=${perPage}`;
     if (dateFilter) {
       url += `&date_filter=${dateFilter}`;
     }
-    API.get(url)
-      .then(res => {
-        if (res.data.violations) {
-          setViolations(res.data.violations);
-          setTotalPages(res.data.pagination.pages);
-          setTotalItems(res.data.pagination.total);
-        } else {
-          setViolations(res.data || []);
-        }
-        setLoading(false);
-      })
-      .catch(() => {
-        setError('Failed to load violations');
-        setLoading(false);
-      });
+
+    try {
+      // If forceFresh is true, invalidate the cache first
+      if (forceFresh) {
+        invalidateCache(url, { method: 'GET', credentials: 'include' });
+      }
+
+      // Use fetchWithCache instead of API.get
+      const data = await fetchWithCache(
+        url, 
+        { method: 'GET', credentials: 'include' },
+        CACHE_DURATION
+      );
+
+      // Process the response data
+      if (data.violations) {
+        setViolations(data.violations);
+        setTotalPages(data.pagination.pages);
+        setTotalItems(data.pagination.total);
+      } else {
+        setViolations(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching violations:', err);
+      setError('Failed to load violations');
+    } finally {
+      setLoading(false);
+    }
   }, [page, perPage, dateFilter]);
+
+  // Initial fetch and when dependencies change
+  useEffect(() => {
+    fetchViolations();
+  }, [fetchViolations]);
 
   const handlePageChange = (newPage) => {
     if (newPage > 0 && newPage <= totalPages) {
@@ -51,6 +75,11 @@ export default function useViolationList() {
     setPage(1);
   };
 
+  // Add function to force refresh data
+  const refreshViolations = () => {
+    fetchViolations(true);
+  };
+
   return {
     violations,
     loading,
@@ -62,6 +91,7 @@ export default function useViolationList() {
     dateFilter,
     handlePageChange,
     handlePerPageChange,
-    handleDateFilterChange
+    handleDateFilterChange,
+    refreshViolations
   };
 } 
